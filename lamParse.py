@@ -42,7 +42,7 @@ def lamParse(lamrang, lam, *args):
     if fineion and (min_lam < lam and max_lam > lam):
         lamAxis = np.linspace(min_lam, max_lam, npts)
         L = next(i for i in range(len(lamAxis)) if lamAxis[i] >= lam - 2)
-        print(L)
+        #print(L)
         # L = find(lamAxis >= lam - 2, 1, 'first');
         rlamAxis = lamAxis[::-1]
         R = np.abs(next(i for i in range(len(lamAxis)) if rlamAxis[i] <= lam + 2) - len(lamAxis))
@@ -54,8 +54,7 @@ def lamParse(lamrang, lam, *args):
     else:
         lamAxis = np.linspace(min_lam, max_lam, npts)
 
-    print(lamAxis)
-    print(type(lamAxis))
+
     omgs = 2e7 * np.pi * c / lamAxis  # Scattered frequency axis(1 / sec)
     omgL = 2 * np.pi * 1e7 * c / lam  # laser frequency Rad / s
 
