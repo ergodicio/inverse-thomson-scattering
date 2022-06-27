@@ -9,10 +9,10 @@ def zprimeMaxw(xi):
     # xi is expected to be ascending
 
     if not 'rdWT' in globals():
-        #global rdWT
+        global rdWT
         rdWT= np.vstack(np.loadtxt('rdWT.txt'))
     if not 'idWT' in globals():
-        #global idWT
+        global idWT
         idWT = np.vstack(np.loadtxt('idWT.txt'))
     ai = xi <-10
     bi = xi > 10

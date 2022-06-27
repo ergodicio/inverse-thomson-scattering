@@ -37,7 +37,7 @@ def ratcen(f, g):
     tmp = (fav * gdif - gav * fdif)
     rf = fav / gav + tmp * gdif / (12. * gav**3)
 
-    rfn = fdif / gdif + tmp * log((gav + 0.5 + 0j * gdif) / (gav - 0.5 * gdif)) / gdif**2
+    rfn = fdif / gdif + tmp * log((gav + (0.5 + 0j) * gdif) / (gav - 0.5 * gdif)) / gdif**2
 
     out[:,iflat]  = rf[:, iflat]
     out[:, ~iflat] = rfn[:, ~iflat]

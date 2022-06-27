@@ -3,6 +3,7 @@
 
 import scipy.interpolate as sp
 import numpy as np
+import time
 import matplotlib.pyplot as plt
 from lamParse import *
 from zprimeMaxw import *
@@ -49,7 +50,7 @@ def nonMaxwThomson(Te,Ti,Z,A,fract,ne,Va,ud,lamrang,lam,sa,*fe):
     ud = ud * 1e6       #drift velocity in 1e6 cm/s
     npts=20460
 
-    [omgL,omgs,lamAxis,_]=lamParse(lamrang,lam,npts,False)
+    [omgL,omgs,lamAxis,_]=lamParse(lamrang,lam,npts,True)
 
     #calculate k and omega vectors
     omgpe= constants*np.sqrt(np.transpose(ne))  #plasma frequency Rad/cm
@@ -144,6 +145,7 @@ def nonMaxwThomson(Te,Ti,Z,A,fract,ne,Va,ud,lamrang,lam,sa,*fe):
     ratmod = np.array(np.exp(ratmod(xi1)),dtype=float)
     ratdf = np.gradient(ratmod,xi1[1] - xi1[0])
     ratdf[np.isnan(ratdf)] = 0
+
     #ratdf= ratdf[np.newaxis,...]
 
     #if np.shape(ratdf) == 1:
@@ -161,9 +163,10 @@ def nonMaxwThomson(Te,Ti,Z,A,fract,ne,Va,ud,lamrang,lam,sa,*fe):
     else:
         chiERrat = np.interpn(np.arange(0,2*np.pi,10**-1.2018), xi2, chiERratprim, beta, xie, 'spline')
     chiERrat = - 1. / (klde**2) * chiERrat
+    #plt.plot(chiERrat[0, :, 1])
 
     chiE = chiERrat + chiEI
-    print(chiEI)
+    #print(chiEI)
     #plt.plot(np.imag(chiEI[0, :, 1]))
     epsilon = 1 + (chiE) + (chiI)
     #plt.plot(np.real(epsilon[0,:,1]))
@@ -199,8 +202,15 @@ x=np.array(np.arange(-8,8,.1))
 distf=1/(2*np.pi)**(1/2) *np.exp(-x**2/2)
 sa=np.linspace(55, 65, 10)
 
-[formf,lams]=nonMaxwThomson(1,1,[1,2],[1,4],[.5, .5],.3e20,0,0,[400,700],526.5,sa,distf,x)
-print(formf[0,:,1])
-plt.plot(lams[0,:,0],formf[0,:,1])
+t0=time.time()
+#[formf,lams]=nonMaxwThomson(1,1,[1,2],[1,4],[.5, .5],.3e20,0,0,[400,700],526.5,sa,distf,x)
+[formf,lams]=nonMaxwThomson(1,1,1,1,1,.3e20,0,0,[400,700],526.5,sa,distf,x)
+t1=time.time()
+
+#print(formf[0,:,1])
+print(t1-t0)
+plt.plot(formf[0,:,0])
+plt.plot(formf[0,:,9])
+#plt.plot(lams[0,:,0],formf[0,:,1])
 plt.show()
 print('end')
