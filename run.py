@@ -15,17 +15,29 @@ if __name__ == "__main__":
     backend = "jax"
 
     if backend == "numpy":
-        [formf, lams] = np_ff.nonMaxwThomson(1, 1, 1, 1, 1, 0.3e20, 0, 0, [400, 700], 526.5, sa, distf, x)
+        formf, lams = np_ff.nonMaxwThomson(1, 1, 1, 1, 1, 0.3e20, 0, 0, [400, 700], 526.5, sa, distf, x)
+
+        t0 = time.time()
+        formf, lams = np_ff.nonMaxwThomson(1, 1, 1, 1, 1, 0.3e20, 0, 0, [400, 700], 526.5, sa, distf, x)
+        # [formf,lams]=nonMaxwThomson(1,1,[1,2],[1,4],[.5, .5],.3e20,0,0,[400,700],526.5,sa,distf,x)
+        t1 = time.time()
+        # print(formf[0,:,1])
+        print(t1 - t0)
+
     elif backend == "jax":
         ff_fn = jnp_ff.get_form_factor_fn([400, 700], 526.5)
-        [formf, lams] = ff_fn(1, 1, 1, 1, 1, 0.3e20, 0, 0, sa, (distf, x))
 
-    t0 = time.time()
-    [formf, lams] = np_ff.nonMaxwThomson(1, 1, 1, 1, 1, 0.3e20, 0, 0, [400, 700], 526.5, sa, distf, x)
-    # [formf,lams]=nonMaxwThomson(1,1,[1,2],[1,4],[.5, .5],.3e20,0,0,[400,700],526.5,sa,distf,x)
-    t1 = time.time()
-    # print(formf[0,:,1])
-    print(t1 - t0)
+        formf, lams = ff_fn(1, 1, 1, 1, 1, 0.3e20, 0, 0, sa, (distf, x))
+        # vg_ff = value_and_grad(ff_fn, argnums=0, has_aux=False)
+        # val_and_grad = vg_ff(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
+
+        t0 = time.time()
+        formf, lams = ff_fn(1, 1, 1, 1, 1, 0.3e20, 0, 0, sa, (distf, x))
+        # [formf,lams]=nonMaxwThomson(1,1,[1,2],[1,4],[.5, .5],.3e20,0,0,[400,700],526.5,sa,distf,x)
+        t1 = time.time()
+        # print(formf[0,:,1])
+        print(t1 - t0)
+
     plt.plot(formf[0, :, 0])
     plt.plot(formf[0, :, 9])
     # plt.plot(lams[0,:,0],formf[0,:,1])

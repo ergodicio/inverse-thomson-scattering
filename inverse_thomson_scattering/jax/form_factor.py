@@ -1,3 +1,7 @@
+from jax import config
+
+config.update("jax_enable_x64", True)
+
 from jax import numpy as jnp
 from jax import jit
 from inverse_thomson_scattering.jax import ratintn
@@ -151,7 +155,6 @@ def get_form_factor_fn(lamrang, lam):
         # ratdf[jnp.isnan(ratdf)] = 0
 
         chiERratprim = jnp.array([jnp.real(ratintn.ratintn(ratdf, xi1 - xi2[iw], xi1)) for iw in range(len(xi2))])
-
         # if len(fe) == 2:
         # not sure about the extrapolation here
         # chiERrat = sp.interp1d(xi2, chiERratprim, "cubic", bounds_error=False, fill_value=0)
@@ -177,14 +180,14 @@ def get_form_factor_fn(lamrang, lam):
             (jnp.abs(chiE[..., jnp.newaxis])) ** 2.0 * jnp.exp(-(xii**2)) / jnp.sqrt(2 * jnp.pi)
         )
         ele_comp = (jnp.abs(1.0 + chiI)) ** 2.0 * fe_vphi / vTe
-        ele_compE = fe_vphi / vTe
+        # ele_compE = fe_vphi / vTe
 
         SKW_ion_omg = (
             2.0
             * jnp.pi
             * 1.0
             / klde[..., jnp.newaxis]
-            * (ion_comp)
+            * ion_comp
             / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
             * 1.0
             / omgpe
@@ -194,15 +197,18 @@ def get_form_factor_fn(lamrang, lam):
         # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe
 
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
+
         # PsOmgE = (SKW_ele_omgE) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
         lams = 2 * jnp.pi * C / omgs
         lams = lams[jnp.newaxis, ..., jnp.newaxis]
         PsLam = PsOmg * 2 * jnp.pi * C / lams**2
         # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2
-
         formfactor = PsLam
         # formfactorE = PsLamE
-
         return formfactor, lams
+
+    def cost_fn(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe):
+        formf, _ = nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe)
+        return jnp.sum(formf)
 
     return nonMaxwThomson
