@@ -3,7 +3,7 @@ from jax import config
 config.update("jax_enable_x64", True)
 
 from jax import numpy as jnp
-from jax import jit
+from jax import jit, value_and_grad
 from inverse_thomson_scattering.jax import ratintn
 from inverse_thomson_scattering.v0 import lamParse
 from inverse_thomson_scattering.v0.form_factor import zprimeMaxw
@@ -211,4 +211,4 @@ def get_form_factor_fn(lamrang, lam):
         formf, _ = nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe)
         return jnp.sum(formf)
 
-    return nonMaxwThomson
+    return nonMaxwThomson, value_and_grad(cost_fn)

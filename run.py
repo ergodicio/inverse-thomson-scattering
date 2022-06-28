@@ -14,29 +14,33 @@ if __name__ == "__main__":
     sa = np.linspace(55, 65, 10)
     backend = "jax"
 
-    if backend == "numpy":
-        formf, lams = np_ff.nonMaxwThomson(1, 1, 1, 1, 1, 0.3e20, 0, 0, [400, 700], 526.5, sa, distf, x)
+    # if backend == "numpy":
+    t0 = time.time()
+    formf, lams = np_ff.nonMaxwThomson(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, [400, 700], 526.5, sa, distf, x)
+    t1 = time.time()
+    print(f"numpy/scipy form factor calculation {np.round(t1 - t0, 4)} s")
 
-        t0 = time.time()
-        formf, lams = np_ff.nonMaxwThomson(1, 1, 1, 1, 1, 0.3e20, 0, 0, [400, 700], 526.5, sa, distf, x)
-        # [formf,lams]=nonMaxwThomson(1,1,[1,2],[1,4],[.5, .5],.3e20,0,0,[400,700],526.5,sa,distf,x)
-        t1 = time.time()
-        # print(formf[0,:,1])
-        print(t1 - t0)
+    # elif backend == "jax":
+    # get the functions
+    ff_fn, vg_ff_fn = jnp_ff.get_form_factor_fn([400, 700], 526.5)
 
-    elif backend == "jax":
-        ff_fn = jnp_ff.get_form_factor_fn([400, 700], 526.5)
+    # run them once so they're compiled
+    formf, lams = ff_fn(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
+    val, grad = vg_ff_fn(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
 
-        formf, lams = ff_fn(1, 1, 1, 1, 1, 0.3e20, 0, 0, sa, (distf, x))
-        # vg_ff = value_and_grad(ff_fn, argnums=0, has_aux=False)
-        # val_and_grad = vg_ff(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
+    # then run them again to benchmark them
+    # TODO: find a better way to measure this
+    t0 = time.time()
+    formf, lams = ff_fn(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
+    t1 = time.time()
+    print(f"jax form factor calculation took {np.round(t1 - t0, 4)} s")
 
-        t0 = time.time()
-        formf, lams = ff_fn(1, 1, 1, 1, 1, 0.3e20, 0, 0, sa, (distf, x))
-        # [formf,lams]=nonMaxwThomson(1,1,[1,2],[1,4],[.5, .5],.3e20,0,0,[400,700],526.5,sa,distf,x)
-        t1 = time.time()
-        # print(formf[0,:,1])
-        print(t1 - t0)
+    t0 = time.time()
+    val, grad = vg_ff_fn(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
+    t1 = time.time()
+    print(f"value and gradient took {np.round(t1 - t0, 4)} s")
+
+    print(f"gradient was {grad}")
 
     plt.plot(formf[0, :, 0])
     plt.plot(formf[0, :, 9])
