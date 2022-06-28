@@ -3,7 +3,7 @@ from jax import config
 config.update("jax_enable_x64", True)
 
 from jax import numpy as jnp
-from jax import jit, value_and_grad
+from jax import jit, value_and_grad, vmap
 from inverse_thomson_scattering.jax import ratintn
 from inverse_thomson_scattering.v0 import lamParse
 from inverse_thomson_scattering.v0.form_factor import zprimeMaxw
@@ -24,9 +24,6 @@ def get_form_factor_fn(lamrang, lam):
     xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
     xi2 = jnp.array(jnp.arange(-minmax, minmax, h))
     Zpi = jnp.array(zprimeMaxw(xi2))
-
-    # def vmap_interp(xie, chiERratprim):
-    #     return jnp.interp(xie, xi2, chiERratprim)
 
     # @jit
     def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe):
@@ -101,9 +98,7 @@ def get_form_factor_fn(lamrang, lam):
         num_ion_pts = jnp.shape(xii)
         chiI = jnp.zeros(num_ion_pts)
 
-        # ZpiR = sp.interp1d(xi2, Zpi[0, :], "cubic", bounds_error=False, fill_value=0)
         ZpiR = jnp.interp(xii, xi2, Zpi[0, :])  # , "cubic", bounds_error=False, fill_value=0)
-        # ZpiI = sp.interp1d(xi2, Zpi[1, :], "cubic", bounds_error=False, fill_value=0)
         ZpiI = jnp.interp(xii, xi2, Zpi[1, :])  # , "cubic", bounds_error=False, fill_value=0)
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
 
@@ -116,9 +111,6 @@ def get_form_factor_fn(lamrang, lam):
         # if len(fe) == 2:
         [DF, x] = fe
         fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(DF)))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
-        # fe_vphi = jnp.exp(fe_vphi(xie))
-        #    jnp.exp(sp.interp1d(x, jnp.log(DF), xie, interpAlg, -jnp.inf))
-        # fe_vphi[jnp.isnan(fe_vphi)] = 0.0
 
         # elif len(fe) == 3:
         #     [DF, x, thetaphi] = fe
@@ -148,30 +140,23 @@ def get_form_factor_fn(lamrang, lam):
 
         chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
-        # ratmod = sp.interp1d(x, jnp.log(DF), interpAlg, bounds_error=False, fill_value=-jnp.inf)
         ratmod = jnp.exp(jnp.interp(xi1, x, jnp.log(DF)))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
-        # ratmod = jnp.array(jnp.exp(ratmod(xi1)), dtype=float)
         ratdf = jnp.gradient(ratmod, xi1[1] - xi1[0])
-        # ratdf[jnp.isnan(ratdf)] = 0
 
-        chiERratprim = jnp.array([jnp.real(ratintn.ratintn(ratdf, xi1 - xi2[iw], xi1)) for iw in range(len(xi2))])
+        def this_ratintn(this_dx):
+            return jnp.real(ratintn.ratintn(ratdf, this_dx, xi1))
+
+        chiERratprim = vmap(this_ratintn)(xi1[None, :] - xi2[:, None])
+        # chiERratprim = jnp.array([jnp.real(ratintn.ratintn(ratdf, xi1 - xi2[iw], xi1)) for iw in range(len(xi2))])
         # if len(fe) == 2:
         # not sure about the extrapolation here
-        # chiERrat = sp.interp1d(xi2, chiERratprim, "cubic", bounds_error=False, fill_value=0)
-        # chiERrat = jnp.squeeze(chiERrat(xie), 0)
-        chiERrat = jnp.transpose(
-            jnp.concatenate([jnp.interp(xie[0, :, i], xi2, chiERratprim[:, 0])[None, :] for i in range(xie.shape[2])])
-        )
+        chiERrat = jnp.reshape(jnp.interp(xie.flatten(), xi2, chiERratprim[:, 0]), xie.shape)
         # else:
         #     chiERrat = jnp.interpn(jnp.arange(0, 2 * jnp.pi, 10**-1.2018), xi2, chiERratprim, beta, xie, "spline")
         chiERrat = -1.0 / (klde**2) * chiERrat
-        # plt.plot(chiERrat[0, :, 1])
 
         chiE = chiERrat + chiEI
-        # print(chiEI)
-        # plt.plot(jnp.imag(chiEI[0, :, 1]))
         epsilon = 1.0 + chiE + chiI
-        # plt.plot(jnp.real(epsilon[0,:,1]))
 
         # This line needs to be changed if ion distribution is changed!!!
         # ion_comp = Z. * sqrt(Te / Ti. * A * 1836) * (abs(chiE)). ^ 2. * exp(-(xii. ^ 2)) / sqrt(2 * pi);
@@ -211,4 +196,4 @@ def get_form_factor_fn(lamrang, lam):
         formf, _ = nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe)
         return jnp.sum(formf)
 
-    return nonMaxwThomson, value_and_grad(cost_fn)
+    return jit(nonMaxwThomson), jit(value_and_grad(cost_fn))
