@@ -10,8 +10,8 @@ def zprimeMaxw(xi):
     # approximation(see Eqn. 5.2.10) is used.
     # xi is expected to be ascending
 
-    rdWT = np.vstack(np.loadtxt("aux/rdWT.txt"))
-    idWT = np.vstack(np.loadtxt("aux/idWT.txt"))
+    rdWT = np.vstack(np.loadtxt("files/rdWT.txt"))
+    idWT = np.vstack(np.loadtxt("files/idWT.txt"))
 
     ai = xi < -10
     bi = xi > 10

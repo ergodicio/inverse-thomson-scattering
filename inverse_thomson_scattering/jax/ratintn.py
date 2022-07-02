@@ -1,6 +1,7 @@
 from jax import numpy as jnp
 from jax import jit
 
+
 @jit
 def ratintn(f, g, z):
 
@@ -30,17 +31,10 @@ def ratcen(f, g):
     fav = 0.5 * (f[:, 1:-1] + f[:, 0:-2])
     gav = 0.5 * (g[1:-1] + g[0:-2])
 
-    # out = 0.0 * fdif
-
-    # iflat = jnp.abs(gdif) < 1.0e-4 * jnp.abs(gav)
-
     tmp = fav * gdif - gav * fdif
     rf = fav / gav + tmp * gdif / (12.0 * gav**3)
 
     rfn = fdif / gdif + tmp * jnp.log((gav + (0.5 + 0j) * gdif) / (gav - 0.5 * gdif)) / gdif**2
 
     out = jnp.where((jnp.abs(gdif) < 1.0e-4 * jnp.abs(gav))[None, :], rf, rfn)
-    # out[:, iflat] = rf[:, iflat]
-    # out[:, ~iflat] = rfn[:, ~iflat]
-
     return out

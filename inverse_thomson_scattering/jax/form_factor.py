@@ -147,7 +147,6 @@ def get_form_factor_fn(lamrang, lam):
             return jnp.real(ratintn.ratintn(ratdf, this_dx, xi1))
 
         chiERratprim = vmap(this_ratintn)(xi1[None, :] - xi2[:, None])
-        # chiERratprim = jnp.array([jnp.real(ratintn.ratintn(ratdf, xi1 - xi2[iw], xi1)) for iw in range(len(xi2))])
         # if len(fe) == 2:
         # not sure about the extrapolation here
         chiERrat = jnp.reshape(jnp.interp(xie.flatten(), xi2, chiERratprim[:, 0]), xie.shape)
