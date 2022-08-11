@@ -3,3 +3,5 @@ jaxlib
 numpy
 scipy
 matplotlib
+pyhdf
+xlrd
