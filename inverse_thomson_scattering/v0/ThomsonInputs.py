@@ -124,7 +124,7 @@ class ThomsonInputs:
             self.ne['Active']=args[2]
             self.ne['Value']=args[3]
             
-            self.m['Active']=args[7]
+            self.m['Active']=args[6]
             self.m['Value']=args[7]
 
             self.fe['Active']=0

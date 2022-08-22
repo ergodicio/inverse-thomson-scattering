@@ -70,6 +70,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     PhysParams = dict([])
     D['extraoptions']=extraoptions
     D['expandedions']=False
+    D['extraoptions']['fitspecs']=[0,1,1]
 
     norm2B = 0 # 0 no normalization
                 # 1 norm to blue
@@ -285,10 +286,31 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
 
     ## Plot initial guess
     plotState(x0,TSinputs,xie,sa,D,data)
+    chiinit=chiSq2(x0,TSinputs,xie,sa,D,data)
+    print(chiinit)
 
+    ## Perform fit
+    if np.shape(x0)[0]!=0:
+        fun = lambda x: chiSq2(x,TSinputs,xie,sa,D,data)
+        res = spopt.minimize(fun, x0, bounds=zip(lb,ub))
+        #print(res)
+        #[x,~,~,~,~,grad,hess]=fmincon(@(x)chiSq2(x,TSinputs,xie,sa,D,data),x0,[],[],[],[],lb,ub,[],options)
+    
+        #chisq=@(x)chiSq2(x,TSinputs,xie,sa,D,data);
+    else:
+        x=x0
 
+    ## Plot Result
+    plotState(res.x,TSinputs,xie,sa,D,data)
+    chifin=chiSq2(res.x,TSinputs,xie,sa,D,data)
+    print(chifin)
 
-## Perform fit
+    result=TSinputs
+    result.setTo(res.x)
+    result.disp()
+    
+    return result
+    
 
 def plotState(x,TSinputs,xie,sas,D,data):
     #all ion terms are commented out for testing
@@ -327,7 +349,6 @@ def plotState(x,TSinputs,xie,sas,D,data):
     #n=floor(length(ThryI)/length(data));
     #ThryI=arrayfun(@(i) mean(ThryI(i:i+n-1)),1:n:length(ThryI)-n+1);
 
-    ##### End of edits 8-19
     if D['PhysParams']['norm']==0:
         lamAxisE = np.average(lamAxisE.reshape(1024, -1), axis=1)
         #lamAxisE=arrayfun(@(i) mean(lamAxisE(i:i+n-1)),1:n:length(lamAxisE)-n+1);
@@ -379,11 +400,11 @@ def plotState(x,TSinputs,xie,sas,D,data):
 
         if D['extraoptions']['fitspecs'][1]:
             #chisq=chisq+sum((data(1,lamAxisE<lam)-ThryE(lamAxisE<lam)).^2);
-            chisq=chisq+sum((data[0,(lamAxisE>410) and (lamAxisE<510)]-ThryE[(lamAxisE>410) and (lamAxisE<510)])**2)
+            chisq=chisq+sum((data[0,(lamAxisE>410) & (lamAxisE<510)]-ThryE[(lamAxisE>410) & (lamAxisE<510)])**2)
 
         if D['extraoptions']['fitspecs'][2]:
             #chisq=chisq+sum((data(1,lamAxisE>lam)-ThryE(lamAxisE>lam)).^2);
-            chisq=chisq+sum((data[0,(lamAxisE>540) and (lamAxisE<680)]-ThryE[(lamAxisE>540) and (lamAxisE<680)])**2)
+            chisq=chisq+sum((data[0,(lamAxisE>540) & (lamAxisE<680)]-ThryE[(lamAxisE>540) & (lamAxisE<680)])**2)
 
 
 def fitModel2(TSins,xie,sa,x,D):
@@ -431,3 +452,69 @@ def fitModel2(TSins,xie,sa,x,D):
 
             modlE[lamleft:lamright]=modlE[lamleft:lamright]*10**(-D['iawfilter'][1])
     return modlE, lamAxisE
+
+def chiSq2(x,TSinputs,xie,sas,D,data):
+    
+    #all ion terms are commented out for testing
+    [modlE,lamAxisE]=fitModel2(TSinputs,xie,sas,x,D)
+
+    [_,_,lam,_]=TSinputs.genTS(x,xie)
+    [amp1,amp2,_]=TSinputs.genRest(x)
+    #[_,_,lamAxisE,_]=lamParse(D['lamrangE'],lam,D['npts'])
+    #[omgL,omgsI,lamAxisI,_]=lamParse(D['lamrangI'],lam,D['npts'])
+    
+    #this needs to be updated
+    #modlI=fitModel(Te,Ti,Z,D.A,D.fract,ne,Va,ud,omgsI,omgL,D.sa,curDist,D.distTable,0,{0},D.lamrangI,lam,lamAxisI);
+    
+    originE=(max(lamAxisE)+min(lamAxisE))/2 #Conceptual_origin so the convolution donsn't shift the signal
+    #originI=(max(lamAxisI)+min(lamAxisI))/2 #Conceptual_origin so the convolution donsn't shift the signal
+        
+    stddev = D['PhysParams']['widIRF']
+    
+    inst_funcE = np.squeeze((1/(stddev[0]*np.sqrt(2*np.pi)))*np.exp(-(lamAxisE-originE)**2/(2*(stddev[0])**2))) #Gaussian
+    #inst_funcI = (1/(stddev[1]*np.sqrt(2*np.pi)))*np.exp(-(lamAxisI-originI)**2/(2*(stddev[1])**2)) #Gaussian
+    
+    ThryE = np.convolve(modlE, inst_funcE,'same')
+    ThryE=(max(modlE)/max(ThryE))*ThryE
+    #ThryI = np.convolve(modlI, inst_funcI,'same')
+    #ThryI=(max(modlI)/max(ThryI))*ThryI
+
+    if D['PhysParams']['norm']>0:
+        ThryE[lamAxisE<lam] = amp1*(ThryE[lamAxisE<lam]/max(ThryE[lamAxisE<lam]))
+        ThryE[lamAxisE>lam] = amp2*(ThryE[lamAxisE>lam]/max(ThryE[lamAxisE>lam]))
+
+    #n=np.floor(len(ThryE)/len(data))
+    #ThryE = np.average(ThryE.reshape(-1, n), axis=1)
+    ThryE = np.average(ThryE.reshape(1024, -1), axis=1)
+    #ThryE= [np.mean(ThryE[i:i+n-1]) for i in np.arange(0,len(ThryE),n)]
+    #arrayfun(@(i) mean(ThryE(i:i+n-1)),1:n:length(ThryE)-n+1);
+    #n=floor(length(ThryI)/length(data));
+    #ThryI=arrayfun(@(i) mean(ThryI(i:i+n-1)),1:n:length(ThryI)-n+1);
+
+    if D['PhysParams']['norm']==0:
+        lamAxisE = np.average(lamAxisE.reshape(1024, -1), axis=1)
+        #lamAxisE=arrayfun(@(i) mean(lamAxisE(i:i+n-1)),1:n:length(lamAxisE)-n+1);
+        ThryE = D['PhysParams']['amps'][0]*ThryE/max(ThryE)
+        #lamAxisI=arrayfun(@(i) mean(lamAxisI(i:i+n-1)),1:n:length(lamAxisI)-n+1);
+        #ThryI = amp3*D.PhysParams{3}(2)*ThryI/max(ThryI);
+        ThryE[lamAxisE<lam] = amp1*(ThryE[lamAxisE<lam])
+        ThryE[lamAxisE>lam] = amp2*(ThryE[lamAxisE>lam])
+    
+
+    chisq=float("nan")
+    redchi=float("nan")
+
+    if 'fitspecs' in D['extraoptions'].keys():
+        chisq=0
+             #if D.extraoptions.fitspecs(1)
+             #    chisq=chisq+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+
+        if D['extraoptions']['fitspecs'][1]:
+            #chisq=chisq+sum((data(1,lamAxisE<lam)-ThryE(lamAxisE<lam)).^2);
+            chisq=chisq+sum((data[0,(lamAxisE>410) & (lamAxisE<510)]-ThryE[(lamAxisE>410) & (lamAxisE<510)])**2)
+
+        if D['extraoptions']['fitspecs'][2]:
+            #chisq=chisq+sum((data(1,lamAxisE>lam)-ThryE(lamAxisE>lam)).^2);
+            chisq=chisq+sum((data[0,(lamAxisE>540) & (lamAxisE<680)]-ThryE[(lamAxisE>540) & (lamAxisE<680)])**2)
+
+    return chisq
