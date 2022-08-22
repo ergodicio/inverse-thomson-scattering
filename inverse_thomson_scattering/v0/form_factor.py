@@ -27,7 +27,7 @@ def zprimeMaxw(xi):
     return Zp
 
 
-def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, lamrang, lam, sa, *fe):
+def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, lamrang, lam, sa, *fe, expion=False):
     """
     NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma
      conditions and scattering angles. The spectral density function is calculated with and without the ion contribution
@@ -63,9 +63,9 @@ def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, lamrang, lam, sa, *fe):
 
     Va = Va * 1e6  # flow velocity in 1e6 cm/s
     ud = ud * 1e6  # drift velocity in 1e6 cm/s
-    npts = 20460
+    npts = 20480 #20460
 
-    [omgL, omgs, lamAxis, _] = lamParse.lamParse(lamrang, lam, npts, True)
+    [omgL, omgs, lamAxis, _] = lamParse.lamParse(lamrang, lam, npts, expion)
 
     # calculate k and omega vectors
     omgpe = constants * np.sqrt(np.transpose(ne))  # plasma frequency Rad/cm

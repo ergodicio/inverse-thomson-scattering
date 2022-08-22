@@ -105,4 +105,6 @@ def getCalibrations(shotNum,tstype,CCDsize):
         axisxE = np.vstack(np.loadtxt("files/angsFRED.txt"))
         axisxI = np.arange(1,CCDsize[1]+1)
         
-    return axisxE, axisxI, axisyE, axisyI, magE, IAWtime
+    stddev=[stddevE, stddevI]
+        
+    return axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev

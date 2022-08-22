@@ -1,0 +1,8 @@
+jax
+jaxlib
+numpy
+scipy
+matplotlib
+pyhdf
+xlrd
+argparse

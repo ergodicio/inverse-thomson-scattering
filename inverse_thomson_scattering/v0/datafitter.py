@@ -7,6 +7,8 @@ from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.v0.loadTSdata import loadData
 from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
 from inverse_thomson_scattering.v0.getCalibrations import getCalibrations
+from inverse_thomson_scattering.v0.plotters import LinePlots
+from inverse_thomson_scattering.v0.form_factor import nonMaxwThomson
 
 
 def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, extraoptions):
@@ -28,11 +30,16 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     #       Better way to hadnle shots with multiple types of data
     #       Way to handle calibrations which change from one to shot day to the next and have to be recalculated frequently (adding a new function to attempt this 8/8/22)
     #       Potentially move the default values, especially the calibration into the input file
+    #       A way to handle the expanded ion calculation when colapsing the spectrum to pixel resolution
+    #       A way to handle different numbers of points 
     
     # Depreciated functions that need to be restored:
     #    Streaked EPW warp correction
     #    Time axis alignment with fiducials
     #    persistents
+    #    persistends in numDistFunc
+    #    interactive confirmation of new table creation
+    #    ability to generate different table names without the default values
 
     ## Persistents
     # used to prevent reloading and one time analysis (not sure if there is a way to do this in python, omitted for now)
@@ -61,7 +68,8 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     D['NumBinInRng'] = 0
     D['TotalNumBin'] = 1023
     PhysParams = dict([])
-    D['PhysParams'] = PhysParams
+    D['extraoptions']=extraoptions
+    D['expandedions']=False
 
     norm2B = 0 # 0 no normalization
                 # 1 norm to blue
@@ -70,7 +78,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
 
     feDecreaseStrict = 1 # forces the result to have a decreasing distribution function(no bumps)
 
-    #TSinputs.fe.Length = 3999
+    TSinputs.fe['Length'] = 3999
     CCDsize = [1024, 1024] # dimensions of the CCD chip as read
     shift_zero = 0
 
@@ -112,7 +120,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     cmap = mpl.colors.ListedColormap(cmap, name='myColorMap', N=cmap.shape[0])
 
     #Retrieve calibrated axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime] = getCalibrations(shotNum, tstype, CCDsize)
+    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(shotNum, tstype, CCDsize)
 
     ## Data loading and corrections
     # Open data stored from the previous run (inactivated for now)
@@ -146,7 +154,6 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
         ionData_bsub = ionData;
     
     ## Assign lineout locations
-    
     if lineoutloc['type'] == 'ps':
         LineoutPixelE = np.argmin(abs(axisxE - lineoutloc['val'] - shift_zero))
         LineoutPixelI = LineoutPixelE
@@ -255,38 +262,172 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     LineoutTSI_norm = LineoutTSI_smooth/gain
     LineoutTSI_norm = LineoutTSI_norm-noiseI #new 6-29-20
     ampI=np.max(LineoutTSI_norm)
-    PhysParams = {'widIRF': [stddevE, stddevI], 'background': [0, 0], 'amps': [ampE, ampI], 'norm': norm2B} #{width of IRF,background , amplitude ,Normalization of peaks} new 6-29-20
+    PhysParams = {'widIRF': stddev, 'background': [0, 0], 'amps': [ampE, ampI], 'norm': norm2B} #{width of IRF,background , amplitude ,Normalization of peaks} new 6-29-20
+
 
      ## Setup x0
-        #if isempty(TSinputs.fe.Value):
-         #   TSinputs=TSinputs.initFe(xie)
-#[TSinputs,x0,lb,ub]=genX(TSinputs);
+    D['lamrangE']=[axisyE[0], axisyE[-2]]
+    D['lamrangI']=[axisyI[0], axisyI[-2]]
+    D['iawoff']=0
+    D['iawfilter']=[1,4,24,528]
+    D['npts']=(len(LineoutTSE_norm)-1)*20
+    D['PhysParams'] = PhysParams
+    data = np.vstack((LineoutTSE_norm,LineoutTSI_norm))
+
+
+    xie=np.linspace(-7,7,TSinputs.fe['Length'])
+    
+    if 'Value' in TSinputs.fe.keys():
+        TSinputs.initFe(xie)
+
+    [x0,lb,ub]=TSinputs.genX()
+    #print(x0)
 
     ## Plot initial guess
+    plotState(x0,TSinputs,xie,sa,D,data)
 
-#Thryinit=ArtemisModel(TSinputs,xie,scaterangs,x0,weightMatrix,...
-#    spectralFWHM,angularFWHM,lamAxis,xax,D,norm2B);
-#if ~norm2B
-#    Thryinit=Thryinit./max(Thryinit(470:900,:));
-#    Thryinit=Thryinit.*max(data(470:900,:));
-#    Thryinit=TSinputs.amp1.Value*Thryinit;
-#end
-#chisq = sum(sum((data([40:330 470:900],90:1015)-Thryinit([40:330 470:900],90:1015)).^2));
-#Thryinit(330:470,:)=0;
-#
-#ColorPlots(yax,xax,rot90(Thryinit),'Kaxis',[TSinputs.ne.Value*1E20,TSinputs.Te.Value,526.5],...
-#    'Title','Starting point','Name','Initial Spectrum');
-#ColorPlots(yax,xax,rot90(data-Thryinit),'Title',...
-#    ['Initial difference: \chi^2 =' num2str(chisq)],'Name','Initial Difference');
-#load('diffcmap.mat','diffcmap');
-#colormap(diffcmap);
-
-#if norm2B
-#    caxis([-1 1]);
-#else
-#    caxis([-8000 8000]);
-#end
 
 
 ## Perform fit
 
+def plotState(x,TSinputs,xie,sas,D,data):
+    #all ion terms are commented out for testing
+    [modlE,lamAxisE]=fitModel2(TSinputs,xie,sas,x,D)
+
+    [_,_,lam,_]=TSinputs.genTS(x,xie)
+    [amp1,amp2,_]=TSinputs.genRest(x)
+    #[_,_,lamAxisE,_]=lamParse(D['lamrangE'],lam,D['npts'])
+    #[omgL,omgsI,lamAxisI,_]=lamParse(D['lamrangI'],lam,D['npts'])
+    
+    #this needs to be updated
+    #modlI=fitModel(Te,Ti,Z,D.A,D.fract,ne,Va,ud,omgsI,omgL,D.sa,curDist,D.distTable,0,{0},D.lamrangI,lam,lamAxisI);
+    
+    originE=(max(lamAxisE)+min(lamAxisE))/2 #Conceptual_origin so the convolution donsn't shift the signal
+    #originI=(max(lamAxisI)+min(lamAxisI))/2 #Conceptual_origin so the convolution donsn't shift the signal
+        
+    stddev = D['PhysParams']['widIRF']
+    
+    inst_funcE = np.squeeze((1/(stddev[0]*np.sqrt(2*np.pi)))*np.exp(-(lamAxisE-originE)**2/(2*(stddev[0])**2))) #Gaussian
+    #inst_funcI = (1/(stddev[1]*np.sqrt(2*np.pi)))*np.exp(-(lamAxisI-originI)**2/(2*(stddev[1])**2)) #Gaussian
+    
+    ThryE = np.convolve(modlE, inst_funcE,'same')
+    ThryE=(max(modlE)/max(ThryE))*ThryE
+    #ThryI = np.convolve(modlI, inst_funcI,'same')
+    #ThryI=(max(modlI)/max(ThryI))*ThryI
+
+    if D['PhysParams']['norm']>0:
+        ThryE[lamAxisE<lam] = amp1*(ThryE[lamAxisE<lam]/max(ThryE[lamAxisE<lam]))
+        ThryE[lamAxisE>lam] = amp2*(ThryE[lamAxisE>lam]/max(ThryE[lamAxisE>lam]))
+
+    #n=np.floor(len(ThryE)/len(data))
+    #ThryE = np.average(ThryE.reshape(-1, n), axis=1)
+    ThryE = np.average(ThryE.reshape(1024, -1), axis=1)
+    #ThryE= [np.mean(ThryE[i:i+n-1]) for i in np.arange(0,len(ThryE),n)]
+    #arrayfun(@(i) mean(ThryE(i:i+n-1)),1:n:length(ThryE)-n+1);
+    #n=floor(length(ThryI)/length(data));
+    #ThryI=arrayfun(@(i) mean(ThryI(i:i+n-1)),1:n:length(ThryI)-n+1);
+
+    ##### End of edits 8-19
+    if D['PhysParams']['norm']==0:
+        lamAxisE = np.average(lamAxisE.reshape(1024, -1), axis=1)
+        #lamAxisE=arrayfun(@(i) mean(lamAxisE(i:i+n-1)),1:n:length(lamAxisE)-n+1);
+        ThryE = D['PhysParams']['amps'][0]*ThryE/max(ThryE)
+        #lamAxisI=arrayfun(@(i) mean(lamAxisI(i:i+n-1)),1:n:length(lamAxisI)-n+1);
+        #ThryI = amp3*D.PhysParams{3}(2)*ThryI/max(ThryI);
+        ThryE[lamAxisE<lam] = amp1*(ThryE[lamAxisE<lam])
+        ThryE[lamAxisE>lam] = amp2*(ThryE[lamAxisE>lam])
+    
+    if D['extraoptions']['spectype']==1:
+        print('colorplot still needs to be written')
+        #Write Colorplot
+        #Thryinit=ArtemisModel(TSinputs,xie,scaterangs,x0,weightMatrix,...
+    #    spectralFWHM,angularFWHM,lamAxis,xax,D,norm2B);
+    #if ~norm2B
+    #    Thryinit=Thryinit./max(Thryinit(470:900,:));
+    #    Thryinit=Thryinit.*max(data(470:900,:));
+    #    Thryinit=TSinputs.amp1.Value*Thryinit;
+    #end
+    #chisq = sum(sum((data([40:330 470:900],90:1015)-Thryinit([40:330 470:900],90:1015)).^2));
+    #Thryinit(330:470,:)=0;
+    #
+    #ColorPlots(yax,xax,rot90(Thryinit),'Kaxis',[TSinputs.ne.Value*1E20,TSinputs.Te.Value,526.5],...
+    #    'Title','Starting point','Name','Initial Spectrum');
+    #ColorPlots(yax,xax,rot90(data-Thryinit),'Title',...
+    #    ['Initial difference: \chi^2 =' num2str(chisq)],'Name','Initial Difference');
+    #load('diffcmap.mat','diffcmap');
+    #colormap(diffcmap);
+
+    #if norm2B
+    #    caxis([-1 1]);
+    #else
+    #    caxis([-8000 8000]);
+    #end
+    else:
+        LinePlots(lamAxisE,np.vstack((data[0,:], ThryE)), CurveNames=['Data','Fit'],XLabel='Wavelength (nm)')
+        plt.xlim([450, 630])
+
+        #LinePlots(lamAxisI,[data(2,:); ThryI],'CurveNames',{'Data','Fit'},'XLabel','Wavelength (nm)')
+        #xlim([525 528])
+
+    chisq=float("nan")
+    redchi=float("nan")
+
+    if 'fitspecs' in D['extraoptions'].keys():
+        chisq=0
+             #if D.extraoptions.fitspecs(1)
+             #    chisq=chisq+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+
+        if D['extraoptions']['fitspecs'][1]:
+            #chisq=chisq+sum((data(1,lamAxisE<lam)-ThryE(lamAxisE<lam)).^2);
+            chisq=chisq+sum((data[0,(lamAxisE>410) and (lamAxisE<510)]-ThryE[(lamAxisE>410) and (lamAxisE<510)])**2)
+
+        if D['extraoptions']['fitspecs'][2]:
+            #chisq=chisq+sum((data(1,lamAxisE>lam)-ThryE(lamAxisE>lam)).^2);
+            chisq=chisq+sum((data[0,(lamAxisE>540) and (lamAxisE<680)]-ThryE[(lamAxisE>540) and (lamAxisE<680)])**2)
+
+
+def fitModel2(TSins,xie,sa,x,D):
+
+    [Te,ne,lam,fecur]=TSins.genTS(x,xie)
+    [Te,ne]=TSins.genGradients(Te,ne,7)
+    fecur=np.exp(fecur)
+    
+    if TSins.fe['Type']=='MYDLM':
+        [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,TSins.fe['thetaphi'])
+    elif TSins.fe['Type']=='Numeric':
+        [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,[2*np.pi/3,0])
+    else:
+        [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,expion=D['expandedions'])
+    
+    #remove extra dimensions and rescale to nm
+    lamAxisE=np.squeeze(lamAxisE)* 1e7
+    
+    Thry=np.real(Thry)
+    Thry=np.mean(Thry,axis=0)
+    modlE=np.sum(Thry*sa['weights'],axis=1)
+
+    #[modl,lamAx]=S2Signal(Thry,lamAxis,D);
+    #[_,_,lamAxisE,_]=lamParse(D['lamrangE'],lam,D['npts'])
+    if D['iawoff'] and (D['lamrangE'][0]<lam and D['lamrangE'][1]>lam):
+        #set the ion feature to 0 #should be switched to a range about lam
+        lamloc = np.argmin(abs(lamAxisE-lam))
+        #lamloc=find(abs(lamAxisE-lam)<(lamAxisE(2)-lamAxisE(1)));
+        modlE[lamloc-2000:lamloc+2000]=0
+
+    if D['iawfilter'][0]:
+        filterb=D['iawfilter'][3]-D['iawfilter'][2]/2
+        filterr=D['iawfilter'][3]+D['iawfilter'][2]/2
+        if D['lamrangE'][0]<filterr and D['lamrangE'][1]>filterb:
+            if D['lamrangE'][0]<filterb:
+                lamleft = np.argmin(abs(lamAxisE-filterb))
+            else:
+                lamleft=0
+                
+            if D['lamrangE'][1]>filterr:
+                lamright = np.argmin(abs(lamAxisE-filterr))
+            else:
+                lamright = len(lamAxisE)
+                #lamright=[0 length(lamAxisE)];
+
+            modlE[lamleft:lamright]=modlE[lamleft:lamright]*10**(-D['iawfilter'][1])
+    return modlE, lamAxisE
