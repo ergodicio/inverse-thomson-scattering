@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def loadData(sNum,sDay,specType,magE):
+def loadData(sNum,sDay,specType,magE,loadspecs):
     # This function loads the appropriate data based off the provided shot number (sNum) and the type of data specified
     # using specType. The flag sDay changes the default path to the temporary archive on the redwood server and will
     # only work if connected to the LLE redwood server.
@@ -24,6 +24,7 @@ def loadData(sNum,sDay,specType,magE):
             
         xlab='Scattering angle (degrees)'
         zero=0
+        loadspecs=[0,1]
 
     elif specType ==2:
         if sDay:
@@ -36,28 +37,36 @@ def loadData(sNum,sDay,specType,magE):
             hdfnameE = join(folder, 'EPW-s' + str(sNum) + '.hdf')
             hdfnameI = join(folder, 'IAW-s' + str(sNum) + '.hdf')
 
-        try:
-            eDatfile=SD(hdfnameE,SDC.READ)
-            sds_obj = eDatfile.select('Streak_array') # select sds
-            eDat = sds_obj.get() # get sds data
-            eDat = eDat.astype('float64')
-            eDat=eDat[0,:,:]-eDat[1,:,:]
-            #for now i have remove the warp correction call this will need to be added back later 8/8/22
-            #eDat = OMEGAWarpCorrection(eDat,'EPW',5,1) #correction file need to be updated
-            #eDat = eDat[16:1039,16:1039]
-        except BaseException:
-            print('Unable to find Streaked EPW')
-            eDat=[]
-        
-        try:
-            iDatfile=SD(hdfnameI,SDC.READ)
-            sds_obj = iDatfile.select('Streak_array') # select sds
-            iDat = sds_obj.get() # get sds data
-            iDat = iDat.astype('float64')
-            iDat=iDat[0,:,:]-iDat[1,:,:]
-        except BaseException:
-            print('Unable to find Streaked IAW')
+        if loadspecs[0]:
+            try:
+                iDatfile=SD(hdfnameI,SDC.READ)
+                sds_obj = iDatfile.select('Streak_array') # select sds
+                iDat = sds_obj.get() # get sds data
+                iDat = iDat.astype('float64')
+                iDat=iDat[0,:,:]-iDat[1,:,:]
+            except BaseException:
+                print('Unable to find Streaked IAW')
+                iDat=[]
+                loadspecs[0]=0
+        else:
             iDat=[]
+                
+        if loadspecs[1]:
+            try:
+                eDatfile=SD(hdfnameE,SDC.READ)
+                sds_obj = eDatfile.select('Streak_array') # select sds
+                eDat = sds_obj.get() # get sds data
+                eDat = eDat.astype('float64')
+                eDat=eDat[0,:,:]-eDat[1,:,:]
+                #for now i have remove the warp correction call this will need to be added back later 8/8/22
+                #eDat = OMEGAWarpCorrection(eDat,'EPW',5,1) #correction file need to be updated
+                #eDat = eDat[16:1039,16:1039]
+            except BaseException:
+                print('Unable to find Streaked EPW')
+                eDat=[]
+                loadspecs[1]=0
+        else:
+            eDat=[]
             
         xlab='Time (ps)'
             
@@ -87,28 +96,37 @@ def loadData(sNum,sDay,specType,magE):
             folder = 'data'
             hdfnameE = join(folder, 'EPW_CCD-s' + str(sNum) + '.hdf')
             hdfnameI = join(folder, 'IAW_CCD-s' + str(sNum) + '.hdf')
-
-        try:
-            eDatfile=SD(hdfnameE,SDC.READ)
-            sds_obj = eDatfile.select('Streak_array') # select sds
-            eDat = sds_obj.get() # get sds data
-            eDat = eDat.astype('float64')
-            eDat=np.squeeze(eDat[0,:,:]-eDat[1,:,:])
-            eDat=np.rot90(eDat,3)
-        except BaseException:
-            print('Unable to find Imaging EPW')
-            eDat=[]
-        
-        try:
-            iDatfile=SD(hdfnameI,SDC.READ)
-            sds_obj = iDatfile.select('Streak_array') # select sds
-            iDat = sds_obj.get() # get sds data
-            iDat = iDat.astype('float64')
-            iDat=np.squeeze(iDat[0,:,:]-iDat[1,:,:])
-            iDat=np.rot90(iDat,3)
-        except BaseException:
-            print('Unable to find Imaging IAW')
+                
+        if loadspecs[0]:
+            try:
+                iDatfile=SD(hdfnameI,SDC.READ)
+                sds_obj = iDatfile.select('Streak_array') # select sds
+                iDat = sds_obj.get() # get sds data
+                iDat = iDat.astype('float64')
+                iDat=np.squeeze(iDat[0,:,:]-iDat[1,:,:])
+                iDat=np.rot90(iDat,3)
+            except BaseException:
+                print('Unable to find Imaging IAW')
+                iDat=[]
+                loadspecs[0]=0
+        else:
             iDat=[]
+                
+        if loadspecs[1]:
+            try:
+                eDatfile=SD(hdfnameE,SDC.READ)
+                sds_obj = eDatfile.select('Streak_array') # select sds
+                eDat = sds_obj.get() # get sds data
+                eDat = eDat.astype('float64')
+                eDat=np.squeeze(eDat[0,:,:]-eDat[1,:,:])
+                eDat=np.rot90(eDat,3)
+            except BaseException:
+                print('Unable to find Imaging EPW')
+                eDat=[]
+                loadspecs[1]=0
+        else:
+            eDat=[]        
+        
             
         xlab='Radius (\mum)'
         zero=0

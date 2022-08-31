@@ -8,7 +8,9 @@ from inverse_thomson_scattering.v0.loadTSdata import loadData
 from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
 from inverse_thomson_scattering.v0.getCalibrations import getCalibrations
 from inverse_thomson_scattering.v0.plotters import LinePlots
+from inverse_thomson_scattering.v0.numDistFunc import NumDistFunc
 from inverse_thomson_scattering.v0.form_factor import nonMaxwThomson
+from inverse_thomson_scattering.jax.form_factor import get_form_factor_fn
 
 
 def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, extraoptions):
@@ -68,9 +70,23 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     D['NumBinInRng'] = 0
     D['TotalNumBin'] = 1023
     PhysParams = dict([])
-    D['extraoptions']=extraoptions
     D['expandedions']=False
-    D['extraoptions']['fitspecs']=[0,1,1]
+    
+    D['extraoptions']=extraoptions
+    if 'loadspecs' not in D['extraoptions'].keys():
+        #This defines the spectra to be loaded and plotted [IAW, EPW]
+        D['extraoptions']['loadspecs']=[1,1]
+    if 'fitspecs' in D['extraoptions'].keys():
+        if D['extraoptions']['loadspecs'][0]==0 and D['extraoptions']['fitspecs'][0]==1:
+            D['extraoptions']['fitspecs'][0]=0
+            print('IAW data not loaded, omitting IAW fit')
+        if D['extraoptions']['loadspecs'][1]==0 and (D['extraoptions']['fitspecs'][1]==1 or D['extraoptions']['fitspecs'][1]==1):
+            D['extraoptions']['fitspecs'][1]=0
+            D['extraoptions']['fitspecs'][2]=0
+            print('EPW data not loaded, omitting EPW fit')
+    else:
+        #This defines the spectrum to be fit [IAW, EPWb, EPWr]
+        D['extraoptions']['fitspecs']=[0,1,1]
 
     norm2B = 0 # 0 no normalization
                 # 1 norm to blue
@@ -79,7 +95,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
 
     feDecreaseStrict = 1 # forces the result to have a decreasing distribution function(no bumps)
 
-    TSinputs.fe['Length'] = 3999
+    TSinputs['fe']['Length'] = 3999
     CCDsize = [1024, 1024] # dimensions of the CCD chip as read
     shift_zero = 0
 
@@ -131,8 +147,10 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     #    xlab = prevShot.xlab;
     #    shift_zero = prevShot.shift_zero;
 
-    [elecData, ionData, xlab, shift_zero] = loadData(shotNum, shotDay, tstype, magE)
-    elecData = correctThroughput(elecData, tstype, axisyE)
+    [elecData, ionData, xlab, shift_zero] = loadData(shotNum, shotDay, tstype, magE, D['extraoptions']['loadspecs'])
+    
+    if D['extraoptions']['loadspecs'][1]:
+        elecData = correctThroughput(elecData, tstype, axisyE)
     #prevShot.shotNum = shotNum;
     #prevShot.elecData = elecData;
     #prevShot.ionData = ionData;
@@ -142,13 +160,15 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
 
     ## Background Shot subtraction
     if bgShot['type']=='Shot':
-        [BGele, BGion, _, _]=loadData(bgShot['val'],shotDay,specType,magE)
-        ionData_bsub = ionData - conv2(BGion, np.ones([5, 3])/15, mode='same')
-        BGele = correctThroughput(BGele, tstype, axisyE)
-        if specType==1:
-            elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5])/25, mode='same')
-        else:
-            elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 3])/15, mode='same')
+        [BGele, BGion, _, _]=loadData(bgShot['val'],shotDay,specType,magE,D['extraoptions']['loadspecs'])
+        if D['extraoptions']['loadspecs'][0]:
+            ionData_bsub = ionData - conv2(BGion, np.ones([5, 3])/15, mode='same')
+        if D['extraoptions']['loadspecs'][1]:
+            BGele = correctThroughput(BGele, tstype, axisyE)
+            if specType==1:
+                elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5])/25, mode='same')
+            else:
+                elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 3])/15, mode='same')
             
     else:
         elecData_bsub = elecData;
@@ -178,43 +198,47 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     
     span = 2 * dpixel + 1; # (span must be odd)
     
-    LineoutTSE = np.mean(elecData_bsub[:, LineoutPixelE - dpixel: LineoutPixelE + dpixel], axis=1)
-    LineoutTSE_smooth = np.convolve(LineoutTSE, np.ones(span)/span, 'same')
+    if D['extraoptions']['loadspecs'][1]:
+        LineoutTSE = np.mean(elecData_bsub[:, LineoutPixelE - dpixel: LineoutPixelE + dpixel], axis=1)
+        LineoutTSE_smooth = np.convolve(LineoutTSE, np.ones(span)/span, 'same')
     
-    LineoutTSI = np.mean(ionData_bsub[:, LineoutPixelI - IAWtime - dpixel: LineoutPixelI - IAWtime + dpixel], axis=1 )
-    LineoutTSI_smooth = np.convolve(LineoutTSI, np.ones(span)/span, 'same') #was divided by 10 for some reason (removed 8-9-22)
+    if D['extraoptions']['loadspecs'][0]:
+        LineoutTSI = np.mean(ionData_bsub[:, LineoutPixelI - IAWtime - dpixel: LineoutPixelI - IAWtime + dpixel], axis=1 )
+        LineoutTSI_smooth = np.convolve(LineoutTSI, np.ones(span)/span, 'same') #was divided by 10 for some reason (removed 8-9-22)
 
     if bgShot['type'] == 'Fit':
-        if specType == 1:
-            [BGele, _, _, _]=loadData(bgShot['val'],shotDay,specType,magE)
-            xx=np.arange(1024)
-            def qaudbg(x):
-                np.sum((elecData[1000,:] -((x[0]*(xx-x[3])**2 + x[1]*(xx-x[3]) + x[2])*BGele[1000,:]))**2)
+        if D['extraoptions']['loadspecs'][1]:
+            if specType == 1:
+                [BGele, _, _, _]=loadData(bgShot['val'],shotDay,specType,magE,D['extraoptions']['loadspecs'])
+                xx=np.arange(1024)
+                def qaudbg(x):
+                    np.sum((elecData[1000,:] -((x[0]*(xx-x[3])**2 + x[1]*(xx-x[3]) + x[2])*BGele[1000,:]))**2)
 
-            corrfactor=spopt.minimize(quadbg,[.1, .1, 1.15, 300])
-            newBG=(corrfactor.x[0]*(xx-corrfactor.x[3])**2 + corrfactor.x[1]*(xx-corrfactor.x[3]) + corrfactor[2])*BGele
-            elecData_bsub=elecData-newBG
-        else:
-            # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
-            bgfitx=np.hstack([np.arange(100,200),np.arange(800,1024)])
-            def exp2(x,a,b,c,d):
-                return a*np.exp(b*x)+c*np.exp(d*x)
-            #[expbg, _] = spopt.curve_fit(exp2,bgfitx,LineoutTSE_smooth[bgfitx])
+                corrfactor=spopt.minimize(quadbg,[.1, .1, 1.15, 300])
+                newBG=(corrfactor.x[0]*(xx-corrfactor.x[3])**2 + corrfactor.x[1]*(xx-corrfactor.x[3]) + corrfactor[2])*BGele
+                elecData_bsub=elecData-newBG
+            else:
+                # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
+                bgfitx=np.hstack([np.arange(100,200),np.arange(800,1024)])
+                def exp2(x,a,b,c,d):
+                    return a*np.exp(b*x)+c*np.exp(d*x)
+                #[expbg, _] = spopt.curve_fit(exp2,bgfitx,LineoutTSE_smooth[bgfitx])
         
-            def power2(x,a,b,c):
-                return a*x**b+c
-            #[pwerbg, _] = spopt.curve_fit(power2,bgfitx,LineoutTSE_smooth[bgfitx])
+                def power2(x,a,b,c):
+                    return a*x**b+c
+                #[pwerbg, _] = spopt.curve_fit(power2,bgfitx,LineoutTSE_smooth[bgfitx])
         
-            def rat21(x,a,b,c,d):
-                return (a*x**2 + b*x + c) / (x + d)
-            #[ratbg, _] = spopt.curve_fit(rat21,bgfitx,LineoutTSE_smooth[bgfitx])
+                def rat21(x,a,b,c,d):
+                    return (a*x**2 + b*x + c) / (x + d)
+                #[ratbg, _] = spopt.curve_fit(rat21,bgfitx,LineoutTSE_smooth[bgfitx])
             
-            def rat11(x,a,b,c):
-                return (a*x + b) / (x + c)
-            [rat1bg, _] = spopt.curve_fit(rat11,bgfitx,LineoutTSE_smooth[bgfitx])
+                def rat11(x,a,b,c):
+                    return (a*x + b) / (x + c)
+                [rat1bg, _] = spopt.curve_fit(rat11,bgfitx,LineoutTSE_smooth[bgfitx])
     
-            LineoutTSE_smooth = LineoutTSE_smooth - rat11(np.arange(1024),rat1bg)
+                LineoutTSE_smooth = LineoutTSE_smooth - rat11(np.arange(1024),rat1bg)
     
+        #### loadspecs added up to this line
     #Attempt to quantify any residual background
     #this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
     noiseE = np.mean(elecData_bsub[:, BackgroundPixel - dpixel: BackgroundPixel + dpixel], 1 )
@@ -276,13 +300,18 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     data = np.vstack((LineoutTSE_norm,LineoutTSI_norm))
 
 
-    xie=np.linspace(-7,7,TSinputs.fe['Length'])
+    xie=np.linspace(-7,7,TSinputs['fe']['Length'])
+    initFe(TSinputs,xie)
     
-    if 'Value' in TSinputs.fe.keys():
-        TSinputs.initFe(xie)
-
-    [x0,lb,ub]=TSinputs.genX()
-    #print(x0)
+    TSinputs['fe']['lb']= np.multiply(TSinputs['fe']['lb'],np.ones(TSinputs['fe']['length']))
+    TSinputs['fe']['ub']= np.multiply(TSinputs['fe']['ub'],np.ones(TSinputs['fe']['length']))
+    
+    x0=[]; lb=[]; ub=[]
+    for key in TSinputs.keys():
+        if TSinputs[key]['active']:
+            x0.append(TSinputs[key]['val'])
+            lb.append(TSinputs[key]['lb'])
+            ub.append(TSinputs[key]['ub'])
 
     ## Plot initial guess
     plotState(x0,TSinputs,xie,sa,D,data)
@@ -306,8 +335,15 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     print(chifin)
 
     result=TSinputs
-    result.setTo(res.x)
-    result.disp()
+    xiter=iter(res.x)
+    for key in result.keys():
+        if result[key]['active']:
+            result[key]['val']=next(xiter)
+            print(key,': ',result[key]['val'])
+    if result['fe']['active']:
+        result['fe']['val']=res.x[-result['fe']['length']::]
+    elif result['m']['active']:
+        initFe(result,xie)
     
     return result
     
@@ -316,8 +352,9 @@ def plotState(x,TSinputs,xie,sas,D,data):
     #all ion terms are commented out for testing
     [modlE,lamAxisE]=fitModel2(TSinputs,xie,sas,x,D)
 
-    [_,_,lam,_]=TSinputs.genTS(x,xie)
-    [amp1,amp2,_]=TSinputs.genRest(x)
+    lam=TSinputs['lam']['val']
+    amp1=TSinputs['amp1']['val']
+    amp2=TSinputs['amp2']['val']
     #[_,_,lamAxisE,_]=lamParse(D['lamrangE'],lam,D['npts'])
     #[omgL,omgsI,lamAxisI,_]=lamParse(D['lamrangI'],lam,D['npts'])
     
@@ -409,16 +446,28 @@ def plotState(x,TSinputs,xie,sas,D,data):
 
 def fitModel2(TSins,xie,sa,x,D):
 
-    [Te,ne,lam,fecur]=TSins.genTS(x,xie)
-    [Te,ne]=TSins.genGradients(Te,ne,7)
-    fecur=np.exp(fecur)
+    xiter=iter(x)
+    for key in TSins.keys():
+        if TSins[key]['active']:
+            TSins[key]['val']=next(xiter)
+    if TSins['fe']['active']:
+        TSins['fe']['val']=x[-TSins['fe']['length']::]
+    elif TSins['m']['active']:
+        initFe(TSins,xie)
     
-    if TSins.fe['Type']=='MYDLM':
-        [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,TSins.fe['thetaphi'])
-    elif TSins.fe['Type']=='Numeric':
-        [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,[2*np.pi/3,0])
-    else:
-        [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,expion=D['expandedions'])
+    #[Te,ne]=TSins.genGradients(Te,ne,7)
+    fecur=np.exp(TSins['fe']['val'])
+    lam=TSins['lam']['val']
+    
+    [Thry,lamAxisE]=nonMaxwThomson(TSins['Te']['val'], TSins['Te']['val'], 1, 1, 1, TSins['ne']['val']*1e20, 0, 0, D['lamrangE'], lam, sa['sa'], fecur,xie,expion=D['expandedions'])
+    #if TSins.fe['Type']=='MYDLM':
+    #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,TSins.fe['thetaphi'])
+    #elif TSins.fe['Type']=='Numeric':
+    #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,[2*np.pi/3,0])
+    #else:
+    #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,expion=D['expandedions'])
+        #nonMaxwThomson,_ =get_form_factor_fn(D['lamrangE'],lam)
+        #[Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,sa['sa'], [fecur,xie])
     
     #remove extra dimensions and rescale to nm
     lamAxisE=np.squeeze(lamAxisE)* 1e7
@@ -458,8 +507,9 @@ def chiSq2(x,TSinputs,xie,sas,D,data):
     #all ion terms are commented out for testing
     [modlE,lamAxisE]=fitModel2(TSinputs,xie,sas,x,D)
 
-    [_,_,lam,_]=TSinputs.genTS(x,xie)
-    [amp1,amp2,_]=TSinputs.genRest(x)
+    lam=TSinputs['lam']['val']
+    amp1=TSinputs['amp1']['val']
+    amp2=TSinputs['amp2']['val']
     #[_,_,lamAxisE,_]=lamParse(D['lamrangE'],lam,D['npts'])
     #[omgL,omgsI,lamAxisI,_]=lamParse(D['lamrangI'],lam,D['npts'])
     
@@ -518,3 +568,22 @@ def chiSq2(x,TSinputs,xie,sas,D,data):
             chisq=chisq+sum((data[0,(lamAxisE>540) & (lamAxisE<680)]-ThryE[(lamAxisE>540) & (lamAxisE<680)])**2)
 
     return chisq
+
+def initFe(TSinputs,xie):
+    #generate fe from inputs or keep numerical fe
+    if TSinputs['fe']['type']=='DLM':
+        TSinputs['fe']['val'] = np.log( NumDistFunc( [TSinputs['fe']['type'], TSinputs['m']['val']], xie, TSinputs['fe']['type']))
+            
+    elif TSinputs['fe']['type']=='Fourkal':
+        TSinputs['fe']['val'] = np.log( NumDistFunc( [TSinputs['fe']['type'], TSinputs['m']['val'], TSinputs['Z']['val']], xie, TSinputs['fe']['type']))
+            
+    elif TSinputs['fe']['type']=='SpitzerDLM':
+        TSinputs['fe']['val'] = np.log( NumDistFunc( [TSinputs['fe']['type'], TSinputs['m']['val'], TSinputs['fe']['theta'], TSinputs['fe']['delT']], xie, TSinputs['fe']['type']))
+        
+    elif TSinputs['fe']['type']=='MYDLM': #This will eventually need another parameter for density gradient
+        TSinputs['fe']['val'] = np.log( NumDistFunc( [TSinputs['fe']['type'], TSinputs['m']['val'], TSinputs['fe']['theta'], TSinputs['fe']['delT']], xie, TSinputs['fe']['type']))
+    
+    else :
+        raise NameError('Unrecognized distribtuion function type')
+            
+    TSinputs['fe']['val'][TSinputs['fe']['val']<=-100]=-99
