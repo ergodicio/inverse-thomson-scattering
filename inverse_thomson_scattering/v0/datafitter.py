@@ -560,7 +560,7 @@ def get_fitModel2(TSins, xie, sa, D):
             D["lamrangE"],
             lam,
             # ,
-            expion=D["expandedions"],
+            # expion=D["expandedions"],
         )
 
         # if TSins.fe['Type']=='MYDLM':
