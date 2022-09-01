@@ -390,7 +390,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
         x = x0
 
     ## Plot Result
-    plotState(res.x, TSinputs, xie, sa, D, data)
+    plotState(res.x, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
     chifin = chiSq2(res.x)  # , TSinputs, xie, sa, D, data)
     print(chifin)
 
