@@ -649,13 +649,13 @@ def get_chisq2(TSinputs, xie, sas, D, data):
         # ThryI=(max(modlI)/max(ThryI))*ThryI
 
         if D["PhysParams"]["norm"] > 0:
-            # ThryE = jnp.where(
-            #     lamAxisE < lam,
-            #     amp1 * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
-            #     amp2 * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
-            # )
-            ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam] / jnp.amax(ThryE[lamAxisE < lam]))
-            ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam] / jnp.amax(ThryE[lamAxisE > lam]))
+            ThryE = jnp.where(
+                lamAxisE < lam,
+                amp1 * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
+                amp2 * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
+            )
+            # ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam] / jnp.amax(ThryE[lamAxisE < lam]))
+            # ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam] / jnp.amax(ThryE[lamAxisE > lam]))
 
         # n=jnp.floor(len(ThryE)/len(data))
         # ThryE = jnp.average(ThryE.reshape(-1, n), axis=1)
@@ -674,11 +674,11 @@ def get_chisq2(TSinputs, xie, sas, D, data):
             ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam])
             ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam])
 
-            # ThryE = jnp.where(
-            #     lamAxisE < lam,
-            #     amp1 * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
-            #     amp2 * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
-            # )
+            ThryE = jnp.where(
+                lamAxisE < lam,
+                amp1 * ThryE,
+                amp2 * ThryE,
+            )
 
         chisq = jnp.nan
         redchi = jnp.nan
