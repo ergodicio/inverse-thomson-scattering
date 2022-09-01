@@ -610,7 +610,7 @@ def get_fitModel2(TSins, xie, sa, D):
 
         return modlE, lamAxisE
 
-    return jit(fitModel2)
+    return fitModel2
 
 
 def get_chisq2(TSinputs, xie, sas, D, data):
