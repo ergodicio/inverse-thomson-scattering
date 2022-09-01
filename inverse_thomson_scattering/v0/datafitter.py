@@ -620,7 +620,7 @@ def get_chisq2(TSinputs, xie, sas, D, data):
     def chiSq2(x):
 
         # all ion terms are commented out for testing
-        [modlE, lamAxisE] = fitModel2(x)
+        modlE, lamAxisE = fitModel2(x)
 
         lam = TSinputs["lam"]["val"]
         amp1 = TSinputs["amp1"]["val"]
@@ -632,44 +632,56 @@ def get_chisq2(TSinputs, xie, sas, D, data):
         # modlI=fitModel(Te,Ti,Z,D.A,D.fract,ne,Va,ud,omgsI,omgL,D.sa,curDist,D.distTable,0,{0},D.lamrangI,lam,lamAxisI);
 
         # Conceptual_origin so the convolution donsn't shift the signal
-        originE = (np.amax(lamAxisE) + np.amin(lamAxisE)) / 2.0
+        originE = (jnp.amax(lamAxisE) + jnp.amin(lamAxisE)) / 2.0
         # originI=(max(lamAxisI)+min(lamAxisI))/2 #Conceptual_origin so the convolution donsn't shift the signal
 
         stddev = D["PhysParams"]["widIRF"]
 
-        inst_funcE = np.squeeze(
-            (1.0 / (stddev[0] * np.sqrt(2 * np.pi))) * np.exp(-((lamAxisE - originE) ** 2) / (2 * (stddev[0]) ** 2))
+        inst_funcE = jnp.squeeze(
+            (1.0 / (stddev[0] * jnp.sqrt(2.0 * jnp.pi)))
+            * jnp.exp(-((lamAxisE - originE) ** 2.0) / (2.0 * (stddev[0]) ** 2.0))
         )  # Gaussian
-        # inst_funcI = (1/(stddev[1]*np.sqrt(2*np.pi)))*np.exp(-(lamAxisI-originI)**2/(2*(stddev[1])**2)) #Gaussian
+        # inst_funcI = (1/(stddev[1]*jnp.sqrt(2*jnp.pi)))*jnp.exp(-(lamAxisI-originI)**2/(2*(stddev[1])**2)) #Gaussian
 
-        ThryE = np.convolve(modlE, inst_funcE, "same")
-        ThryE = (max(modlE) / max(ThryE)) * ThryE
-        # ThryI = np.convolve(modlI, inst_funcI,'same')
+        ThryE = jnp.convolve(modlE, inst_funcE, "same")
+        ThryE = (jnp.amax(modlE) / jnp.amax(ThryE)) * ThryE
+        # ThryI = jnp.convolve(modlI, inst_funcI,'same')
         # ThryI=(max(modlI)/max(ThryI))*ThryI
 
         if D["PhysParams"]["norm"] > 0:
-            ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam] / np.amax(ThryE[lamAxisE < lam]))
-            ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam] / np.amax(ThryE[lamAxisE > lam]))
+            ThryE = jnp.where(
+                lamAxisE < lam,
+                amp1 * (ThryE[lamAxisE < lam] / jnp.amax(ThryE[lamAxisE < lam])),
+                amp2 * (ThryE[lamAxisE > lam] / jnp.amax(ThryE[lamAxisE > lam])),
+            )
+            # ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam] / jnp.amax(ThryE[lamAxisE < lam]))
+            # ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam] / jnp.amax(ThryE[lamAxisE > lam]))
 
-        # n=np.floor(len(ThryE)/len(data))
-        # ThryE = np.average(ThryE.reshape(-1, n), axis=1)
-        ThryE = np.average(ThryE.reshape(1024, -1), axis=1)
-        # ThryE= [np.mean(ThryE[i:i+n-1]) for i in np.arange(0,len(ThryE),n)]
+        # n=jnp.floor(len(ThryE)/len(data))
+        # ThryE = jnp.average(ThryE.reshape(-1, n), axis=1)
+        ThryE = jnp.average(ThryE.reshape(1024, -1), axis=1)
+        # ThryE= [jnp.mean(ThryE[i:i+n-1]) for i in jnp.arange(0,len(ThryE),n)]
         # arrayfun(@(i) mean(ThryE(i:i+n-1)),1:n:length(ThryE)-n+1);
         # n=floor(length(ThryI)/length(data));
         # ThryI=arrayfun(@(i) mean(ThryI(i:i+n-1)),1:n:length(ThryI)-n+1);
 
         if D["PhysParams"]["norm"] == 0:
-            lamAxisE = np.average(lamAxisE.reshape(1024, -1), axis=1)
+            lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
             # lamAxisE=arrayfun(@(i) mean(lamAxisE(i:i+n-1)),1:n:length(lamAxisE)-n+1);
-            ThryE = D["PhysParams"]["amps"][0] * ThryE / max(ThryE)
+            ThryE = D["PhysParams"]["amps"][0] * ThryE / jnp.amax(ThryE)
             # lamAxisI=arrayfun(@(i) mean(lamAxisI(i:i+n-1)),1:n:length(lamAxisI)-n+1);
             # ThryI = amp3*D.PhysParams{3}(2)*ThryI/max(ThryI);
-            ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam])
-            ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam])
+            # ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam])
+            # ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam])
 
-        chisq = np.nan
-        redchi = np.nan
+            ThryE = jnp.where(
+                lamAxisE < lam,
+                amp1 * (ThryE[lamAxisE < lam] / jnp.amax(ThryE[lamAxisE < lam])),
+                amp2 * (ThryE[lamAxisE > lam] / jnp.amax(ThryE[lamAxisE > lam])),
+            )
+
+        chisq = jnp.nan
+        redchi = jnp.nan
 
         if "fitspecs" in D["extraoptions"].keys():
             chisq = 0
@@ -678,13 +690,13 @@ def get_chisq2(TSinputs, xie, sas, D, data):
 
             if D["extraoptions"]["fitspecs"][1]:
                 # chisq=chisq+sum((data(1,lamAxisE<lam)-ThryE(lamAxisE<lam)).^2);
-                chisq = chisq + np.sum(
+                chisq = chisq + jnp.sum(
                     (data[0, (lamAxisE > 410) & (lamAxisE < 510)] - ThryE[(lamAxisE > 410) & (lamAxisE < 510)]) ** 2
                 )
 
             if D["extraoptions"]["fitspecs"][2]:
                 # chisq=chisq+sum((data(1,lamAxisE>lam)-ThryE(lamAxisE>lam)).^2);
-                chisq = chisq + np.sum(
+                chisq = chisq + jnp.sum(
                     (data[0, (lamAxisE > 540) & (lamAxisE < 680)] - ThryE[(lamAxisE > 540) & (lamAxisE < 680)]) ** 2
                 )
 
