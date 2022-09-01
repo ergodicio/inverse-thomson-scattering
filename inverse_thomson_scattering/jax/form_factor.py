@@ -6,11 +6,11 @@ from jax import numpy as jnp
 from jax import jit, value_and_grad, vmap
 from inverse_thomson_scattering.jax import ratintn
 from inverse_thomson_scattering.jax import lamParse
-# from inverse_thomson_scattering.v0 import lamParse
+
 from inverse_thomson_scattering.v0.form_factor import zprimeMaxw
 
 
-def get_form_factor_fn():
+def get_form_factor_fn(lamrang):
     npts = 20460
 
     # basic quantities
@@ -26,7 +26,7 @@ def get_form_factor_fn():
     Zpi = jnp.array(zprimeMaxw(xi2))
 
     # @jit
-    def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lamrang, lam):
+    def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lam):
         """
         NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma
          conditions and scattering angles. The spectral density function is calculated with and without the ion contribution
@@ -58,7 +58,7 @@ def get_form_factor_fn():
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
 
-        omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts) #, True)
+        omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts)  # , True)
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(jnp.transpose(ne))  # plasma frequency Rad/cm

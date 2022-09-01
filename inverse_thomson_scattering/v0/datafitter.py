@@ -512,7 +512,7 @@ def plotState(x, TSinputs, xie, sas, D, data, fitModel2):
 
 
 def get_fitModel2(TSins, xie, sa, D):
-    nonMaxwThomson_jax, _ = get_form_factor_fn()
+    nonMaxwThomson_jax, _ = get_form_factor_fn(D["lamrangE"])
 
     def fitModel2(x):
         i = 0
@@ -557,7 +557,6 @@ def get_fitModel2(TSins, xie, sa, D):
             0,
             sa["sa"],
             (fecur, xie),
-            D["lamrangE"],
             lam,
             # ,
             # expion=D["expandedions"],
