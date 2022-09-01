@@ -651,8 +651,8 @@ def get_chisq2(TSinputs, xie, sas, D, data):
         if D["PhysParams"]["norm"] > 0:
             ThryE = jnp.where(
                 lamAxisE < lam,
-                amp1 * (ThryE[lamAxisE < lam] / jnp.amax(ThryE[lamAxisE < lam])),
-                amp2 * (ThryE[lamAxisE > lam] / jnp.amax(ThryE[lamAxisE > lam])),
+                amp1 * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
+                amp2 * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
             )
             # ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam] / jnp.amax(ThryE[lamAxisE < lam]))
             # ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam] / jnp.amax(ThryE[lamAxisE > lam]))
@@ -676,8 +676,8 @@ def get_chisq2(TSinputs, xie, sas, D, data):
 
             ThryE = jnp.where(
                 lamAxisE < lam,
-                amp1 * (ThryE[lamAxisE < lam] / jnp.amax(ThryE[lamAxisE < lam])),
-                amp2 * (ThryE[lamAxisE > lam] / jnp.amax(ThryE[lamAxisE > lam])),
+                amp1 * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
+                amp2 * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
             )
 
         chisq = jnp.nan
