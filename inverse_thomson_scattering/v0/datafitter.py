@@ -702,7 +702,7 @@ def get_chisq2(TSinputs, xie, sas, D, data):
 
         return chisq
 
-    return jit(chiSq2)
+    return chiSq2
 
 
 def initFe(TSinputs, xie):
