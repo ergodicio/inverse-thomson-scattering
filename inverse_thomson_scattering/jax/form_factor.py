@@ -5,7 +5,8 @@ config.update("jax_enable_x64", True)
 from jax import numpy as jnp
 from jax import jit, value_and_grad, vmap
 from inverse_thomson_scattering.jax import ratintn
-from inverse_thomson_scattering.v0 import lamParse
+from inverse_thomson_scattering.jax import lamParse
+# from inverse_thomson_scattering.v0 import lamParse
 from inverse_thomson_scattering.v0.form_factor import zprimeMaxw
 
 
@@ -57,7 +58,7 @@ def get_form_factor_fn():
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
 
-        omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts, True)
+        omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts) #, True)
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(jnp.transpose(ne))  # plasma frequency Rad/cm
