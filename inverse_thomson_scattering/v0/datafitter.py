@@ -594,7 +594,7 @@ def get_chisq2(TSinputs, xie, sas, D, data):
     def chiSq2(x):
 
         # all ion terms are commented out for testing
-        [modlE, lamAxisE] = fitModel2(TSinputs, xie, sas, x, D)
+        [modlE, lamAxisE] = fitModel2(x)
 
         lam = TSinputs["lam"]["val"]
         amp1 = TSinputs["amp1"]["val"]
