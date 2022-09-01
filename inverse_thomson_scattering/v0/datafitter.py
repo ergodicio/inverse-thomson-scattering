@@ -4,6 +4,7 @@ import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
 from jax import numpy as jnp
+from jax import jit
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.v0.loadTSdata import loadData
 from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
@@ -609,7 +610,7 @@ def get_fitModel2(TSins, xie, sa, D):
 
         return modlE, lamAxisE
 
-    return fitModel2
+    return jit(fitModel2)
 
 
 def get_chisq2(TSinputs, xie, sas, D, data):
@@ -689,7 +690,7 @@ def get_chisq2(TSinputs, xie, sas, D, data):
 
         return chisq
 
-    return chiSq2
+    return jit(chiSq2)
 
 
 def initFe(TSinputs, xie):
