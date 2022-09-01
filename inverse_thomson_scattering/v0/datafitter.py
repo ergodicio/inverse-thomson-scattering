@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
+from jax import numpy as jnp
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.v0.loadTSdata import loadData
 from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
@@ -511,6 +512,8 @@ def plotState(x, TSinputs, xie, sas, D, data, fitModel2):
 
 
 def get_fitModel2(TSins, xie, sa, D):
+    nonMaxwThomson_jax, _ = get_form_factor_fn()
+
     def fitModel2(x):
         i = 0
         for key in TSins.keys():
@@ -523,10 +526,27 @@ def get_fitModel2(TSins, xie, sa, D):
             initFe(TSins, xie)
 
         # [Te,ne]=TSins.genGradients(Te,ne,7)
-        fecur = np.exp(TSins["fe"]["val"])
+        fecur = jnp.exp(TSins["fe"]["val"])
         lam = TSins["lam"]["val"]
 
-        [Thry, lamAxisE] = nonMaxwThomson(
+        # Thry, lamAxisE = nonMaxwThomson(
+        #     TSins["Te"]["val"],
+        #     TSins["Te"]["val"],
+        #     1,
+        #     1,
+        #     1,
+        #     TSins["ne"]["val"] * 1e20,
+        #     0,
+        #     0,
+        #     D["lamrangE"],
+        #     lam,
+        #     sa["sa"],
+        #     fecur,
+        #     xie,
+        #     expion=D["expandedions"],
+        # )
+        # Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lamrang, lam
+        Thry, lamAxisE = nonMaxwThomson_jax(
             TSins["Te"]["val"],
             TSins["Te"]["val"],
             1,
@@ -535,13 +555,14 @@ def get_fitModel2(TSins, xie, sa, D):
             TSins["ne"]["val"] * 1e20,
             0,
             0,
+            sa["sa"],
+            (fecur, xie),
             D["lamrangE"],
             lam,
-            sa["sa"],
-            fecur,
-            xie,
+            # ,
             expion=D["expandedions"],
         )
+
         # if TSins.fe['Type']=='MYDLM':
         #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,TSins.fe['thetaphi'])
         # elif TSins.fe['Type']=='Numeric':
@@ -552,36 +573,41 @@ def get_fitModel2(TSins, xie, sa, D):
         # [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,sa['sa'], [fecur,xie])
 
         # remove extra dimensions and rescale to nm
-        lamAxisE = np.squeeze(lamAxisE) * 1e7
+        lamAxisE = jnp.squeeze(lamAxisE) * 1e7
 
-        Thry = np.real(Thry)
-        Thry = np.mean(Thry, axis=0)
-        modlE = np.sum(Thry * sa["weights"], axis=1)
+        Thry = jnp.real(Thry)
+        Thry = jnp.mean(Thry, axis=0)
+        modlE = jnp.sum(Thry * sa["weights"], axis=1)
 
         # [modl,lamAx]=S2Signal(Thry,lamAxis,D);
         # [_,_,lamAxisE,_]=lamParse(D['lamrangE'],lam,D['npts'])
         if D["iawoff"] and (D["lamrangE"][0] < lam and D["lamrangE"][1] > lam):
             # set the ion feature to 0 #should be switched to a range about lam
-            lamloc = np.argmin(abs(lamAxisE - lam))
+            lamloc = jnp.argmin(jnp.abs(lamAxisE - lam))
             # lamloc=find(abs(lamAxisE-lam)<(lamAxisE(2)-lamAxisE(1)));
-            modlE[lamloc - 2000 : lamloc + 2000] = 0
+            # modlE[lamloc - 2000 : lamloc + 2000] = 0
+            modlE = jnp.concatenate([modlE[: lamloc - 2000], jnp.zeros(4000), modlE[lamloc + 2000 :]])
 
         if D["iawfilter"][0]:
             filterb = D["iawfilter"][3] - D["iawfilter"][2] / 2
             filterr = D["iawfilter"][3] + D["iawfilter"][2] / 2
             if D["lamrangE"][0] < filterr and D["lamrangE"][1] > filterb:
                 if D["lamrangE"][0] < filterb:
-                    lamleft = np.argmin(abs(lamAxisE - filterb))
+                    lamleft = jnp.argmin(jnp.abs(lamAxisE - filterb))
                 else:
                     lamleft = 0
 
                 if D["lamrangE"][1] > filterr:
-                    lamright = np.argmin(abs(lamAxisE - filterr))
+                    lamright = jnp.argmin(jnp.abs(lamAxisE - filterr))
                 else:
-                    lamright = len(lamAxisE)
+                    lamright = lamAxisE.size
                     # lamright=[0 length(lamAxisE)];
 
-                modlE[lamleft:lamright] = modlE[lamleft:lamright] * 10 ** (-D["iawfilter"][1])
+                # modlE[lamleft:lamright] = modlE[lamleft:lamright] * 10 ** (-D["iawfilter"][1])
+                modlE = jnp.concatenate(
+                    [modlE[:lamleft], modlE[lamleft:lamright] * 10 ** (-D["iawfilter"][1]), modlE[lamright:]]
+                )
+
         return modlE, lamAxisE
 
     return fitModel2

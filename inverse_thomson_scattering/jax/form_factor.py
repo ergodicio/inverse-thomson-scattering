@@ -9,14 +9,13 @@ from inverse_thomson_scattering.v0 import lamParse
 from inverse_thomson_scattering.v0.form_factor import zprimeMaxw
 
 
-def get_form_factor_fn(lamrang, lam):
+def get_form_factor_fn():
     npts = 20460
 
     # basic quantities
     C = 2.99792458e10
     Me = 510.9896 / C**2  # electron mass keV/C^2
     Mp = Me * 1836.1  # proton mass keV/C^2
-    [omgL, omgs, lamAxis, _] = lamParse.lamParse(lamrang, lam, npts, True)
 
     h = 0.01
     minmax = 8.2
@@ -26,7 +25,7 @@ def get_form_factor_fn(lamrang, lam):
     Zpi = jnp.array(zprimeMaxw(xi2))
 
     # @jit
-    def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe):
+    def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lamrang, lam):
         """
         NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma
          conditions and scattering angles. The spectral density function is calculated with and without the ion contribution
@@ -57,6 +56,8 @@ def get_form_factor_fn(lamrang, lam):
 
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
+
+        omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts, True)
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(jnp.transpose(ne))  # plasma frequency Rad/cm
@@ -109,7 +110,7 @@ def get_form_factor_fn(lamrang, lam):
         # capable of handling isotropic or anisotropic distribution functions
         # fe is separated into components distribution function, v / vth axis, angles between f1 and kL
         # if len(fe) == 2:
-        [DF, x] = fe
+        DF, x = fe
         fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(DF)))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
 
         # elif len(fe) == 3:
@@ -164,7 +165,7 @@ def get_form_factor_fn(lamrang, lam):
             (jnp.abs(chiE[..., jnp.newaxis])) ** 2.0 * jnp.exp(-(xii**2)) / jnp.sqrt(2 * jnp.pi)
         )
         ele_comp = (jnp.abs(1.0 + chiI)) ** 2.0 * fe_vphi / vTe
-        # ele_compE = fe_vphi / vTe
+        # ele_compE = fe_vphi / vTe # commented because unused
 
         SKW_ion_omg = (
             2.0
@@ -178,17 +179,17 @@ def get_form_factor_fn(lamrang, lam):
         )
         SKW_ion_omg = jnp.sum(SKW_ion_omg, 3)
         SKW_ele_omg = 2 * jnp.pi * 1.0 / klde * (ele_comp) / ((jnp.abs(epsilon)) ** 2) * vTe / omgpe
-        # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe
+        # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
 
-        # PsOmgE = (SKW_ele_omgE) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
+        # PsOmgE = (SKW_ele_omgE) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * C / omgs
         lams = lams[jnp.newaxis, ..., jnp.newaxis]
         PsLam = PsOmg * 2 * jnp.pi * C / lams**2
-        # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2
+        # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam
-        # formfactorE = PsLamE
+        # formfactorE = PsLamE # commented because unused
         return formfactor, lams
 
     def cost_fn(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe):
