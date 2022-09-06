@@ -1,4 +1,6 @@
 # This file contains 3 functions for calculating and handleing numerical distribtuion functions
+import jax.scipy.interpolate
+from jax import numpy as jnp
 import numpy as np
 import scipy.interpolate as sp
 import scipy.io as sio
@@ -97,6 +99,8 @@ def get_num_dist_func(fe_type, xie):
         bi = xs > max(params["x"])
         ci = ~(ai + bi)
 
+    x_float_inds = np.interp(xs[ci], params["x"], np.linspace(0, len(params["x"])))
+
     def NumDistFunc(m):
         # if len(curDist) == 1:
         #     if len(np.shape(IT)) == 2:
@@ -106,8 +110,17 @@ def get_num_dist_func(fe_type, xie):
         #         [X1, X2, X3] = np.meshgrid(xs[ci], params["m"], params["Z"])
         #         interpedSection = sp.interpn((params["x"], params["m"], params["Z"]), IT, (X1, X2, X3))
         # elif len(curDist) == 2:
-        [X1, X2] = np.meshgrid(xs[ci], m)
-        interpedSection = sp.interpn((params["x"], params["m"]), IT, (X1, X2))
+        # X1, X2 = np.meshgrid(xs[ci], m)
+
+        m_float_inds = jnp.interp(m, params["m"], np.linspace(0, len(params["m"])))
+        ind_x_mesh, ind_m_mesh = jnp.meshgrid(x_float_inds, m_float_inds)
+        indices = zip(ind_x_mesh.flatten(), ind_m_mesh.flatten())
+
+        interpedSection = jax.scipy.ndimage.map_coordinates(IT, indices, order=1, mode="wrap")
+        #
+        # interpedSection = jnp.reshape(interpedSection, X1.shape, order="F")
+
+        # interpedSection = sp.interpn((params["x"], params["m"]), IT, (X1, X2))
         # elif len(curDist) == 3:
         #     [X1, X2, X3] = np.meshgrid(xs[ci], curDist[1], curDist[2])
         #     interpedSection = sp.interpn((params["x"], params["m"], params["Z"]), IT, (X1, X2, X3))
