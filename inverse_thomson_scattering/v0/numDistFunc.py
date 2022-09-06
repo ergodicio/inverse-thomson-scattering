@@ -99,7 +99,7 @@ def get_num_dist_func(fe_type, xie):
         bi = xs > max(params["x"])
         ci = ~(ai + bi)
 
-    x_float_inds = np.interp(xs, params["x"], np.linspace(0, len(params["x"])))
+    x_float_inds = np.interp(xs, params["x"], np.linspace(0, params["x"].size, params["x"].size))
 
     def NumDistFunc(m):
         # if len(curDist) == 1:
