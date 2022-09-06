@@ -99,7 +99,7 @@ def get_num_dist_func(fe_type, xie):
         bi = xs > max(params["x"])
         ci = ~(ai + bi)
 
-    x_float_inds = np.interp(xs[ci], params["x"], np.linspace(0, len(params["x"])))
+    x_float_inds = np.interp(xs, params["x"], np.linspace(0, len(params["x"])))
 
     def NumDistFunc(m):
         # if len(curDist) == 1:
@@ -112,11 +112,12 @@ def get_num_dist_func(fe_type, xie):
         # elif len(curDist) == 2:
         # X1, X2 = np.meshgrid(xs[ci], m)
 
-        m_float_inds = jnp.interp(m, params["m"], np.linspace(0, len(params["m"])))
-        ind_x_mesh, ind_m_mesh = jnp.meshgrid(x_float_inds, m_float_inds)
-        indices = zip(ind_x_mesh.flatten(), ind_m_mesh.flatten())
+        m_float_inds = jnp.array([jnp.interp(m, params["m"], np.linspace(0, params["m"].size, params["m"].size))])
 
-        interpedSection = jax.scipy.ndimage.map_coordinates(IT, indices, order=1, mode="wrap")
+        ind_x_mesh, ind_m_mesh = jnp.meshgrid(x_float_inds, m_float_inds)
+        indices = jnp.concatenate([ind_x_mesh.flatten()[:, None], ind_m_mesh.flatten()[:, None]], axis=1)
+
+        f1D = jax.scipy.ndimage.map_coordinates(IT, indices.T, order=1, mode="constant", cval=0.0)
         #
         # interpedSection = jnp.reshape(interpedSection, X1.shape, order="F")
 
@@ -141,8 +142,8 @@ def get_num_dist_func(fe_type, xie):
 
         # f1D=np.append([np.zeros([len(xs[bi]),*np.shape(interpedSection)[1:]]), interpedSection, np.zeros([len(xs[ai]),*np.shape(interpedSection)[1:]])],axis=0)
         # This will need to be shecked in cases where ai and bi have finite size
-        f1D = np.append(np.zeros([len(xs[bi]), *np.shape(interpedSection)[1:]]), interpedSection, axis=0)
-        f1D = np.append(f1D, np.zeros([len(xs[ai]), *np.shape(interpedSection)[1:]]), axis=0)
+        # f1D = np.append(np.zeros([len(xs[bi]), *np.shape(interpedSection)[1:]]), interpedSection, axis=0)
+        # f1D = np.append(f1D, np.zeros([len(xs[ai]), *np.shape(interpedSection)[1:]]), axis=0)
 
         #     if invertedxs:
         #         f1D=np.flip(f1D);
@@ -156,7 +157,7 @@ def get_num_dist_func(fe_type, xie):
         #         [X1, X2, X3] = np.meshgrid(params['x'],curDist[1],curDist[2])
         #         f1D = sp.interpn(params['x'],params['m'],params['Z'],IT,X1,X2,X3)
 
-        return np.squeeze(f1D)
+        return jnp.squeeze(f1D)
 
     return NumDistFunc
 
