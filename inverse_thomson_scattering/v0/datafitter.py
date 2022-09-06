@@ -10,7 +10,7 @@ from inverse_thomson_scattering.v0.loadTSdata import loadData
 from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
 from inverse_thomson_scattering.v0.getCalibrations import getCalibrations
 from inverse_thomson_scattering.v0.plotters import LinePlots
-from inverse_thomson_scattering.v0.numDistFunc import NumDistFunc
+from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.v0.form_factor import nonMaxwThomson
 from inverse_thomson_scattering.jax.form_factor import get_form_factor_fn
 
@@ -359,8 +359,10 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     data = np.vstack((LineoutTSE_norm, LineoutTSI_norm))
 
     xie = np.linspace(-7, 7, TSinputs["fe"]["Length"])
-    initFe(TSinputs, xie)
 
+    NumDistFunc = get_num_dist_func(TSinputs["fe"]["type"], xie)
+    # initFe(TSinputs, xie)
+    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))
     TSinputs["fe"]["lb"] = np.multiply(TSinputs["fe"]["lb"], np.ones(TSinputs["fe"]["length"]))
     TSinputs["fe"]["ub"] = np.multiply(TSinputs["fe"]["ub"], np.ones(TSinputs["fe"]["length"]))
 
@@ -405,7 +407,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     if result["fe"]["active"]:
         result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
     elif result["m"]["active"]:
-        initFe(result, xie)
+        TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
 
     return result
 
@@ -514,6 +516,7 @@ def plotState(x, TSinputs, xie, sas, D, data, fitModel2):
 
 def get_fitModel2(TSins, xie, sa, D):
     nonMaxwThomson_jax, _ = get_form_factor_fn(D["lamrangE"])
+    NumDistFunc = get_num_dist_func(TSins["fe"]["type"], xie)
 
     def fitModel2(x):
         i = 0
@@ -524,7 +527,8 @@ def get_fitModel2(TSins, xie, sa, D):
         if TSins["fe"]["active"]:
             TSins["fe"]["val"] = x[-TSins["fe"]["length"] : :]
         elif TSins["m"]["active"]:
-            initFe(TSins, xie)
+            # initFe(TSins, xie)
+            TSins["fe"]["val"] = jnp.log(NumDistFunc(TSins["m"]["val"]))
 
         # [Te,ne]=TSins.genGradients(Te,ne,7)
         fecur = jnp.exp(TSins["fe"]["val"])
