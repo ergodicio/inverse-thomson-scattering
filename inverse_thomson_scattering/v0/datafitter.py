@@ -5,6 +5,8 @@ import numpy as np
 import scipy.optimize as spopt
 from jax import numpy as jnp
 from jax import jit
+import jax
+import time
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.v0.loadTSdata import loadData
 from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
@@ -378,14 +380,22 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     ## Plot initial guess
     fitmodel2 = get_fitModel2(TSinputs, xie, sa, D)
     plotState(x0, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
-    chiSq2 = get_chisq2(TSinputs, xie, sa, D, data)
+    chiSq2, vgchiSq2 = get_chisq2(TSinputs, xie, sa, D, data)
     chiinit = chiSq2(x0)
     print(chiinit)
 
+    print(x0)
     ## Perform fit
     if np.shape(x0)[0] != 0:
         # fun = lambda x: chiSq2(x, TSinputs, xie, sa, D, data)
-        res = spopt.minimize(chiSq2, np.array(x0), bounds=zip(lb, ub))
+        
+        t0 = time.time()
+        res = spopt.minimize(chiSq2, np.array(x0), method="L-BFGS-B", bounds=zip(lb, ub), options={"disp": True})
+        print(f"gradless took {round(time.time() - t0, 2)} s")
+
+        t0 = time.time()        
+        res = spopt.minimize(vgchiSq2, np.array(x0), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": True})
+        print(f"w grad took {round(time.time() - t0, 2)} s")
         # print(res)
         # [x,~,~,~,~,grad,hess]=fmincon(@(x)chiSq2(x,TSinputs,xie,sa,D,data),x0,[],[],[],[],lb,ub,[],options)
 
@@ -551,7 +561,7 @@ def get_fitModel2(TSins, xie, sa, D):
         #     expion=D["expandedions"],
         # )
         # Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lamrang, lam
-        Thry, lamAxisE = nonMaxwThomson_jax(
+        Thry, lamAxisE = jit(nonMaxwThomson_jax)(
             TSins["Te"]["val"],
             TSins["Te"]["val"],
             1,
@@ -620,12 +630,8 @@ def get_fitModel2(TSins, xie, sa, D):
 def get_chisq2(TSinputs, xie, sas, D, data):
 
     fitModel2 = get_fitModel2(TSinputs, xie, sas, D)
-
-    def chiSq2(x):
-
-        # all ion terms are commented out for testing
-        modlE, lamAxisE = fitModel2(x)
-
+    
+    def rest_of_chisq2(modlE, lamAxisE):
         lam = TSinputs["lam"]["val"]
         amp1 = TSinputs["amp1"]["val"]
         amp2 = TSinputs["amp2"]["val"]
@@ -699,10 +705,26 @@ def get_chisq2(TSinputs, xie, sas, D, data):
                 chisq = chisq + jnp.sum(
                     (data[0, (lamAxisE > 540) & (lamAxisE < 680)] - ThryE[(lamAxisE > 540) & (lamAxisE < 680)]) ** 2
                 )
-
+                
         return chisq
+    
+    def chiSq2(x):
 
-    return chiSq2
+        # all ion terms are commented out for testing
+        modlE, lamAxisE = fitModel2(x)
+        
+        return rest_of_chisq2(modlE, lamAxisE)
+    
+    vg_func = jax.value_and_grad(chiSq2)
+    
+    def val_and_grad_chisq2(x):
+        x = jnp.array(x)
+        value, grad = vg_func(x)
+        
+        return value, np.array(grad)
+        
+
+    return chiSq2, val_and_grad_chisq2
 
 
 def initFe(TSinputs, xie):
