@@ -15,6 +15,7 @@ from inverse_thomson_scattering.v0.plotters import LinePlots
 from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.v0.form_factor import nonMaxwThomson
 from inverse_thomson_scattering.jax.form_factor import get_form_factor_fn
+import multiprocessing
 
 
 def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, extraoptions):
@@ -79,7 +80,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     D["extraoptions"] = extraoptions
     if "loadspecs" not in D["extraoptions"].keys():
         # This defines the spectra to be loaded and plotted [IAW, EPW]
-        D["extraoptions"]["loadspecs"] = [1, 1]
+        D["extraoptions"]["loadspecs"] = [0, 1]
     if "fitspecs" in D["extraoptions"].keys():
         if D["extraoptions"]["loadspecs"][0] == 0 and D["extraoptions"]["fitspecs"][0] == 1:
             D["extraoptions"]["fitspecs"][0] = 0
@@ -189,7 +190,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
 
     ## Assign lineout locations
     if lineoutloc["type"] == "ps":
-        LineoutPixelE = np.argmin(abs(axisxE - lineoutloc["val"] - shift_zero))
+        LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in lineoutloc['val']]
         LineoutPixelI = LineoutPixelE
 
     elif lineoutloc["type"] == "um":  # [char(hex2dec('03bc')) 'm']:
@@ -213,8 +214,8 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     # (span must be odd)
 
     if D["extraoptions"]["loadspecs"][1]:
-        LineoutTSE = np.mean(elecData_bsub[:, LineoutPixelE - dpixel : LineoutPixelE + dpixel], axis=1)
-        LineoutTSE_smooth = np.convolve(LineoutTSE, np.ones(span) / span, "same")
+        LineoutTSE = [np.mean(elecData_bsub[:, a - dpixel : a + dpixel], axis=1) for a in LineoutPixelE]
+        LineoutTSE_smooth = [np.convolve(LineoutTSE[i], np.ones(span) / span, "same") for i,_ in enumerate(LineoutPixelE)]
 
     if D["extraoptions"]["loadspecs"][0]:
         LineoutTSI = np.mean(
@@ -269,85 +270,92 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
 
                 LineoutTSE_smooth = LineoutTSE_smooth - rat11(np.arange(1024), rat1bg)
 
-        #### loadspecs added up to this line
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
-    noiseE = np.mean(elecData_bsub[:, BackgroundPixel - dpixel : BackgroundPixel + dpixel], 1)
-    noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
+    if D["extraoptions"]["loadspecs"][0]:
+        noiseI = np.mean(ionData_bsub[:, BackgroundPixel - dpixel : BackgroundPixel + dpixel], 1)
+        noiseI = np.convolve(noiseI, np.ones(span) / span, "same")
+        bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
+        noiseI = np.mean(noiseI[bgfitx])
+        noiseI = np.ones(1024) * bgscalingI * noiseI
+    
+    if D["extraoptions"]["loadspecs"][1]:
+        noiseE = np.mean(elecData_bsub[:, BackgroundPixel - dpixel : BackgroundPixel + dpixel], 1)
+        noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
 
-    def exp2(x, a, b, c, d):
-        return a * np.exp(-b * x) + c * np.exp(-d * x)
+        def exp2(x, a, b, c, d):
+            return a * np.exp(-b * x) + c * np.exp(-d * x)
 
-    bgfitx = np.hstack(
-        [np.arange(200, 480), np.arange(540, 900)]
-    )  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
-    [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
-    noiseE = bgscalingE * exp2(np.arange(1024), *expbg)
+        bgfitx = np.hstack([np.arange(200, 480), np.arange(540, 900)])  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
+        [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
+        noiseE = bgscalingE * exp2(np.arange(1024), *expbg)
 
-    noiseI = np.mean(ionData_bsub[:, BackgroundPixel - dpixel : BackgroundPixel + dpixel], 1)
-    noiseI = np.convolve(noiseI, np.ones(span) / span, "same")
-    bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
-    noiseI = np.mean(noiseI[bgfitx])
-    noiseI = np.ones(1024) * bgscalingI * noiseI
-
-    # temporary constant addition to the background
-    noiseE = noiseE + flatbg
+        # temporary constant addition to the background
+        noiseE = noiseE + flatbg
 
     ## Plot data
     fig, ax = plt.subplots(1, 2, figsize=(16, 4))
-    imE = ax[0].imshow(
-        conv2(elecData_bsub, np.ones([5, 3]) / 15, mode="same"),
-        cmap,
-        interpolation="none",
-        extent=[axisxE[0] - shift_zero, axisxE[-1] - shift_zero, axisyE[-1], axisyE[0]],
-        aspect="auto",
-        vmin=0,
-    )
-    ax[0].set_title(
-        "Shot : " + str(shotNum) + " : " + "TS : Thruput corrected", fontdict={"fontsize": 10, "fontweight": "bold"}
-    )
-    ax[0].set_xlabel(xlab)
-    ax[0].set_ylabel("Wavelength (nm)")
-    plt.colorbar(imE, ax=ax[0])
-    ax[0].plot([axisxE[LineoutPixelE] - shift_zero, axisxE[LineoutPixelE] - shift_zero], [axisyE[0], axisyE[-1]], "r")
-    ax[0].plot(
-        [axisxE[BackgroundPixel] - shift_zero, axisxE[BackgroundPixel] - shift_zero], [axisyE[0], axisyE[-1]], "k"
-    )
-
-    imI = ax[1].imshow(
-        conv2(ionData_bsub, np.ones([5, 3]) / 15, mode="same"),
-        cmap,
-        interpolation="none",
-        extent=[axisxI[0] - shift_zero, axisxI[-1] - shift_zero, axisyI[-1], axisyI[0]],
-        aspect="auto",
-        vmin=0,
-    )
-    ax[1].set_title(
-        "Shot : " + str(shotNum) + " : " + "TS : Thruput corrected", fontdict={"fontsize": 10, "fontweight": "bold"}
-    )
-    ax[1].set_xlabel(xlab)
-    ax[1].set_ylabel("Wavelength (nm)")
-    plt.colorbar(imI, ax=ax[1])
-    ax[1].plot([axisxI[LineoutPixelI] - shift_zero, axisxI[LineoutPixelI] - shift_zero], [axisyI[0], axisyI[-1]], "r")
-    ax[1].plot(
-        [axisxI[BackgroundPixel] - shift_zero, axisxI[BackgroundPixel] - shift_zero], [axisyI[0], axisyI[-1]], "k"
-    )
+    if D["extraoptions"]["loadspecs"][0]:
+        imI = ax[1].imshow(
+            conv2(ionData_bsub, np.ones([5, 3]) / 15, mode="same"),
+            cmap,
+            interpolation="none",
+            extent=[axisxI[0] - shift_zero, axisxI[-1] - shift_zero, axisyI[-1], axisyI[0]],
+            aspect="auto",
+            vmin=0,
+        )
+        ax[1].set_title(
+            "Shot : " + str(shotNum) + " : " + "TS : Thruput corrected", fontdict={"fontsize": 10, "fontweight": "bold"}
+        )
+        ax[1].set_xlabel(xlab)
+        ax[1].set_ylabel("Wavelength (nm)")
+        plt.colorbar(imI, ax=ax[1])
+        ax[1].plot([axisxI[LineoutPixelI] - shift_zero, axisxI[LineoutPixelI] - shift_zero], [axisyI[0], axisyI[-1]], "r")
+        ax[1].plot(
+            [axisxI[BackgroundPixel] - shift_zero, axisxI[BackgroundPixel] - shift_zero], [axisyI[0], axisyI[-1]], "k"
+        )
+        
+    if D["extraoptions"]["loadspecs"][1]:
+        imE = ax[0].imshow(
+            conv2(elecData_bsub, np.ones([5, 3]) / 15, mode="same"),
+            cmap,
+            interpolation="none",
+            extent=[axisxE[0] - shift_zero, axisxE[-1] - shift_zero, axisyE[-1], axisyE[0]],
+            aspect="auto",
+            vmin=0,
+        )
+        ax[0].set_title(
+            "Shot : " + str(shotNum) + " : " + "TS : Thruput corrected", fontdict={"fontsize": 10, "fontweight": "bold"}
+        )
+        ax[0].set_xlabel(xlab)
+        ax[0].set_ylabel("Wavelength (nm)")
+        plt.colorbar(imE, ax=ax[0])
+        ax[0].plot([axisxE[LineoutPixelE] - shift_zero, axisxE[LineoutPixelE] - shift_zero], [axisyE[0], axisyE[-1]], "r")
+        ax[0].plot(
+            [axisxE[BackgroundPixel] - shift_zero, axisxE[BackgroundPixel] - shift_zero], [axisyE[0], axisyE[-1]], "k"
+        )
 
     ## Normalize Data before fitting
+    if D["extraoptions"]["loadspecs"][0]:
+        noiseI = noiseI / gain
+        LineoutTSI_norm = LineoutTSI_smooth / gain
+        LineoutTSI_norm = LineoutTSI_norm - noiseI  # new 6-29-20
+        ampI = np.max(LineoutTSI_norm)
+    else:
+        ampI=1
+    
+    if D["extraoptions"]["loadspecs"][1]:
+        noiseE = noiseE / gain
+        LineoutTSE_norm = [LineoutTSE_smooth[i] / gain for i,_ in enumerate(LineoutPixelE)]
+        LineoutTSE_norm = LineoutTSE_norm - noiseE  # new 6-29-20
+        ampE = np.amax(LineoutTSE_norm[:,100:-1],axis=1)  # attempts to ignore 3w comtamination
+    else:
+        ampE=1
 
-    noiseE = noiseE / gain
-    LineoutTSE_norm = LineoutTSE_smooth / gain
-    LineoutTSE_norm = LineoutTSE_norm - noiseE  # new 6-29-20
-    ampE = np.max(LineoutTSE_norm[100:-1])  # attempts to ignore 3w comtamination
-
-    noiseI = noiseI / gain
-    LineoutTSI_norm = LineoutTSI_smooth / gain
-    LineoutTSI_norm = LineoutTSI_norm - noiseI  # new 6-29-20
-    ampI = np.max(LineoutTSI_norm)
+    
     PhysParams = {
         "widIRF": stddev,
         "background": [0, 0],
-        "amps": [ampE, ampI],
         "norm": norm2B,
     }  # {width of IRF,background , amplitude ,Normalization of peaks} new 6-29-20
 
@@ -358,7 +366,6 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     D["iawfilter"] = [1, 4, 24, 528]
     D["npts"] = (len(LineoutTSE_norm) - 1) * 20
     D["PhysParams"] = PhysParams
-    data = np.vstack((LineoutTSE_norm, LineoutTSI_norm))
 
     xie = np.linspace(-7, 7, TSinputs["fe"]["Length"])
 
@@ -371,53 +378,89 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     x0 = []
     lb = []
     ub = []
+    xiter = []
     for key in TSinputs.keys():
         if TSinputs[key]["active"]:
             x0.append(TSinputs[key]["val"])
             lb.append(TSinputs[key]["lb"])
             ub.append(TSinputs[key]["ub"])
 
-    ## Plot initial guess
-    fitmodel2 = get_fitModel2(TSinputs, xie, sa, D)
-    plotState(x0, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
-    chiSq2, vgchiSq2 = get_chisq2(TSinputs, xie, sa, D, data)
-    chiinit = chiSq2(x0)
-    print(chiinit)
-
-    print(x0)
-    ## Perform fit
-    if np.shape(x0)[0] != 0:
-        # fun = lambda x: chiSq2(x, TSinputs, xie, sa, D, data)
+    t0 = time.time() 
+    #run fitting code for each lineout
+    
+    global performfit
+    def performfit(i):
+    #for i,_ in enumerate(lineoutloc['val']):
+        #this probably needs to be done differently
+        if D["extraoptions"]["loadspecs"][0] and D["extraoptions"]["loadspecs"][1]:
+            data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
+            D["PhysParams"]["amps"]=[ampE[i], ampI[i]]
+        elif D["extraoptions"]["loadspecs"][0]:
+            data = np.vstack((LineoutTSI_norm[i], LineoutTSI_norm[i]))
+            D["PhysParams"]["amps"]=[ampE, ampI[i]]
+        elif D["extraoptions"]["loadspecs"][1]:
+            data = np.vstack((LineoutTSE_norm[i], LineoutTSE_norm[i]))
+            D["PhysParams"]["amps"]=[ampE[i], ampI]
         
-        t0 = time.time()
-        res = spopt.minimize(chiSq2, np.array(x0), method="L-BFGS-B", bounds=zip(lb, ub), options={"disp": True})
-        print(f"gradless took {round(time.time() - t0, 2)} s")
+        ## Plot initial guess
+        fitmodel2 = get_fitModel2(TSinputs, xie, sa, D)
+        #plotState(x0, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
+        chiSq2, vgchiSq2 = get_chisq2(TSinputs, xie, sa, D, data)
+        #chiinit = chiSq2(x0)
+        #print(chiinit)
 
-        t0 = time.time()        
-        res = spopt.minimize(vgchiSq2, np.array(x0), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": True})
-        print(f"w grad took {round(time.time() - t0, 2)} s")
-        # print(res)
-        # [x,~,~,~,~,grad,hess]=fmincon(@(x)chiSq2(x,TSinputs,xie,sa,D,data),x0,[],[],[],[],lb,ub,[],options)
+        #print(x0)
+        ## Perform fit
+        if np.shape(x0)[0] != 0:
+            # fun = lambda x: chiSq2(x, TSinputs, xie, sa, D, data)
+        
+            #t0 = time.time()
+            #res = spopt.minimize(chiSq2, np.array(x0), method="L-BFGS-B", bounds=zip(lb, ub), options={"disp": False})
+            #print(f"gradless took {round(time.time() - t0, 2)} s")
+            #print(f"gradless used {res.nit} interactions and {res.nfev} function evaluations")
 
-        # chisq=@(x)chiSq2(x,TSinputs,xie,sa,D,data);
-    else:
-        x = x0
+            #t0 = time.time()        
+            res = spopt.minimize(vgchiSq2, np.array(x0), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False})
+            #print(f"w grad took {round(time.time() - t0, 2)} s")
+            #print(f"gradless used {res.nit} interactions and {res.nfev} function evaluations")
+            # print(res)
+            # [x,~,~,~,~,grad,hess]=fmincon(@(x)chiSq2(x,TSinputs,xie,sa,D,data),x0,[],[],[],[],lb,ub,[],options)
 
-    ## Plot Result
-    plotState(res.x, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
-    chifin = chiSq2(res.x)  # , TSinputs, xie, sa, D, data)
-    print(chifin)
+            # chisq=@(x)chiSq2(x,TSinputs,xie,sa,D,data);
+        else:
+            x = x0
 
+        ## Plot Result
+        #plotState(res.x, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
+        #chifin = chiSq2(res.x)  # , TSinputs, xie, sa, D, data)
+        #print(chifin)
+        print(res)
+    
+        #xiter.append(iter(res.x))
+        #xiter.append(res.x)
+        return res.x
+    
+    
+    pool_obj = multiprocessing.Pool()
+    testout= pool_obj.map(performfit,range(len(lineoutloc['val'])))
+    print(testout)
+    print(f"w grad took {round(time.time() - t0, 2)} s")
+    print(xiter)
+    
     result = TSinputs
-    xiter = iter(res.x)
+    count=0
+    xiter=np.array(xiter)
     for key in result.keys():
         if result[key]["active"]:
-            result[key]["val"] = next(xiter)
-            print(key, ": ", result[key]["val"])
-    if result["fe"]["active"]:
-        result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
-    elif result["m"]["active"]:
-        TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
+            result[key]["val"] = xiter[:,count]
+            count=count+1
+            #print(key, ": ", result[key]["val"])
+    
+    #needs to be fixed
+    #if result["fe"]["active"]:
+    #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
+    #elif result["m"]["active"]:
+    #    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
 
     return result
 
