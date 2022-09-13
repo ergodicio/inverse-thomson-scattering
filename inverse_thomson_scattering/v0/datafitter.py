@@ -15,7 +15,7 @@ from inverse_thomson_scattering.v0.plotters import LinePlots
 from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.v0.form_factor import nonMaxwThomson
 from inverse_thomson_scattering.jax.form_factor import get_form_factor_fn
-import multiprocessing
+#import multiprocessing
 
 
 def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, extraoptions):
@@ -52,6 +52,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     # used to prevent reloading and one time analysis (not sure if there is a way to do this in python, omitted for now)
     # persistent prevShot
 
+    t0 = time.time()
     ## Hard code toggles
     # collection of the toggles that are often changed and should eventually be moved out into an input deck
     tstype = extraoptions["spectype"]
@@ -80,7 +81,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     D["extraoptions"] = extraoptions
     if "loadspecs" not in D["extraoptions"].keys():
         # This defines the spectra to be loaded and plotted [IAW, EPW]
-        D["extraoptions"]["loadspecs"] = [0, 1]
+        D["extraoptions"]["loadspecs"] = [1, 1]
     if "fitspecs" in D["extraoptions"].keys():
         if D["extraoptions"]["loadspecs"][0] == 0 and D["extraoptions"]["fitspecs"][0] == 1:
             D["extraoptions"]["fitspecs"][0] = 0
@@ -93,7 +94,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
             print("EPW data not loaded, omitting EPW fit")
     else:
         # This defines the spectrum to be fit [IAW, EPWb, EPWr]
-        D["extraoptions"]["fitspecs"] = [0, 1, 1]
+        D["extraoptions"]["fitspecs"] = [1, 1, 1]
 
     norm2B = 0  # 0 no normalization
     # 1 norm to blue
@@ -218,12 +219,8 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
         LineoutTSE_smooth = [np.convolve(LineoutTSE[i], np.ones(span) / span, "same") for i,_ in enumerate(LineoutPixelE)]
 
     if D["extraoptions"]["loadspecs"][0]:
-        LineoutTSI = np.mean(
-            ionData_bsub[:, LineoutPixelI - IAWtime - dpixel : LineoutPixelI - IAWtime + dpixel], axis=1
-        )
-        LineoutTSI_smooth = np.convolve(
-            LineoutTSI, np.ones(span) / span, "same"
-        )  # was divided by 10 for some reason (removed 8-9-22)
+        LineoutTSI = [np.mean(ionData_bsub[:, a - IAWtime - dpixel : a - IAWtime + dpixel], axis=1) for a in LineoutPixelI]
+        LineoutTSI_smooth = [np.convolve(LineoutTSI[i], np.ones(span) / span, "same") for i,_ in enumerate(LineoutPixelE)] # was divided by 10 for some reason (removed 8-9-22)
 
     if bgShot["type"] == "Fit":
         if D["extraoptions"]["loadspecs"][1]:
@@ -338,9 +335,9 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
     ## Normalize Data before fitting
     if D["extraoptions"]["loadspecs"][0]:
         noiseI = noiseI / gain
-        LineoutTSI_norm = LineoutTSI_smooth / gain
+        LineoutTSI_norm = [LineoutTSI_smooth[i] / gain for i,_ in enumerate(LineoutPixelI)]
         LineoutTSI_norm = LineoutTSI_norm - noiseI  # new 6-29-20
-        ampI = np.max(LineoutTSI_norm)
+        ampI = np.amax(LineoutTSI_norm, axis=1)
     else:
         ampI=1
     
@@ -348,7 +345,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
         noiseE = noiseE / gain
         LineoutTSE_norm = [LineoutTSE_smooth[i] / gain for i,_ in enumerate(LineoutPixelE)]
         LineoutTSE_norm = LineoutTSE_norm - noiseE  # new 6-29-20
-        ampE = np.amax(LineoutTSE_norm[:,100:-1],axis=1)  # attempts to ignore 3w comtamination
+        ampE = np.amax(LineoutTSE_norm[:,100:-1], axis=1)  # attempts to ignore 3w comtamination
     else:
         ampE=1
 
@@ -385,12 +382,12 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
             lb.append(TSinputs[key]["lb"])
             ub.append(TSinputs[key]["ub"])
 
-    t0 = time.time() 
+    t1 = time.time() 
     #run fitting code for each lineout
     
-    global performfit
-    def performfit(i):
-    #for i,_ in enumerate(lineoutloc['val']):
+    #global performfit
+    #def performfit(i):
+    for i,_ in enumerate(lineoutloc['val']):
         #this probably needs to be done differently
         if D["extraoptions"]["loadspecs"][0] and D["extraoptions"]["loadspecs"][1]:
             data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
@@ -404,7 +401,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
         
         ## Plot initial guess
         fitmodel2 = get_fitModel2(TSinputs, xie, sa, D)
-        #plotState(x0, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
+        plotState(x0, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
         chiSq2, vgchiSq2 = get_chisq2(TSinputs, xie, sa, D, data)
         #chiinit = chiSq2(x0)
         #print(chiinit)
@@ -431,21 +428,22 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
             x = x0
 
         ## Plot Result
-        #plotState(res.x, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
+        plotState(res.x, TSinputs, xie, sa, D, data, fitModel2=fitmodel2)
         #chifin = chiSq2(res.x)  # , TSinputs, xie, sa, D, data)
         #print(chifin)
-        print(res)
+        #print(res)
     
         #xiter.append(iter(res.x))
-        #xiter.append(res.x)
-        return res.x
+        xiter.append(res.x)
+        #return res.x
     
     
-    pool_obj = multiprocessing.Pool()
-    testout= pool_obj.map(performfit,range(len(lineoutloc['val'])))
-    print(testout)
-    print(f"w grad took {round(time.time() - t0, 2)} s")
-    print(xiter)
+    #pool_obj = multiprocessing.Pool()
+    #testout= pool_obj.map(performfit,range(len(lineoutloc['val'])))
+    #print(testout)
+    print(f"w grad took {round(time.time() - t1, 2)} s")
+    print(f" full code took {round(time.time() - t0, 2)} s")
+    #print(xiter)
     
     result = TSinputs
     count=0
@@ -467,31 +465,33 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs, e
 
 def plotState(x, TSinputs, xie, sas, D, data, fitModel2):
     # all ion terms are commented out for testing
-    [modlE, lamAxisE] = fitModel2(x)
+    [modlE, modlI, lamAxisE, lamAxisI] = fitModel2(x)
 
     lam = TSinputs["lam"]["val"]
     amp1 = TSinputs["amp1"]["val"]
     amp2 = TSinputs["amp2"]["val"]
-    # [_,_,lamAxisE,_]=lamParse(D['lamrangE'],lam,D['npts'])
+    amp3 = TSinputs["amp3"]["val"]
     # [omgL,omgsI,lamAxisI,_]=lamParse(D['lamrangI'],lam,D['npts'])
 
     # this needs to be updated
     # modlI=fitModel(Te,Ti,Z,D.A,D.fract,ne,Va,ud,omgsI,omgL,D.sa,curDist,D.distTable,0,{0},D.lamrangI,lam,lamAxisI);
 
     originE = (max(lamAxisE) + min(lamAxisE)) / 2  # Conceptual_origin so the convolution donsn't shift the signal
-    # originI=(max(lamAxisI)+min(lamAxisI))/2 #Conceptual_origin so the convolution donsn't shift the signal
+    originI = (max(lamAxisI) + min(lamAxisI)) / 2 #Conceptual_origin so the convolution donsn't shift the signal
 
     stddev = D["PhysParams"]["widIRF"]
 
     inst_funcE = np.squeeze(
         (1 / (stddev[0] * np.sqrt(2 * np.pi))) * np.exp(-((lamAxisE - originE) ** 2) / (2 * (stddev[0]) ** 2))
     )  # Gaussian
-    # inst_funcI = (1/(stddev[1]*np.sqrt(2*np.pi)))*np.exp(-(lamAxisI-originI)**2/(2*(stddev[1])**2)) #Gaussian
+    inst_funcI = np.squeeze(
+        (1 / (stddev[1] * np.sqrt(2 * np.pi))) * np.exp(-((lamAxisI - originI) ** 2) / (2 * (stddev[0]) ** 2))
+    )#Gaussian
 
     ThryE = np.convolve(modlE, inst_funcE, "same")
     ThryE = (max(modlE) / max(ThryE)) * ThryE
-    # ThryI = np.convolve(modlI, inst_funcI,'same')
-    # ThryI=(max(modlI)/max(ThryI))*ThryI
+    ThryI = np.convolve(modlI, inst_funcI,'same')
+    ThryI = (max(modlI) / max(ThryI)) * ThryI
 
     if D["PhysParams"]["norm"] > 0:
         ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam] / max(ThryE[lamAxisE < lam]))
@@ -500,6 +500,7 @@ def plotState(x, TSinputs, xie, sas, D, data, fitModel2):
     # n=np.floor(len(ThryE)/len(data))
     # ThryE = np.average(ThryE.reshape(-1, n), axis=1)
     ThryE = np.average(ThryE.reshape(1024, -1), axis=1)
+    ThryI = np.average(ThryI.reshape(1024, -1), axis=1)
     # ThryE= [np.mean(ThryE[i:i+n-1]) for i in np.arange(0,len(ThryE),n)]
     # arrayfun(@(i) mean(ThryE(i:i+n-1)),1:n:length(ThryE)-n+1);
     # n=floor(length(ThryI)/length(data));
@@ -507,8 +508,10 @@ def plotState(x, TSinputs, xie, sas, D, data, fitModel2):
 
     if D["PhysParams"]["norm"] == 0:
         lamAxisE = np.average(lamAxisE.reshape(1024, -1), axis=1)
+        lamAxisI = np.average(lamAxisI.reshape(1024, -1), axis=1)
         # lamAxisE=arrayfun(@(i) mean(lamAxisE(i:i+n-1)),1:n:length(lamAxisE)-n+1);
         ThryE = D["PhysParams"]["amps"][0] * ThryE / max(ThryE)
+        ThryI = amp3 * D["PhysParams"]["amps"][1] * ThryI / max(ThryI)
         # lamAxisI=arrayfun(@(i) mean(lamAxisI(i:i+n-1)),1:n:length(lamAxisI)-n+1);
         # ThryI = amp3*D.PhysParams{3}(2)*ThryI/max(ThryI);
         ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam])
@@ -540,8 +543,13 @@ def plotState(x, TSinputs, xie, sas, D, data, fitModel2):
     #    caxis([-8000 8000]);
     # end
     else:
-        LinePlots(lamAxisE, np.vstack((data[0, :], ThryE)), CurveNames=["Data", "Fit"], XLabel="Wavelength (nm)")
-        plt.xlim([450, 630])
+        if D["extraoptions"]["loadspecs"][0]:
+            LinePlots(lamAxisI, np.vstack((data[1, :], ThryI)), CurveNames=["Data", "Fit"], XLabel="Wavelength (nm)")
+            plt.xlim([525, 528])
+            
+        if D["extraoptions"]["loadspecs"][1]:
+            LinePlots(lamAxisE, np.vstack((data[0, :], ThryE)), CurveNames=["Data", "Fit"], XLabel="Wavelength (nm)")
+            plt.xlim([450, 630])
 
         # LinePlots(lamAxisI,[data(2,:); ThryI],'CurveNames',{'Data','Fit'},'XLabel','Wavelength (nm)')
         # xlim([525 528])
@@ -551,8 +559,11 @@ def plotState(x, TSinputs, xie, sas, D, data, fitModel2):
 
     if "fitspecs" in D["extraoptions"].keys():
         chisq = 0
-        # if D.extraoptions.fitspecs(1)
+        if D["extraoptions"]["fitspecs"][0]:
         #    chisq=chisq+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+            chisq = chisq + sum(
+                (data[1, :] - ThryI) ** 2
+            )
 
         if D["extraoptions"]["fitspecs"][1]:
             # chisq=chisq+sum((data(1,lamAxisE<lam)-ThryE(lamAxisE<lam)).^2);
@@ -568,7 +579,8 @@ def plotState(x, TSinputs, xie, sas, D, data, fitModel2):
 
 
 def get_fitModel2(TSins, xie, sa, D):
-    nonMaxwThomson_jax, _ = get_form_factor_fn(D["lamrangE"])
+    nonMaxwThomsonE_jax, _ = get_form_factor_fn(D["lamrangE"])
+    nonMaxwThomsonI_jax, _ = get_form_factor_fn(D["lamrangI"])
     NumDistFunc = get_num_dist_func(TSins["fe"]["type"], xie)
 
     def fitModel2(x):
@@ -604,68 +616,98 @@ def get_fitModel2(TSins, xie, sa, D):
         #     expion=D["expandedions"],
         # )
         # Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lamrang, lam
-        Thry, lamAxisE = jit(nonMaxwThomson_jax)(
-            TSins["Te"]["val"],
-            TSins["Te"]["val"],
-            1,
-            1,
-            1,
-            TSins["ne"]["val"] * 1e20,
-            0,
-            0,
-            sa["sa"],
-            (fecur, xie),
-            lam,
-            # ,
-            # expion=D["expandedions"],
-        )
+        print(TSins)
+        if D["extraoptions"]["loadspecs"][0]:
+            ThryI, lamAxisI = jit(nonMaxwThomsonI_jax)(
+                TSins["Te"]["val"],
+                TSins["Ti"]["val"],
+                TSins["Z"]["val"],
+                TSins["A"]["val"],
+                1,
+                TSins["ne"]["val"] * 1e20,
+                0,
+                0,
+                sa["sa"],
+                (fecur, xie),
+                526.5,
+                # ,
+                # expion=D["expandedions"],
+            )
+            
+            # remove extra dimensions and rescale to nm
+            lamAxisI = jnp.squeeze(lamAxisI) * 1e7
 
-        # if TSins.fe['Type']=='MYDLM':
-        #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,TSins.fe['thetaphi'])
-        # elif TSins.fe['Type']=='Numeric':
-        #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,[2*np.pi/3,0])
-        # else:
-        #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,expion=D['expandedions'])
-        # nonMaxwThomson,_ =get_form_factor_fn(D['lamrangE'],lam)
-        # [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,sa['sa'], [fecur,xie])
+            ThryI = jnp.real(ThryI)
+            ThryI = jnp.mean(ThryI, axis=0)
+            modlI = jnp.sum(ThryI * sa["weights"], axis=1)
+        else:
+            ThryI = []; lamAxisI = []
+        
+        if D["extraoptions"]["loadspecs"][1]:
+            ThryE, lamAxisE = jit(nonMaxwThomsonE_jax)(
+                TSins["Te"]["val"],
+                TSins["Ti"]["val"],
+                TSins["Z"]["val"],
+                TSins["A"]["val"],
+                1,
+                TSins["ne"]["val"] * 1e20,
+                0,
+                0,
+                sa["sa"],
+                (fecur, xie),
+                lam,
+                # ,
+                # expion=D["expandedions"],
+            )
 
-        # remove extra dimensions and rescale to nm
-        lamAxisE = jnp.squeeze(lamAxisE) * 1e7
+            # if TSins.fe['Type']=='MYDLM':
+            #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,TSins.fe['thetaphi'])
+            # elif TSins.fe['Type']=='Numeric':
+            #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,[2*np.pi/3,0])
+            # else:
+            #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,expion=D['expandedions'])
+            # nonMaxwThomson,_ =get_form_factor_fn(D['lamrangE'],lam)
+            # [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,sa['sa'], [fecur,xie])
 
-        Thry = jnp.real(Thry)
-        Thry = jnp.mean(Thry, axis=0)
-        modlE = jnp.sum(Thry * sa["weights"], axis=1)
+            # remove extra dimensions and rescale to nm
+            lamAxisE = jnp.squeeze(lamAxisE) * 1e7
 
-        # [modl,lamAx]=S2Signal(Thry,lamAxis,D);
-        # [_,_,lamAxisE,_]=lamParse(D['lamrangE'],lam,D['npts'])
-        if D["iawoff"] and (D["lamrangE"][0] < lam and D["lamrangE"][1] > lam):
-            # set the ion feature to 0 #should be switched to a range about lam
-            lamloc = jnp.argmin(jnp.abs(lamAxisE - lam))
-            # lamloc=find(abs(lamAxisE-lam)<(lamAxisE(2)-lamAxisE(1)));
-            # modlE[lamloc - 2000 : lamloc + 2000] = 0
-            modlE = jnp.concatenate([modlE[: lamloc - 2000], jnp.zeros(4000), modlE[lamloc + 2000 :]])
+            ThryE = jnp.real(ThryE)
+            ThryE = jnp.mean(ThryE, axis=0)
+            modlE = jnp.sum(ThryE * sa["weights"], axis=1)
 
-        if D["iawfilter"][0]:
-            filterb = D["iawfilter"][3] - D["iawfilter"][2] / 2
-            filterr = D["iawfilter"][3] + D["iawfilter"][2] / 2
-            if D["lamrangE"][0] < filterr and D["lamrangE"][1] > filterb:
-                if D["lamrangE"][0] < filterb:
-                    lamleft = jnp.argmin(jnp.abs(lamAxisE - filterb))
-                else:
-                    lamleft = 0
+            # [modl,lamAx]=S2Signal(Thry,lamAxis,D);
+            # [_,_,lamAxisE,_]=lamParse(D['lamrangE'],lam,D['npts'])
+            if D["iawoff"] and (D["lamrangE"][0] < lam and D["lamrangE"][1] > lam):
+                # set the ion feature to 0 #should be switched to a range about lam
+                lamloc = jnp.argmin(jnp.abs(lamAxisE - lam))
+                # lamloc=find(abs(lamAxisE-lam)<(lamAxisE(2)-lamAxisE(1)));
+                # modlE[lamloc - 2000 : lamloc + 2000] = 0
+                modlE = jnp.concatenate([modlE[: lamloc - 2000], jnp.zeros(4000), modlE[lamloc + 2000 :]])
 
-                if D["lamrangE"][1] > filterr:
-                    lamright = jnp.argmin(jnp.abs(lamAxisE - filterr))
-                else:
-                    lamright = lamAxisE.size
+            if D["iawfilter"][0]:
+                filterb = D["iawfilter"][3] - D["iawfilter"][2] / 2
+                filterr = D["iawfilter"][3] + D["iawfilter"][2] / 2
+                if D["lamrangE"][0] < filterr and D["lamrangE"][1] > filterb:
+                    if D["lamrangE"][0] < filterb:
+                        lamleft = jnp.argmin(jnp.abs(lamAxisE - filterb))
+                    else:
+                        lamleft = 0
+
+                    if D["lamrangE"][1] > filterr:
+                        lamright = jnp.argmin(jnp.abs(lamAxisE - filterr))
+                    else:
+                        lamright = lamAxisE.size
                     # lamright=[0 length(lamAxisE)];
 
-                # modlE[lamleft:lamright] = modlE[lamleft:lamright] * 10 ** (-D["iawfilter"][1])
-                modlE = jnp.concatenate(
-                    [modlE[:lamleft], modlE[lamleft:lamright] * 10 ** (-D["iawfilter"][1]), modlE[lamright:]]
-                )
+                    # modlE[lamleft:lamright] = modlE[lamleft:lamright] * 10 ** (-D["iawfilter"][1])
+                    modlE = jnp.concatenate(
+                        [modlE[:lamleft], modlE[lamleft:lamright] * 10 ** (-D["iawfilter"][1]), modlE[lamright:]]
+                    )
+        else:
+            ThryE = []; lamAxisE = []
 
-        return modlE, lamAxisE
+        return modlE, modlI, lamAxisE, lamAxisI
 
     return fitModel2
 

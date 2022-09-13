@@ -1,36 +1,36 @@
 amp1:
     val: 1.
-    active: True
+    active: False
     lb: 0.
     ub: 10.
 amp2:
     val: 1.
-    active: True
+    active: False
     lb: 0.
     ub: 10.
 amp3:
     val: 1.
-    active: True
+    active: False
     lb: 0.
     ub: 10.
 lam:
     val: 526.5
-    active: True
+    active: False
     lb: 523.
     ub: 528.
 Te:
     val: .5
-    active: True
+    active: False
     lb: 0.01
     ub: 3.
 Ti:
     val: .2
-    active: True
+    active: False
     lb: 0.01
     ub: 3.
 Z:
-    val: 8.
-    active: True
+    val: 1.
+    active: False
     lb: 1.
     ub: 25.
 A:
@@ -38,12 +38,12 @@ A:
     active: False
 ne:
     val: .2
-    active: True
+    active: False
     lb: .001
     ub: 10.
 m:
     val: 2.
-    active: True
+    active: False
     lb: 2.
     ub: 5.
 fe:
