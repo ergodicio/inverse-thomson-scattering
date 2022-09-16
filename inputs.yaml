@@ -49,7 +49,7 @@ m:
 fe:
     val: []
     active: False
-    length: 64
+    length: 3999
     type: 'DLM'
     lb: -100.
     ub: -0.5
@@ -69,3 +69,11 @@ fitprops:
     val: []
     active: False
 
+D:
+    extraoptions:
+        spectype: 2
+        load_ion_spec: True
+        load_ele_spec: True
+        fit_IAW: True
+        fit_EPWb: True
+        fit_EPWr: True
