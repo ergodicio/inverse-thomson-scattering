@@ -56,6 +56,7 @@ def get_loss_function(TSinputs, xie, sas, data):
 
         return lamAxisE, ThryE
 
+    @jit
     def get_spectra(modlE, modlI, lamAxisE, lamAxisI, amps):
 
         if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
