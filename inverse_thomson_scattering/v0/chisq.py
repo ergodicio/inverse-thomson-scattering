@@ -8,6 +8,7 @@ def get_chisq2(TSinputs, xie, sas, data):
 
     fitModel2 = get_fitModel2(TSinputs, xie, sas)
 
+    @jit
     def rest_of_chisq2(modlE, modlI, lamAxisE, lamAxisI):
         lam = TSinputs["lam"]["val"]
         amp1 = TSinputs["amp1"]["val"]
