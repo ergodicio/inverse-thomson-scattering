@@ -14,42 +14,56 @@ from inverse_thomson_scattering.v0.getCalibrations import getCalibrations
 from inverse_thomson_scattering.v0.plotters import LinePlots
 from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.v0.plotstate import plotState
-from inverse_thomson_scattering.v0.fitmodl import get_fitModel2
-from inverse_thomson_scattering.v0.chisq import get_chisq2
+from inverse_thomson_scattering.v0.fitmodl import get_fit_model
+from inverse_thomson_scattering.v0.chisq import get_loss_function
 from inverse_thomson_scattering.v0.form_factor import nonMaxwThomson
 
 # import multiprocessing
 
 
 def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
+    """
+    # function description [from Ang](update once complete)
+    This function takes the inputs from the ANGTSDATAFITTERGUI and preforms
+    the data corrections then fits the data returning the fit result
 
-    ## function description [from Ang](update once complete)
-    # This function takes the inputs from the ANGTSDATAFITTERGUI and preforms
-    # the data corrections then fits the data returning the fit result
-    #
-    # The inputs from the GUI are Shot number, lineout locations, background shot
-    # number, probe wavelength, electron temperature, electron density, m, amp1
-    # and amp2, ionization state, starting distribution function
-    # type and the number of distribution function points to use in numerical
-    # distribution function fitting.
+    The inputs from the GUI are Shot number, lineout locations, background shot
+    number, probe wavelength, electron temperature, electron density, m, amp1
+    and amp2, ionization state, starting distribution function
+    type and the number of distribution function points to use in numerical
+    distribution function fitting.
 
-    # Summary of additional needs:
-    #       A wrapper to allow for multiple lineouts or shots to be analyzed and gradients to be handled
-    #       A way to store shot data from one call to the next (this code is frequently used on the same shot repeatedly)
-    #       Better way to handle data finding since the location may change with computer or on a shot day
-    #       Better way to hadnle shots with multiple types of data
-    #       Way to handle calibrations which change from one to shot day to the next and have to be recalculated frequently (adding a new function to attempt this 8/8/22)
-    #       Potentially move the default values, especially the calibration into the input file
-    #       A way to handle the expanded ion calculation when colapsing the spectrum to pixel resolution
-    #       A way to handle different numbers of points
+    Summary of additional needs:
+          A wrapper to allow for multiple lineouts or shots to be analyzed and gradients to be handled
+          A way to store shot data from one call to the next (this code is frequently used on the same shot repeatedly)
+          Better way to handle data finding since the location may change with computer or on a shot day
+          Better way to hadnle shots with multiple types of data
+          Way to handle calibrations which change from one to shot day to the next and have to be recalculated frequently (adding a new function to attempt this 8/8/22)
+          Potentially move the default values, especially the calibration into the input file
+          A way to handle the expanded ion calculation when colapsing the spectrum to pixel resolution
+          A way to handle different numbers of points
 
-    # Depreciated functions that need to be restored:
-    #    Streaked EPW warp correction
-    #    Time axis alignment with fiducials
-    #    persistents
-    #    persistends in numDistFunc
-    #    interactive confirmation of new table creation
-    #    ability to generate different table names without the default values
+    Depreciated functions that need to be restored:
+       Streaked EPW warp correction
+       Time axis alignment with fiducials
+       persistents
+       persistends in numDistFunc
+       interactive confirmation of new table creation
+       ability to generate different table names without the default values
+
+
+    Args:
+        shotNum:
+        bgShot:
+        lineoutloc:
+        bgloc:
+        bgscale:
+        dpixel:
+        TSinputs:
+
+    Returns:
+
+    """
 
     ## Persistents
     # used to prevent reloading and one time analysis (not sure if there is a way to do this in python, omitted for now)
@@ -113,7 +127,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     # Retrieve calibrated axes
     [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(shotNum, tstype, CCDsize)
 
-    ## Data loading and corrections
+    # Data loading and corrections
     # Open data stored from the previous run (inactivated for now)
     # if isfield(prevShot, 'shotNum') & & prevShot.shotNum == shotNum
     #    elecData = prevShot.elecData;
@@ -140,7 +154,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     # prevShot.xlab = xlab;
     # prevShot.shift_zero = shift_zero;
 
-    ## Background Shot subtraction
+    # Background Shot subtraction
     if bgShot["type"] == "Shot":
         [BGele, BGion, _, _] = loadData(bgShot["val"], shotDay, specType, magE, TSinputs["D"]["extraoptions"])
         if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
@@ -156,7 +170,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         elecData_bsub = elecData
         ionData_bsub = ionData
 
-    ## Assign lineout locations
+    # Assign lineout locations
     if lineoutloc["type"] == "ps":
         LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in lineoutloc["val"]]
         LineoutPixelI = LineoutPixelE
@@ -311,7 +325,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
             [axisxE[BackgroundPixel] - shift_zero, axisxE[BackgroundPixel] - shift_zero], [axisyE[0], axisyE[-1]], "k"
         )
 
-    ## Normalize Data before fitting
+    # Normalize Data before fitting
     if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
         noiseI = noiseI / gain
         LineoutTSI_norm = [LineoutTSI_smooth[i] / gain for i, _ in enumerate(LineoutPixelI)]
@@ -333,7 +347,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     TSinputs["D"]["lamrangI"] = [axisyI[0], axisyI[-2]]
     TSinputs["D"]["npts"] = (len(LineoutTSE_norm) - 1) * 20
 
-    ## Setup x0
+    # Setup x0
     xie = np.linspace(-7, 7, TSinputs["fe"]["length"])
 
     NumDistFunc = get_num_dist_func(TSinputs["fe"]["type"], xie)
@@ -359,63 +373,45 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     # reshape x0 lb and ub so they are x0 time 1024
     # res = spopt.minimize(vmapvgchisq, np.repeat(np.array(x0)), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False})
 
+    all_data = []
     # run fitting code for each lineout
     for i, _ in enumerate(lineoutloc["val"]):
         # this probably needs to be done differently
         if TSinputs["D"]["extraoptions"]["load_ion_spec"] and TSinputs["D"]["extraoptions"]["load_ele_spec"]:
             data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
-            TSinputs["D"]["PhysParams"]["amps"] = [ampE[i], ampI[i]]
+            amps = [ampE[i], ampI[i]]
         elif TSinputs["D"]["extraoptions"]["load_ion_spec"]:
             data = np.vstack((LineoutTSI_norm[i], LineoutTSI_norm[i]))
-            TSinputs["D"]["PhysParams"]["amps"] = [ampE, ampI[i]]
+            amps = [ampE, ampI[i]]
         elif TSinputs["D"]["extraoptions"]["load_ele_spec"]:
             data = np.vstack((LineoutTSE_norm[i], LineoutTSE_norm[i]))
-            TSinputs["D"]["PhysParams"]["amps"] = [ampE[i], ampI]
+            amps = [ampE[i], ampI]
         else:
             raise NotImplementedError("This spectrum does not exist")
 
-        print(data.shape)
+        all_data.append(data)
+        TSinputs["D"]["PhysParams"]["amps"].append(amps)
 
-        ## Plot initial guess
-        fitmodel2 = get_fitModel2(TSinputs, xie, sa)
-        # print(x0)
-        plotState(x0, TSinputs, xie, sa, data, fitModel2=fitmodel2)
-        chiSq2, vgchiSq2 = get_chisq2(TSinputs, xie, sa, data)
-        # chiinit = chiSq2(x0)
-        # print(chiinit)
+        # Plot initial guess
+        fit_model = get_fit_model(TSinputs, xie, sa)
+        plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
+        loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, data)
 
-        # print(x0)
-
-        ## Perform fit
+        # Perform fit
         if np.shape(x0)[0] != 0:
-            # t0 = time.time()
-            # res = spopt.minimize(chiSq2, np.array(x0), method="L-BFGS-B", bounds=zip(lb, ub), options={"disp": False})
-            # print(f"gradless took {round(time.time() - t0, 2)} s")
-            # print(f"gradless used {res.nit} interactions and {res.nfev} function evaluations")
-
-            # t0 = time.time()
             res = spopt.minimize(
-                vgchiSq2, np.array(x0), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False}
+                vg_loss_fn, np.array(x0), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False}
             )
-            # print(f"w grad took {round(time.time() - t0, 2)} s")
-            # print(f"gradless used {res.nit} interactions and {res.nfev} function evaluations")
-            # print(res)
-
         else:
             x = x0
 
-        ## Plot Result
-        plotState(res.x, TSinputs, xie, sa, data, fitModel2=fitmodel2)
-        # chifin = chiSq2(res.x)
-        # print(chifin)
-        # print(res)
+        # Plot Result
+        plotState(res.x, TSinputs, xie, sa, data, fitModel2=fit_model)
 
         xiter.append(res.x)
 
     print(f"w grad took {round(time.time() - t1, 2)} s")
     print(f" full code took {round(time.time() - t0, 2)} s")
-    # print(xiter)
-
     result = TSinputs
     count = 0
     xiter = np.array(xiter)
@@ -423,8 +419,6 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         if result[key]["active"]:
             result[key]["val"] = xiter[:, count]
             count = count + 1
-            # print(key, ": ", result[key]["val"])
-
     # needs to be fixed
     # if result["fe"]["active"]:
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
