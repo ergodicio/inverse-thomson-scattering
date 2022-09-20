@@ -54,12 +54,12 @@ def get_chisq2(TSinputs, xie, sas, data):
                 ThryE = TSinputs["D"]["PhysParams"]["amps"][0] * ThryE / jnp.amax(ThryE)
                 ThryE = jnp.where(lamAxisE < lam, amp1 * ThryE, amp2 * ThryE)
 
-        return ThryE, ThryI
+        return ThryE, ThryI, lamAxisE
 
     def chiSq2(x):
 
         modlE, modlI, lamAxisE, lamAxisI = fitModel2(x)
-        ThryE, ThryI = rest_of_chisq2(modlE, modlI, lamAxisE, lamAxisI)
+        ThryE, ThryI, lamAxisE = rest_of_chisq2(modlE, modlI, lamAxisE, lamAxisI)
         chisq = 0
         if TSinputs["D"]["extraoptions"]["fit_IAW"]:
             #    chisq=chisq+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
