@@ -71,13 +71,15 @@ def get_loss_function(TSinputs, xie, sas, data):
 
     def loss_fn(x):
 
-        # modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
-        modlE, modlI, lamAxisE, lamAxisI = vmap_fit_model(x)
+        modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
+        # modlE, modlI, lamAxisE, lamAxisI = vmap_fit_model(x)
 
-        # ThryE, ThryI, lamAxisE, lamAxisI = get_spectra(modlE, modlI, lamAxisE, lamAxisI)
-        ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
-            modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"])
+        ThryE, ThryI, lamAxisE, lamAxisI = get_spectra(
+            modlE, modlI, lamAxisE, lamAxisI, TSinputs["D"]["PhysParams"]["amps"]
         )
+        # ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
+        #     modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"])
+        # )
 
         chisq = 0
         if TSinputs["D"]["extraoptions"]["fit_IAW"]:

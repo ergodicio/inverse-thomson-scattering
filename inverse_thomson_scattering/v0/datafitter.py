@@ -391,7 +391,8 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
             raise NotImplementedError("This spectrum does not exist")
 
         all_data.append(data)
-        TSinputs["D"]["PhysParams"]["amps"].append(amps)
+        # TSinputs["D"]["PhysParams"]["amps"].append(amps)
+        TSinputs["D"]["PhysParams"]["amps"] = amps
 
         # Plot initial guess
         fit_model = get_fit_model(TSinputs, xie, sa)
