@@ -374,6 +374,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     # res = spopt.minimize(vmapvgchisq, np.repeat(np.array(x0)), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False})
 
     all_data = []
+    TSinputs["D"]["PhysParams"]["amps"] = []
     # run fitting code for each lineout
     for i, _ in enumerate(lineoutloc["val"]):
         # this probably needs to be done differently
@@ -390,11 +391,11 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
             raise NotImplementedError("This spectrum does not exist")
 
         all_data.append(data)
-        TSinputs["D"]["PhysParams"]["amps"] = amps
+        TSinputs["D"]["PhysParams"]["amps"].append(amps)
 
         # Plot initial guess
         fit_model = get_fit_model(TSinputs, xie, sa)
-        plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
+        # plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
         loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, data)
 
         # Perform fit

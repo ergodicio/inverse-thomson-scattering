@@ -14,7 +14,7 @@ def get_loss_function(TSinputs, xie, sas, data):
 
     stddev = TSinputs["D"]["PhysParams"]["widIRF"]
 
-    def load_ion_spec(lamAxisI, modlI, lamAxisE):
+    def load_ion_spec(lamAxisI, modlI, lamAxisE, amps):
         originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
         inst_funcI = jnp.squeeze(
             (1.0 / (stddev[1] * jnp.sqrt(2.0 * jnp.pi)))
@@ -26,12 +26,12 @@ def get_loss_function(TSinputs, xie, sas, data):
 
         if TSinputs["D"]["PhysParams"]["norm"] == 0:
             lamAxisI = jnp.average(lamAxisI.reshape(1024, -1), axis=1)
-            ThryI = amp3 * TSinputs["D"]["PhysParams"]["amps"][1] * ThryI / jnp.amax(ThryI)
+            ThryI = amp3 * amps[1] * ThryI / jnp.amax(ThryI)
             lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
 
         return lamAxisI, lamAxisE, ThryI
 
-    def load_electron_spec(lamAxisE, modlE):
+    def load_electron_spec(lamAxisE, modlE, amps):
         # Conceptual_origin so the convolution donsn't shift the signal
         originE = (jnp.amax(lamAxisE) + jnp.amin(lamAxisE)) / 2.0
         inst_funcE = jnp.squeeze(
@@ -51,25 +51,34 @@ def get_loss_function(TSinputs, xie, sas, data):
         ThryE = jnp.average(ThryE.reshape(1024, -1), axis=1)
         if TSinputs["D"]["PhysParams"]["norm"] == 0:
             lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
-            ThryE = TSinputs["D"]["PhysParams"]["amps"][0] * ThryE / jnp.amax(ThryE)
+            ThryE = amps[0] * ThryE / jnp.amax(ThryE)
             ThryE = jnp.where(lamAxisE < lam, amp1 * ThryE, amp2 * ThryE)
 
         return lamAxisE, ThryE
 
-    def get_spectra(modlE, modlI, lamAxisE, lamAxisI):
+    def get_spectra(modlE, modlI, lamAxisE, lamAxisI, amps):
 
         if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
-            lamAxisI, lamAxisE, ThryI = load_ion_spec(lamAxisI, modlI, lamAxisE)
+            lamAxisI, lamAxisE, ThryI = load_ion_spec(lamAxisI, modlI, lamAxisE, amps)
 
         if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
-            lamAxisE, ThryE = load_electron_spec(lamAxisE, modlE)
+            lamAxisE, ThryE = load_electron_spec(lamAxisE, modlE, amps)
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
+    vmap_fit_model = jax.vmap(fit_model)
+    vmap_get_spectra = jax.vmap(get_spectra)
+
     def loss_fn(x):
 
-        modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
-        ThryE, ThryI, lamAxisE, lamAxisI = get_spectra(modlE, modlI, lamAxisE, lamAxisI)
+        # modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
+        modlE, modlI, lamAxisE, lamAxisI = vmap_fit_model(x)
+
+        # ThryE, ThryI, lamAxisE, lamAxisI = get_spectra(modlE, modlI, lamAxisE, lamAxisI)
+        ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
+            modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"])
+        )
+
         chisq = 0
         if TSinputs["D"]["extraoptions"]["fit_IAW"]:
             #    chisq=chisq+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
