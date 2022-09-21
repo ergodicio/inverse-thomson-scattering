@@ -1,24 +1,16 @@
-## function definition
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
-from jax import numpy as jnp
-from jax import jit
-import jax
 import time
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.v0.loadTSdata import loadData
 from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
 from inverse_thomson_scattering.v0.getCalibrations import getCalibrations
-from inverse_thomson_scattering.v0.plotters import LinePlots
 from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.v0.plotstate import plotState
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 from inverse_thomson_scattering.v0.chisq import get_loss_function
-from inverse_thomson_scattering.v0.form_factor import nonMaxwThomson
-
-# import multiprocessing
 
 
 def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
@@ -391,18 +383,22 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
             raise NotImplementedError("This spectrum does not exist")
 
         all_data.append(data)
-        # TSinputs["D"]["PhysParams"]["amps"].append(amps)
-        TSinputs["D"]["PhysParams"]["amps"] = amps
+        TSinputs["D"]["PhysParams"]["amps"].append(amps)
+        # TSinputs["D"]["PhysParams"]["amps"] = amps
 
         # Plot initial guess
         fit_model = get_fit_model(TSinputs, xie, sa)
         # plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
         loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, data)
 
+        x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0)
+        lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0)
+        ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0)
+
         # Perform fit
         if np.shape(x0)[0] != 0:
             res = spopt.minimize(
-                vg_loss_fn, np.array(x0), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False}
+                vg_loss_fn, x0, method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False}
             )
         else:
             x = x0
