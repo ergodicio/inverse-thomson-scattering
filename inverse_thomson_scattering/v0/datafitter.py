@@ -395,6 +395,8 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0)
         ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0)
 
+        print(x0.shape, len(all_data), lb.shape, ub.shape)
+
         # Perform fit
         if np.shape(x0)[0] != 0:
             res = spopt.minimize(
