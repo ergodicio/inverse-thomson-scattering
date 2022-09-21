@@ -24,7 +24,8 @@ def loadData(sNum,sDay,specType,magE,loadspecs):
             
         xlab='Scattering angle (degrees)'
         zero=0
-        loadspecs=[0,1]
+        loadspecs['load_ion_spec']= False
+        loadspecs['load_ele_spec']= True
 
     elif specType ==2:
         if sDay:
@@ -37,7 +38,7 @@ def loadData(sNum,sDay,specType,magE,loadspecs):
             hdfnameE = join(folder, 'EPW-s' + str(sNum) + '.hdf')
             hdfnameI = join(folder, 'IAW-s' + str(sNum) + '.hdf')
 
-        if loadspecs[0]:
+        if loadspecs['load_ion_spec']:
             try:
                 iDatfile=SD(hdfnameI,SDC.READ)
                 sds_obj = iDatfile.select('Streak_array') # select sds
@@ -47,11 +48,11 @@ def loadData(sNum,sDay,specType,magE,loadspecs):
             except BaseException:
                 print('Unable to find Streaked IAW')
                 iDat=[]
-                loadspecs[0]=0
+                loadspecs['load_ion_spec'] = False
         else:
             iDat=[]
                 
-        if loadspecs[1]:
+        if loadspecs['load_ele_spec']:
             try:
                 eDatfile=SD(hdfnameE,SDC.READ)
                 sds_obj = eDatfile.select('Streak_array') # select sds
@@ -64,7 +65,7 @@ def loadData(sNum,sDay,specType,magE,loadspecs):
             except BaseException:
                 print('Unable to find Streaked EPW')
                 eDat=[]
-                loadspecs[1]=0
+                loadspecs['load_ele_spec'] = False
         else:
             eDat=[]
             
@@ -97,7 +98,7 @@ def loadData(sNum,sDay,specType,magE,loadspecs):
             hdfnameE = join(folder, 'EPW_CCD-s' + str(sNum) + '.hdf')
             hdfnameI = join(folder, 'IAW_CCD-s' + str(sNum) + '.hdf')
                 
-        if loadspecs[0]:
+        if loadspecs['load_ion_spec']:
             try:
                 iDatfile=SD(hdfnameI,SDC.READ)
                 sds_obj = iDatfile.select('Streak_array') # select sds
@@ -108,11 +109,11 @@ def loadData(sNum,sDay,specType,magE,loadspecs):
             except BaseException:
                 print('Unable to find Imaging IAW')
                 iDat=[]
-                loadspecs[0]=0
+                loadspecs['load_ion_spec'] = False
         else:
             iDat=[]
                 
-        if loadspecs[1]:
+        if loadspecs['load_ele_spec']:
             try:
                 eDatfile=SD(hdfnameE,SDC.READ)
                 sds_obj = eDatfile.select('Streak_array') # select sds
@@ -123,7 +124,7 @@ def loadData(sNum,sDay,specType,magE,loadspecs):
             except BaseException:
                 print('Unable to find Imaging EPW')
                 eDat=[]
-                loadspecs[1]=0
+                loadspecs['load_ele_spec'] = False
         else:
             eDat=[]        
         

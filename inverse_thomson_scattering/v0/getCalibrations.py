@@ -31,7 +31,7 @@ def getCalibrations(shotNum,tstype,CCDsize):
             EPWDisp = 0.4104
             IAWDisp = 0.00678
             EPWoff = 319.3
-            IAWoff = 522.90
+            IAWoff = 523.1#522.90
             stddevI = .02262 # spectral IAW IRF for 8 / 26 / 21(grating was masked)
             stddevE = 1.4294 # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
             

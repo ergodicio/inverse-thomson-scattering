@@ -2,6 +2,7 @@ import numpy as np
 import scipy.interpolate as sp
 from inverse_thomson_scattering.v0 import lamParse, ratintn
 
+import matplotlib.pyplot as plt
 
 def zprimeMaxw(xi):
 
@@ -58,6 +59,9 @@ def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, lamrang, lam, sa, *fe, expio
     re = 2.8179e-13  # classical electron radius cm
     Esq = Me * C**2 * re  # sq of the electron charge keV cm
     constants = np.sqrt(4 * np.pi * Esq / Me)
+
+    print(sa)
+    print(type(sa))
     sarad = sa * np.pi / 180  # scattering angle in radians
     sarad = np.reshape(sarad, [1, 1, -1])
 
@@ -119,6 +123,12 @@ def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, lamrang, lam, sa, *fe, expio
     ZpiI = sp.interp1d(xi2, Zpi[1, :], "cubic", bounds_error=False, fill_value=0)
     ZpiI = ZpiI(xii)
     chiI = np.sum(-0.5 / (kldi**2) * (ZpiR + np.sqrt(-1 + 0j) * ZpiI), 3)
+    
+    fig, ax0 = plt.subplots(2, 2)
+    ax0[0, 0].plot(ZpiR[0,:,0])
+    ax0[0, 1].plot(ZpiR[0,10000:10200,0])
+    ax0[1, 0].plot(ZpiI[0,:,0])
+    ax0[1, 1].plot(ZpiI[0,10000:10200,0])
 
     # electron susceptibility
     # calculating normilized phase velcoity(xi's) for electrons
