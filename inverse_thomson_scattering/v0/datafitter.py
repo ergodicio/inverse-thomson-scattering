@@ -386,29 +386,29 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         TSinputs["D"]["PhysParams"]["amps"].append(amps)
         # TSinputs["D"]["PhysParams"]["amps"] = amps
 
-        # Plot initial guess
-        fit_model = get_fit_model(TSinputs, xie, sa)
-        # plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
-        loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, data)
+    # Plot initial guess
+    fit_model = get_fit_model(TSinputs, xie, sa)
+    # plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
+    loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, data)
 
-        x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0)
-        lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0)
-        ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0)
+    x0 = np.repeat(np.array(x0), repeats=len(all_data), axis=0)
+    lb = np.repeat(np.array(lb), repeats=len(all_data), axis=0)
+    ub = np.repeat(np.array(ub), repeats=len(all_data), axis=0)
 
-        print(x0.shape, len(all_data), lb.shape, ub.shape)
+    print(x0.shape, len(all_data), lb.shape, ub.shape)
 
-        # Perform fit
-        if np.shape(x0)[0] != 0:
-            res = spopt.minimize(
-                vg_loss_fn, x0, method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False}
-            )
-        else:
-            x = x0
+    # Perform fit
+    if np.shape(x0)[0] != 0:
+        res = spopt.minimize(
+            vg_loss_fn, x0, method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False}
+        )
+    else:
+        x = x0
 
-        # Plot Result
-        plotState(res.x, TSinputs, xie, sa, data, fitModel2=fit_model)
+    # Plot Result
+    plotState(res.x, TSinputs, xie, sa, data, fitModel2=fit_model)
 
-        xiter.append(res.x)
+    xiter.append(res.x)
 
     print(f"w grad took {round(time.time() - t1, 2)} s")
     print(f" full code took {round(time.time() - t0, 2)} s")
