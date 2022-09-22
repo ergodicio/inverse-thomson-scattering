@@ -10,7 +10,7 @@ from inverse_thomson_scattering.v0.getCalibrations import getCalibrations
 from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.v0.plotstate import plotState
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
-from inverse_thomson_scattering.v0.chisq import get_loss_function
+from inverse_thomson_scattering.v0.loss_function import get_loss_function
 
 
 def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
