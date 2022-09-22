@@ -391,9 +391,9 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     # plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
     loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, data)
 
-    x0 = np.repeat(np.array(x0), repeats=len(all_data), axis=0)
-    lb = np.repeat(np.array(lb), repeats=len(all_data), axis=0)
-    ub = np.repeat(np.array(ub), repeats=len(all_data), axis=0)
+    x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0)
+    lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0)
+    ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0)
 
     print(x0)
 
