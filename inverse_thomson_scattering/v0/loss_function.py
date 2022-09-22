@@ -5,7 +5,6 @@ from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 
 
 def get_loss_function(TSinputs, xie, sas, data: np.ndarray):
-
     fit_model = get_fit_model(TSinputs, xie, sas)
     lam = TSinputs["lam"]["val"]
     amp1 = TSinputs["amp1"]["val"]
@@ -72,7 +71,7 @@ def get_loss_function(TSinputs, xie, sas, data: np.ndarray):
         return ThryE, ThryI, lamAxisE, lamAxisI
 
     vmap_fit_model = vmap(fit_model)
-    vmap_get_spectra = vmap(get_spectra)
+    vmap_get_spectra = jit(vmap(get_spectra))
 
     def loss_fn(x: jnp.ndarray):
         # modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
@@ -83,7 +82,7 @@ def get_loss_function(TSinputs, xie, sas, data: np.ndarray):
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"])
         )
-        print(ThryE.shape, lamAxisE.shape, data.shape)
+
         loss = 0
         if TSinputs["D"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
@@ -91,16 +90,20 @@ def get_loss_function(TSinputs, xie, sas, data: np.ndarray):
 
         if TSinputs["D"]["extraoptions"]["fit_EPWb"]:
             eslc = (lamAxisE > 410) & (lamAxisE < 510)
-            print(eslc.shape)
+            eslc = eslc[:, None, :]
+            eslc = jnp.concatenate([eslc, jnp.zeros_like(eslc, dtype=bool)], axis=1)
 
-            data_slc = data[eslc[:, None, :]]
-            thry_slc = ThryE[eslc]
+            data_slc = data[:, 0, :]
+            thry_slc = ThryE  # [eslc[:, 0, :]]
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
         if TSinputs["D"]["extraoptions"]["fit_EPWr"]:
             eslc = (lamAxisE > 540) & (lamAxisE < 680)
-            data_slc = data[eslc[:, None, :]]
-            thry_slc = ThryE[eslc]
+            eslc = eslc[:, None, :]
+            eslc = jnp.concatenate([eslc, jnp.zeros_like(eslc, dtype=bool)], axis=1)
+
+            data_slc = data[:, 0, :]
+            thry_slc = ThryE  # [eslc[:, 0, :]]
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
         return loss
@@ -111,6 +114,6 @@ def get_loss_function(TSinputs, xie, sas, data: np.ndarray):
         reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
         value, grad = vg_func(reshaped_x)
 
-        return value, jnp.array(grad)
+        return value, np.array(grad).flatten()
 
     return loss_fn, val_and_grad_loss
