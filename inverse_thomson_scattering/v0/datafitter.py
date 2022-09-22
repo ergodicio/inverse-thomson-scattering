@@ -391,11 +391,15 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     # plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
     loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, data)
 
-    x0 = np.repeat(np.array(x0), repeats=len(all_data), axis=0).flatten()
-    lb = np.repeat(np.array(lb), repeats=len(all_data), axis=0).flatten()
-    ub = np.repeat(np.array(ub), repeats=len(all_data), axis=0).flatten()
+    x0 = np.repeat(np.array(x0), repeats=len(all_data), axis=0)
+    lb = np.repeat(np.array(lb), repeats=len(all_data), axis=0)
+    ub = np.repeat(np.array(ub), repeats=len(all_data), axis=0)
 
-    print(x0.shape, len(all_data), lb.shape, ub.shape)
+    print(x0)
+
+    x0 = x0.flatten()
+    lb = lb.flatten()
+    rb = rb.flatten()
 
     # Perform fit
     if np.shape(x0)[0] != 0:
