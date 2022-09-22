@@ -71,9 +71,6 @@ def get_loss_function(TSinputs, xie, sas, data):
     vmap_get_spectra = vmap(get_spectra)
 
     def loss_fn(x: jnp.ndarray):
-        print(x)
-
-        raise ValueError
         print(x.shape)
         # modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
         modlE, modlI, lamAxisE, lamAxisI = vmap_fit_model(x)
@@ -108,6 +105,7 @@ def get_loss_function(TSinputs, xie, sas, data):
 
     def val_and_grad_loss(x: np.ndarray):
         reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
+        print(reshaped_x)
         value, grad = vg_func(reshaped_x)
 
         return value, jnp.array(grad)
