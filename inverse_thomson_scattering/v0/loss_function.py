@@ -84,20 +84,23 @@ def get_loss_function(TSinputs, xie, sas, data: np.ndarray):
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"])
         )
         print(ThryE.shape, lamAxisE.shape, data.shape)
-
         loss = 0
         if TSinputs["D"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
             loss = loss + jnp.sum((data[:, 1, :] - ThryI) ** 2)
 
         if TSinputs["D"]["extraoptions"]["fit_EPWb"]:
-            data_slc = data[:, 0, (lamAxisE > 410) & (lamAxisE < 510)]
-            thry_slc = ThryE[(lamAxisE > 410) & (lamAxisE < 510)]
+            eslc = (lamAxisE > 410) & (lamAxisE < 510)
+            print(eslc.shape)
+
+            data_slc = data[eslc[:, None, :]]
+            thry_slc = ThryE[eslc]
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
         if TSinputs["D"]["extraoptions"]["fit_EPWr"]:
-            data_slc = data[:, 0, (lamAxisE > 540) & (lamAxisE < 680)]
-            thry_slc = ThryE[(lamAxisE > 540) & (lamAxisE < 680)]
+            eslc = (lamAxisE > 540) & (lamAxisE < 680)
+            data_slc = data[eslc[:, None, :]]
+            thry_slc = ThryE[eslc]
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
         return loss
