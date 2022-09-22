@@ -72,6 +72,8 @@ def get_loss_function(TSinputs, xie, sas, data):
 
     def loss_fn(x: jnp.ndarray):
         print(x)
+
+        raise ValueError
         print(x.shape)
         # modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
         modlE, modlI, lamAxisE, lamAxisI = vmap_fit_model(x)
