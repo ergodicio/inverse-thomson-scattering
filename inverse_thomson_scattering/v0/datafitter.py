@@ -382,14 +382,14 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         else:
             raise NotImplementedError("This spectrum does not exist")
 
-        all_data.append(data)
+        all_data.append(data[None, :])
         TSinputs["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
         # TSinputs["D"]["PhysParams"]["amps"] = amps
 
     # Plot initial guess
     fit_model = get_fit_model(TSinputs, xie, sa)
     # plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
-    loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, data)
+    loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, np.concatenate(all_data))
 
     x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0)
     lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0)

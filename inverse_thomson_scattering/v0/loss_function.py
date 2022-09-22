@@ -4,7 +4,7 @@ import numpy as np
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 
 
-def get_loss_function(TSinputs, xie, sas, data):
+def get_loss_function(TSinputs, xie, sas, data: np.ndarray):
 
     fit_model = get_fit_model(TSinputs, xie, sas)
     lam = TSinputs["lam"]["val"]
@@ -61,9 +61,13 @@ def get_loss_function(TSinputs, xie, sas, data):
 
         if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = load_ion_spec(lamAxisI, modlI, lamAxisE, amps)
+        else:
+            raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
         if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = load_electron_spec(lamAxisE, modlE, amps)
+        else:
+            raise NotImplementedError("Need to create an electron spectrum so we can compare it against data!")
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
@@ -80,24 +84,23 @@ def get_loss_function(TSinputs, xie, sas, data):
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"])
         )
         print(ThryE.shape, lamAxisE.shape, data.shape)
-        raise ValueError
 
-        chisq = 0
+        loss = 0
         if TSinputs["D"]["extraoptions"]["fit_IAW"]:
-            #    chisq=chisq+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-            chisq = chisq + jnp.sum((data[1, :] - ThryI) ** 2)
+            #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+            loss = loss + jnp.sum((data[:, 1, :] - ThryI) ** 2)
 
         if TSinputs["D"]["extraoptions"]["fit_EPWb"]:
-            chisq = chisq + jnp.sum(
-                (data[0, (lamAxisE > 410) & (lamAxisE < 510)] - ThryE[(lamAxisE > 410) & (lamAxisE < 510)]) ** 2
-            )
+            data_slc = data[:, 0, (lamAxisE > 410) & (lamAxisE < 510)]
+            thry_slc = ThryE[(lamAxisE > 410) & (lamAxisE < 510)]
+            loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
         if TSinputs["D"]["extraoptions"]["fit_EPWr"]:
-            chisq = chisq + jnp.sum(
-                (data[0, (lamAxisE > 540) & (lamAxisE < 680)] - ThryE[(lamAxisE > 540) & (lamAxisE < 680)]) ** 2
-            )
+            data_slc = data[:, 0, (lamAxisE > 540) & (lamAxisE < 680)]
+            thry_slc = ThryE[(lamAxisE > 540) & (lamAxisE < 680)]
+            loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
-        return chisq
+        return loss
 
     vg_func = value_and_grad(loss_fn)
 
