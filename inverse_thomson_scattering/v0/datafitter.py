@@ -399,7 +399,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
 
     x0 = x0.flatten()
     lb = lb.flatten()
-    rb = rb.flatten()
+    ub = ub.flatten()
 
     # Perform fit
     if np.shape(x0)[0] != 0:
