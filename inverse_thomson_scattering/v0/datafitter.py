@@ -383,7 +383,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
             raise NotImplementedError("This spectrum does not exist")
 
         all_data.append(data)
-        TSinputs["D"]["PhysParams"]["amps"].append(amps)
+        TSinputs["D"]["PhysParams"]["amps"].append(np.array(amps))
         # TSinputs["D"]["PhysParams"]["amps"] = amps
 
     # Plot initial guess
@@ -394,8 +394,6 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0)
     lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0)
     ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0)
-
-    print(x0)
 
     x0 = x0.flatten()
     lb = lb.flatten()
