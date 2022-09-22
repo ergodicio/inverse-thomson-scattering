@@ -71,7 +71,7 @@ def get_loss_function(TSinputs, xie, sas, data):
     vmap_get_spectra = vmap(get_spectra)
 
     def loss_fn(x: jnp.ndarray):
-
+        print(x.shape)
         # modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
         modlE, modlI, lamAxisE, lamAxisI = vmap_fit_model(x)
 
