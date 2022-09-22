@@ -74,7 +74,7 @@ def get_loss_function(TSinputs, xie, sas, data):
         print(x.shape)
         # modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
         modlE, modlI, lamAxisE, lamAxisI = vmap_fit_model(x)
-
+        print(modlE.shape, modlI.shape, lamAxisE.shape, lamAxisI.shape)
         # ThryE, ThryI, lamAxisE, lamAxisI = get_spectra(
         #     modlE, modlI, lamAxisE, lamAxisI, TSinputs["D"]["PhysParams"]["amps"]
         # )
