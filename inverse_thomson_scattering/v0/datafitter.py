@@ -388,7 +388,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
 
     # Plot initial guess
     fit_model = get_fit_model(TSinputs, xie, sa)
-    plotState(x0, TSinputs, TSinputs["D"]["PhysParams"]["amps"][0][0], xie, sa, all_data[0], fitModel2=fit_model)
+    plotState(x0, TSinputs, TSinputs["D"]["PhysParams"]["amps"][0][0], xie, sa, all_data[0][0], fitModel2=fit_model)
     loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, np.concatenate(all_data))
 
     x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0)
