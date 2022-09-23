@@ -407,7 +407,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
 
     # Plot Result
     plotState(
-        res.x.reshape((len(all_data), -1)),
+        res.x.reshape((len(all_data), -1))[0],
         TSinputs,
         TSinputs["D"]["PhysParams"]["amps"][0][0],
         xie,
