@@ -357,8 +357,6 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
             lb.append(TSinputs[key]["lb"])
             ub.append(TSinputs[key]["ub"])
 
-    t1 = time.time()
-
     # vmapped version will look something like this
     # chiSq2, vgchiSq2 = get_chisq2(TSinputs, xie, sa, D, data)
     # vmapvgchisq = jax.vmap(vgchiSq2)
@@ -391,19 +389,19 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     plotState(x0, TSinputs, TSinputs["D"]["PhysParams"]["amps"][0][0], xie, sa, all_data[0][0], fitModel2=fit_model)
     loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, np.concatenate(all_data))
 
-    x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0)
-    lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0)
-    ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0)
+    x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
+    lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
+    ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
 
-    x0 = x0.flatten()
-    lb = lb.flatten()
-    ub = ub.flatten()
-
+    t1 = time.time()
+    print("minimizing")
     # Perform fit
     if np.shape(x0)[0] != 0:
         res = spopt.minimize(vg_loss_fn, x0, method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False})
     else:
         x = x0
+
+    print(f"minimization took {round(time.time() - t1, 2)} s")
 
     # Plot Result
     plotState(
@@ -417,8 +415,8 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     )
     xiter.append(res.x)
 
-    print(f"w grad took {round(time.time() - t1, 2)} s")
     print(f" full code took {round(time.time() - t0, 2)} s")
+
     result = TSinputs
     count = 0
     xiter = np.array(xiter)

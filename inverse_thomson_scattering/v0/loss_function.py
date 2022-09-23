@@ -1,10 +1,11 @@
+from typing import Dict
 from jax import numpy as jnp
 from jax import jit, vmap, value_and_grad
 import numpy as np
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 
 
-def get_loss_function(TSinputs, xie, sas, data: np.ndarray):
+def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
     fit_model = get_fit_model(TSinputs, xie, sas)
     lam = TSinputs["lam"]["val"]
     amp1 = TSinputs["amp1"]["val"]
@@ -84,27 +85,27 @@ def get_loss_function(TSinputs, xie, sas, data: np.ndarray):
         )
 
         loss = 0
+        i_data = data[:, 1, :]
+        e_data = data[:, 0, :]
         if TSinputs["D"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-            loss = loss + jnp.sum((data[:, 1, :] - ThryI) ** 2)
+            loss = loss + jnp.sum(jnp.square(i_data - ThryI))
 
         if TSinputs["D"]["extraoptions"]["fit_EPWb"]:
-            eslc = (lamAxisE > 410) & (lamAxisE < 510)
-            eslc = eslc[:, None, :]
-            eslc = jnp.concatenate([eslc, jnp.zeros_like(eslc, dtype=bool)], axis=1)
+            thry_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), e_data, 0.0)
 
-            data_slc = data[:, 0, :]
-            thry_slc = ThryE  # [eslc[:, 0, :]]
+            # data_slc = data[:, 0, :]
+            # thry_slc = ThryE  # [eslc[:, 0, :]]
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
         if TSinputs["D"]["extraoptions"]["fit_EPWr"]:
-            eslc = (lamAxisE > 540) & (lamAxisE < 680)
-            eslc = eslc[:, None, :]
-            eslc = jnp.concatenate([eslc, jnp.zeros_like(eslc, dtype=bool)], axis=1)
+            thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), e_data, 0.0)
 
-            data_slc = data[:, 0, :]
-            thry_slc = ThryE  # [eslc[:, 0, :]]
-            loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
+            # data_slc = data[:, 0, :]
+            # thry_slc = ThryE  # [eslc[:, 0, :]]
+            loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
 
         return loss
 
