@@ -412,7 +412,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         TSinputs["D"]["PhysParams"]["amps"][0][0],
         xie,
         sa,
-        all_data[0],
+        all_data[0][0],
         fitModel2=fit_model,
     )
     xiter.append(res.x)
