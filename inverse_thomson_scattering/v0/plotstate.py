@@ -3,7 +3,7 @@ import numpy as np
 from inverse_thomson_scattering.v0.plotters import LinePlots
 
 
-def plotState(x, TSinputs, xie, sas, data, fitModel2):
+def plotState(x, TSinputs, amps, xie, sas, data, fitModel2):
     [modlE, modlI, lamAxisE, lamAxisI] = fitModel2(x)
 
     lam = TSinputs["lam"]["val"]
@@ -24,7 +24,7 @@ def plotState(x, TSinputs, xie, sas, data, fitModel2):
 
         if TSinputs["D"]["PhysParams"]["norm"] == 0:
             lamAxisI = np.average(lamAxisI.reshape(1024, -1), axis=1)
-            ThryI = amp3 * TSinputs["D"]["PhysParams"]["amps"][0][1] * ThryI / max(ThryI)
+            ThryI = amp3 * amps[1] * ThryI / max(ThryI)
 
     if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
         originE = (max(lamAxisE) + min(lamAxisE)) / 2  # Conceptual_origin so the convolution donsn't shift the signal
@@ -41,7 +41,7 @@ def plotState(x, TSinputs, xie, sas, data, fitModel2):
         ThryE = np.average(ThryE.reshape(1024, -1), axis=1)
         if TSinputs["D"]["PhysParams"]["norm"] == 0:
             lamAxisE = np.average(lamAxisE.reshape(1024, -1), axis=1)
-            ThryE = TSinputs["D"]["PhysParams"]["amps"][0][0] * ThryE / max(ThryE)
+            ThryE = amps[0] * ThryE / max(ThryE)
             ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam])
             ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam])
 
