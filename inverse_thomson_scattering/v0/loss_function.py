@@ -71,7 +71,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
-    vmap_fit_model = vmap(fit_model)
+    vmap_fit_model = jit(vmap(fit_model))
     vmap_get_spectra = jit(vmap(get_spectra))
 
     def loss_fn(x: jnp.ndarray):
@@ -98,6 +98,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
             # data_slc = data[:, 0, :]
             # thry_slc = ThryE  # [eslc[:, 0, :]]
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
+            # loss = loss + jnp.sum(jnp.square(e_data - ThryE))
 
         if TSinputs["D"]["extraoptions"]["fit_EPWr"]:
             thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), ThryE, 0.0)
@@ -106,6 +107,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
             # data_slc = data[:, 0, :]
             # thry_slc = ThryE  # [eslc[:, 0, :]]
             loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+            # loss = loss + jnp.sum(jnp.square(e_data - ThryE))
 
         return loss
 
@@ -113,6 +115,9 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
 
     def val_and_grad_loss(x: np.ndarray):
         reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
+        
+        # is reshaped_x correct?
+        
         value, grad = vg_func(reshaped_x)
 
         return value, np.array(grad).flatten()

@@ -13,7 +13,7 @@ def get_fit_model(TSins, xie, sa):
 
     def fit_model(x):
         param_dict = copy.deepcopy(TSins)
-
+        
         i = 0
         for key in TSins.keys():
             if TSins[key]["active"]:
@@ -108,13 +108,16 @@ def get_fit_model(TSins, xie, sa):
                     else:
                         lamright = lamAxisE.size
 
-                    modlE = jnp.concatenate(
-                        [
-                            modlE[:lamleft],
-                            modlE[lamleft:lamright] * 10 ** (-TSins["D"]["iawfilter"][1]),
-                            modlE[lamright:],
-                        ]
-                    )
+                    indices = (filterb < lamAxisE) & (filterr > lamAxisE)
+                    modlE = jnp.where(indices, modlE * 10 ** (-TSins["D"]["iawfilter"][1]), modlE)
+                                      
+                    # modlE = jnp.concatenate(
+                    #     [
+                    #         modlE[:lamleft],
+                    #         modlE[lamleft:lamright] * 10 ** (-TSins["D"]["iawfilter"][1]),
+                    #         modlE[lamright:],
+                    #     ]
+                    # )
         else:
             modlE = []
             lamAxisE = []
