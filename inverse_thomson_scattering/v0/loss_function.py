@@ -1,11 +1,11 @@
+from typing import Dict
 from jax import numpy as jnp
-from jax import jit
-import jax
+from jax import jit, vmap, value_and_grad
+import numpy as np
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 
 
-def get_loss_function(TSinputs, xie, sas, data):
-
+def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
     fit_model = get_fit_model(TSinputs, xie, sas)
     lam = TSinputs["lam"]["val"]
     amp1 = TSinputs["amp1"]["val"]
@@ -61,50 +61,65 @@ def get_loss_function(TSinputs, xie, sas, data):
 
         if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = load_ion_spec(lamAxisI, modlI, lamAxisE, amps)
+        else:
+            raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
         if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = load_electron_spec(lamAxisE, modlE, amps)
+        else:
+            raise NotImplementedError("Need to create an electron spectrum so we can compare it against data!")
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
-    vmap_fit_model = jax.vmap(fit_model)
-    vmap_get_spectra = jax.vmap(get_spectra)
+    vmap_fit_model = jit(vmap(fit_model))
+    vmap_get_spectra = jit(vmap(get_spectra))
 
-    def loss_fn(x):
-
-        modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
-        # modlE, modlI, lamAxisE, lamAxisI = vmap_fit_model(x)
-
-        ThryE, ThryI, lamAxisE, lamAxisI = get_spectra(
-            modlE, modlI, lamAxisE, lamAxisI, TSinputs["D"]["PhysParams"]["amps"]
-        )
-        # ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
-        #     modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"])
+    def loss_fn(x: jnp.ndarray):
+        # modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
+        modlE, modlI, lamAxisE, lamAxisI = vmap_fit_model(x)
+        # ThryE, ThryI, lamAxisE, lamAxisI = get_spectra(
+        #     modlE, modlI, lamAxisE, lamAxisI, TSinputs["D"]["PhysParams"]["amps"]
         # )
+        ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
+            modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"])
+        )
 
-        chisq = 0
+        loss = 0
+        i_data = data[:, 1, :]
+        e_data = data[:, 0, :]
         if TSinputs["D"]["extraoptions"]["fit_IAW"]:
-            #    chisq=chisq+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-            chisq = chisq + jnp.sum((data[1, :] - ThryI) ** 2)
+            #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+            loss = loss + jnp.sum(jnp.square(i_data - ThryI))
 
         if TSinputs["D"]["extraoptions"]["fit_EPWb"]:
-            chisq = chisq + jnp.sum(
-                (data[0, (lamAxisE > 410) & (lamAxisE < 510)] - ThryE[(lamAxisE > 410) & (lamAxisE < 510)]) ** 2
-            )
+            thry_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), e_data, 0.0)
+
+            # data_slc = data[:, 0, :]
+            # thry_slc = ThryE  # [eslc[:, 0, :]]
+            loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
+            # loss = loss + jnp.sum(jnp.square(e_data - ThryE))
 
         if TSinputs["D"]["extraoptions"]["fit_EPWr"]:
-            chisq = chisq + jnp.sum(
-                (data[0, (lamAxisE > 540) & (lamAxisE < 680)] - ThryE[(lamAxisE > 540) & (lamAxisE < 680)]) ** 2
-            )
+            thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), e_data, 0.0)
 
-        return chisq
+            # data_slc = data[:, 0, :]
+            # thry_slc = ThryE  # [eslc[:, 0, :]]
+            loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+            # loss = loss + jnp.sum(jnp.square(e_data - ThryE))
 
-    vg_func = jax.value_and_grad(loss_fn)
+        return loss
 
-    def val_and_grad_loss(x):
-        x = jnp.array(x)
-        value, grad = vg_func(x)
+    vg_func = jit(value_and_grad(loss_fn))
 
-        return value, jnp.array(grad)
+    def val_and_grad_loss(x: np.ndarray):
+        reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
+        
+        # is reshaped_x correct?
+        
+        value, grad = vg_func(reshaped_x)
+
+        return value, np.array(grad).flatten()
 
     return loss_fn, val_and_grad_loss

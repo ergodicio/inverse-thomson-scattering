@@ -4,7 +4,6 @@ from inverse_thomson_scattering.jax.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from jax import numpy as jnp
 from jax import jit
-import jax
 
 
 def get_fit_model(TSins, xie, sa):
@@ -14,7 +13,7 @@ def get_fit_model(TSins, xie, sa):
 
     def fit_model(x):
         param_dict = copy.deepcopy(TSins)
-
+        
         i = 0
         for key in TSins.keys():
             if TSins[key]["active"]:
@@ -90,7 +89,7 @@ def get_fit_model(TSins, xie, sa):
 
             # [modl,lamAx]=S2Signal(Thry,lamAxis,D);
 
-            if TSins["D"]["iawoff"] and (TSins["D"]["lamrangE"][0] < lam and TSins["D"]["lamrangE"][1] > lam):
+            if TSins["D"]["iawoff"] and (TSins["D"]["lamrangE"][0] < lam < TSins["D"]["lamrangE"][1]):
                 # set the ion feature to 0 #should be switched to a range about lam
                 lamloc = jnp.argmin(jnp.abs(lamAxisE - lam))
                 modlE = jnp.concatenate([modlE[: lamloc - 2000], jnp.zeros(4000), modlE[lamloc + 2000 :]])
@@ -109,13 +108,16 @@ def get_fit_model(TSins, xie, sa):
                     else:
                         lamright = lamAxisE.size
 
-                    modlE = jnp.concatenate(
-                        [
-                            modlE[:lamleft],
-                            modlE[lamleft:lamright] * 10 ** (-TSins["D"]["iawfilter"][1]),
-                            modlE[lamright:],
-                        ]
-                    )
+                    indices = (filterb < lamAxisE) & (filterr > lamAxisE)
+                    modlE = jnp.where(indices, modlE * 10 ** (-TSins["D"]["iawfilter"][1]), modlE)
+                                      
+                    # modlE = jnp.concatenate(
+                    #     [
+                    #         modlE[:lamleft],
+                    #         modlE[lamleft:lamright] * 10 ** (-TSins["D"]["iawfilter"][1]),
+                    #         modlE[lamright:],
+                    #     ]
+                    # )
         else:
             modlE = []
             lamAxisE = []

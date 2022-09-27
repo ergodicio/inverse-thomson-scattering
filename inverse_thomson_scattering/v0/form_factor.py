@@ -4,12 +4,20 @@ from inverse_thomson_scattering.v0 import lamParse, ratintn
 
 import matplotlib.pyplot as plt
 
-def zprimeMaxw(xi):
 
-    # This function calculates the derivitive of the Z - function given an array of normilzed phase velocities(xi) as
-    # defined in Chapter 5. For values of xi between - 10 and 10 a table is used. Outside of this range the assumtotic
-    # approximation(see Eqn. 5.2.10) is used.
-    # xi is expected to be ascending
+def zprimeMaxw(xi):
+    """
+    This function calculates the derivitive of the Z - function given an array of normilzed phase velocities(xi) as
+    defined in Chapter 5. For values of xi between - 10 and 10 a table is used. Outside of this range the assumtotic
+    approximation(see Eqn. 5.2.10) is used.
+    xi is expected to be ascending
+
+    Args:
+        xi:
+
+    Returns:
+
+    """
 
     rdWT = np.vstack(np.loadtxt("files/rdWT.txt"))
     idWT = np.vstack(np.loadtxt("files/idWT.txt"))
@@ -67,7 +75,7 @@ def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, lamrang, lam, sa, *fe, expio
 
     Va = Va * 1e6  # flow velocity in 1e6 cm/s
     ud = ud * 1e6  # drift velocity in 1e6 cm/s
-    npts = 20480 #20460
+    npts = 20480  # 20460
 
     [omgL, omgs, lamAxis, _] = lamParse.lamParse(lamrang, lam, npts, expion)
 
@@ -123,12 +131,12 @@ def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, lamrang, lam, sa, *fe, expio
     ZpiI = sp.interp1d(xi2, Zpi[1, :], "cubic", bounds_error=False, fill_value=0)
     ZpiI = ZpiI(xii)
     chiI = np.sum(-0.5 / (kldi**2) * (ZpiR + np.sqrt(-1 + 0j) * ZpiI), 3)
-    
+
     fig, ax0 = plt.subplots(2, 2)
-    ax0[0, 0].plot(ZpiR[0,:,0])
-    ax0[0, 1].plot(ZpiR[0,10000:10200,0])
-    ax0[1, 0].plot(ZpiI[0,:,0])
-    ax0[1, 1].plot(ZpiI[0,10000:10200,0])
+    ax0[0, 0].plot(ZpiR[0, :, 0])
+    ax0[0, 1].plot(ZpiR[0, 10000:10200, 0])
+    ax0[1, 0].plot(ZpiI[0, :, 0])
+    ax0[1, 1].plot(ZpiI[0, 10000:10200, 0])
 
     # electron susceptibility
     # calculating normilized phase velcoity(xi's) for electrons

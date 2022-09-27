@@ -1,24 +1,16 @@
-## function definition
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
-from jax import numpy as jnp
-from jax import jit
-import jax
 import time
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.v0.loadTSdata import loadData
 from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
 from inverse_thomson_scattering.v0.getCalibrations import getCalibrations
-from inverse_thomson_scattering.v0.plotters import LinePlots
 from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.v0.plotstate import plotState
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
-from inverse_thomson_scattering.v0.chisq import get_loss_function
-from inverse_thomson_scattering.v0.form_factor import nonMaxwThomson
-
-# import multiprocessing
+from inverse_thomson_scattering.v0.loss_function import get_loss_function
 
 
 def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
@@ -365,8 +357,6 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
             lb.append(TSinputs[key]["lb"])
             ub.append(TSinputs[key]["ub"])
 
-    t1 = time.time()
-
     # vmapped version will look something like this
     # chiSq2, vgchiSq2 = get_chisq2(TSinputs, xie, sa, D, data)
     # vmapvgchisq = jax.vmap(vgchiSq2)
@@ -390,30 +380,43 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         else:
             raise NotImplementedError("This spectrum does not exist")
 
-        all_data.append(data)
-        # TSinputs["D"]["PhysParams"]["amps"].append(amps)
-        TSinputs["D"]["PhysParams"]["amps"] = amps
+        all_data.append(data[None, :])
+        TSinputs["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
+        # TSinputs["D"]["PhysParams"]["amps"] = amps
 
-        # Plot initial guess
-        fit_model = get_fit_model(TSinputs, xie, sa)
-        # plotState(x0, TSinputs, xie, sa, data, fitModel2=fit_model)
-        loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, data)
+    # Plot initial guess
+    fit_model = get_fit_model(TSinputs, xie, sa)
+    plotState(x0, TSinputs, TSinputs["D"]["PhysParams"]["amps"][0][0], xie, sa, all_data[0][0], fitModel2=fit_model)
+    loss_fn, vg_loss_fn = get_loss_function(TSinputs, xie, sa, np.concatenate(all_data))
 
-        # Perform fit
-        if np.shape(x0)[0] != 0:
-            res = spopt.minimize(
-                vg_loss_fn, np.array(x0), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False}
-            )
-        else:
-            x = x0
+    x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
+    lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
+    ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
 
-        # Plot Result
-        plotState(res.x, TSinputs, xie, sa, data, fitModel2=fit_model)
+    t1 = time.time()
+    print("minimizing")
+    # Perform fit
+    if np.shape(x0)[0] != 0:
+        res = spopt.minimize(vg_loss_fn, x0, method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False})
+    else:
+        x = x0
 
-        xiter.append(res.x)
+    print(f"minimization took {round(time.time() - t1, 2)} s")
 
-    print(f"w grad took {round(time.time() - t1, 2)} s")
+    # Plot Result
+    plotState(
+        res.x.reshape((len(all_data), -1))[0],
+        TSinputs,
+        TSinputs["D"]["PhysParams"]["amps"][0][0],
+        xie,
+        sa,
+        all_data[0][0],
+        fitModel2=fit_model,
+    )
+    xiter.append(res.x)
+
     print(f" full code took {round(time.time() - t0, 2)} s")
+
     result = TSinputs
     count = 0
     xiter = np.array(xiter)

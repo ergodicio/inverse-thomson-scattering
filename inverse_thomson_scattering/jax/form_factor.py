@@ -1,7 +1,7 @@
 from jax import config
 
 config.update("jax_enable_x64", True)
-#config.update('jax_disable_jit',True)
+# config.update('jax_disable_jit',True)
 
 from jax import numpy as jnp
 from jax import jit, value_and_grad, vmap
@@ -26,7 +26,6 @@ def get_form_factor_fn(lamrang):
     xi2 = jnp.array(jnp.arange(-minmax, minmax, h))
     Zpi = jnp.array(zprimeMaxw(xi2))
 
-    # @jit
     def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lam):
         """
         NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma
@@ -48,7 +47,7 @@ def get_form_factor_fn(lamrang):
         Distribution function (DF), normalized velocity (x), and angles from k_L to f1 in radians
         :return:
         """
-        
+
         Mi = jnp.array(A) * Mp  # ion mass
         re = 2.8179e-13  # classical electron radius cm
         Esq = Me * C**2 * re  # sq of the electron charge keV cm
@@ -101,8 +100,8 @@ def get_form_factor_fn(lamrang):
         num_ion_pts = jnp.shape(xii)
         chiI = jnp.zeros(num_ion_pts)
 
-        ZpiR = jnp.interp(xii, xi2, Zpi[0, :], left = 0, right = 0)  # , "cubic", bounds_error=False, fill_value=0)
-        ZpiI = jnp.interp(xii, xi2, Zpi[1, :], left = 0, right = 0)  # , "cubic", bounds_error=False, fill_value=0)
+        ZpiR = jnp.interp(xii, xi2, Zpi[0, :], left=0, right=0)  # , "cubic", bounds_error=False, fill_value=0)
+        ZpiI = jnp.interp(xii, xi2, Zpi[1, :], left=0, right=0)  # , "cubic", bounds_error=False, fill_value=0)
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
 
         # electron susceptibility
@@ -166,7 +165,7 @@ def get_form_factor_fn(lamrang):
             (jnp.abs(chiE[..., jnp.newaxis])) ** 2.0 * jnp.exp(-(xii**2)) / jnp.sqrt(2 * jnp.pi)
         )
         ele_comp = (jnp.abs(1.0 + chiI)) ** 2.0 * fe_vphi / vTe
-        #ele_compE = fe_vphi / vTe # commented because unused
+        # ele_compE = fe_vphi / vTe # commented because unused
 
         SKW_ion_omg = (
             2.0
@@ -180,14 +179,14 @@ def get_form_factor_fn(lamrang):
         )
         SKW_ion_omg = jnp.sum(SKW_ion_omg, 3)
         SKW_ele_omg = 2 * jnp.pi * 1.0 / klde * (ele_comp) / ((jnp.abs(epsilon)) ** 2) * vTe / omgpe
-        #SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
+        # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
-       # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
+        # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * C / omgs
         lams = lams[jnp.newaxis, ..., jnp.newaxis]
         PsLam = PsOmg * 2 * jnp.pi * C / lams**2
-        #PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
+        # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam
         # formfactorE = PsLamE # commented because unused
         return formfactor, lams
