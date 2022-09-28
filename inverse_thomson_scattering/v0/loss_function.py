@@ -111,7 +111,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
 
         return loss
 
-    vg_func = jit(vmap(value_and_grad(loss_fn)))
+    vg_func = jit(value_and_grad(loss_fn))
 
     def val_and_grad_loss(x: np.ndarray):
         reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
