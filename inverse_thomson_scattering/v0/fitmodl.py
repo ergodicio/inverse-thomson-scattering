@@ -12,31 +12,30 @@ def get_fit_model(TSins, xie, sa):
     num_dist_func = get_num_dist_func(TSins["fe"]["type"], xie)
 
     def fit_model(x):
-        param_dict = copy.deepcopy(TSins)
-        
+        # param_dict = copy.deepcopy(TSins)
         i = 0
         for key in TSins.keys():
             if TSins[key]["active"]:
-                param_dict[key]["val"] = x[i]
+                TSins[key]["val"] = x[i]
                 i = i + 1
         if TSins["fe"]["active"]:
-            param_dict["fe"]["val"] = x[-TSins["fe"]["length"] : :]
+            TSins["fe"]["val"] = x[-TSins["fe"]["length"] : :]
         elif TSins["m"]["active"]:
-            param_dict["fe"]["val"] = jnp.log(num_dist_func(TSins["m"]["val"]))
+            TSins["fe"]["val"] = jnp.log(num_dist_func(TSins["m"]["val"]))
 
-        fecur = jnp.exp(param_dict["fe"]["val"])
-        lam = param_dict["lam"]["val"]
+        fecur = jnp.exp(TSins["fe"]["val"])
+        lam = TSins["lam"]["val"]
 
         if TSins["D"]["extraoptions"]["load_ion_spec"]:
             ThryI, lamAxisI = jit(nonMaxwThomsonI_jax)(
-                param_dict["Te"]["val"],
-                param_dict["Ti"]["val"],
-                param_dict["Z"]["val"],
-                param_dict["A"]["val"],
-                param_dict["fract"]["val"],
-                param_dict["ne"]["val"] * 1e20,
-                param_dict["Va"]["val"],
-                param_dict["ud"]["val"],
+                TSins["Te"]["val"],
+                TSins["Ti"]["val"],
+                TSins["Z"]["val"],
+                TSins["A"]["val"],
+                TSins["fract"]["val"],
+                TSins["ne"]["val"] * 1e20,
+                TSins["Va"]["val"],
+                TSins["ud"]["val"],
                 sa["sa"],
                 (fecur, xie),
                 526.5,
@@ -56,14 +55,14 @@ def get_fit_model(TSins, xie, sa):
 
         if TSins["D"]["extraoptions"]["load_ele_spec"]:
             ThryE, lamAxisE = jit(nonMaxwThomsonE_jax)(
-                param_dict["Te"]["val"],
-                param_dict["Ti"]["val"],
-                param_dict["Z"]["val"],
-                param_dict["A"]["val"],
-                param_dict["fract"]["val"],
-                param_dict["ne"]["val"] * 1e20,
-                param_dict["Va"]["val"],
-                param_dict["ud"]["val"],
+                TSins["Te"]["val"],
+                TSins["Ti"]["val"],
+                TSins["Z"]["val"],
+                TSins["A"]["val"],
+                TSins["fract"]["val"],
+                TSins["ne"]["val"] * 1e20,
+                TSins["Va"]["val"],
+                TSins["ud"]["val"],
                 sa["sa"],
                 (fecur, xie),
                 lam,
@@ -122,6 +121,6 @@ def get_fit_model(TSins, xie, sa):
             modlE = []
             lamAxisE = []
 
-        return modlE, modlI, lamAxisE, lamAxisI
+        return modlE, modlI, lamAxisE, lamAxisI, TSins
 
     return fit_model
