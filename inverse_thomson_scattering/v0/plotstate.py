@@ -4,7 +4,7 @@ from inverse_thomson_scattering.v0.plotters import LinePlots
 
 
 def plotState(x, TSinputs, amps, xie, sas, data, fitModel2):
-    [modlE, modlI, lamAxisE, lamAxisI] = fitModel2(x)
+    [modlE, modlI, lamAxisE, lamAxisI, tsdict] = fitModel2(x)
 
     lam = TSinputs["lam"]["val"]
     amp1 = TSinputs["amp1"]["val"]
