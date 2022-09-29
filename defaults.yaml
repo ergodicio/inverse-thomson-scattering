@@ -59,7 +59,8 @@ fe:
     val: []
     active: False
     length: 3999
-    type: 'DLM'
+    type: 
+        DLM:
     lb: -100.
     ub: -0.5
     fe_decrease_strict: True
@@ -82,7 +83,6 @@ fitprops:
 
 D:
     active: False
-    Detector: 'ideal'
     BinWidth: 10
     NumBinInRng: 0
     TotalNumBin: 1023

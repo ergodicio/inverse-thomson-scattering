@@ -65,6 +65,8 @@ def get_num_dist_func(fe_type, xie):
     #     return f1D
 
     # If input is tuple parse as normal
+    #nameCur = fe_type
+    fe_type = list(fe_type.keys())[0]
     nameCur = fe_type
 
     # # Generate Table Name

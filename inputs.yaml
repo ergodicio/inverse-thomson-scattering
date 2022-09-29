@@ -10,7 +10,7 @@ amp2:
     ub: 10.
 amp3:
     val: 1.
-    active: True
+    active: False
     lb: 0.
     ub: 10.
 lam:
@@ -25,12 +25,12 @@ Te:
     ub: 3.
 Ti:
     val: .2
-    active: True
+    active: False
     lb: 0.01
     ub: 3.
 Z:
     val: 8.
-    active: True
+    active: False
     lb: 1.
     ub: 25.
 A:
@@ -50,7 +50,8 @@ fe:
     val: []
     active: False
     length: 3999
-    type: 'DLM'
+    type: 
+        DLM:
     lb: -100.
     ub: -0.5
 
@@ -74,6 +75,6 @@ D:
         spectype: 2
         load_ion_spec: True
         load_ele_spec: True
-        fit_IAW: True
+        fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True

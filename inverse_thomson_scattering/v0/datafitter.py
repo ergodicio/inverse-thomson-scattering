@@ -402,17 +402,19 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         x = x0
 
     print(f"minimization took {round(time.time() - t1, 2)} s")
+    print(res)
 
     # Plot Result
-    plotState(
-        res.x.reshape((len(all_data), -1))[0],
-        TSinputs,
-        TSinputs["D"]["PhysParams"]["amps"][0][0],
-        xie,
-        sa,
-        all_data[0][0],
-        fitModel2=fit_model,
-    )
+    for i, _ in enumerate(lineoutloc["val"]):
+        plotState(
+            res.x.reshape((len(all_data), -1))[i],
+            TSinputs,
+            TSinputs["D"]["PhysParams"]["amps"][i][0],
+            xie,
+            sa,
+            all_data[i][0],
+            fitModel2=fit_model,
+        )
     xiter.append(res.x)
 
     print(f" full code took {round(time.time() - t0, 2)} s")
