@@ -393,9 +393,9 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
     ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
     norms = 2 * (ub - lb)
-    x0 = x0/norms
-    lb = lb/norms
-    ub = ub/norms
+    x0 = x0 / norms
+    lb = lb / norms
+    ub = ub / norms
 
     loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms)
 
@@ -421,7 +421,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     # Plot Result
     for i, _ in enumerate(lineoutloc["val"]):
         plotState(
-            res.x.reshape((len(all_data), -1))[i]*norms,
+            (res.x * norms).reshape((len(all_data), -1))[i],
             config,
             config["D"]["PhysParams"]["amps"][i][0],
             xie,
