@@ -1,85 +1,83 @@
-amp1:
-    val: 1.
-    active: False
-    lb: 0.
-    ub: 10.
-amp2:
-    val: 1.
-    active: False
-    lb: 0.
-    ub: 10.
-amp3:
-    val: 1.
-    active: False
-    lb: 0.
-    ub: 10.
-lam:
-    val: 526.5
-    active: False
-    lb: 523.
-    ub: 528.
-Te:
-    val: .5
-    active: False
-    lb: 0.01
-    ub: 3.
-Ti:
-    val: .2
-    active: False
-    lb: 0.01
-    ub: 3.
-Z:
-    val: 1.
-    active: False
-    lb: 1.
-    ub: 25.
-A:
-    val: 40
-    active: False
-fract:
-    val: 1
-    active: False
-ne:
-    val: .2
-    active: False
-    lb: .001
-    ub: 10.
-ud:
-    val: 0
-    active: False
-Va:
-    val: 0
-    active: False
-m:
-    val: 2.
-    active: False
-    lb: 2.
-    ub: 5.
-fe:
-    val: []
-    active: False
-    length: 3999
-    type: 
-        DLM:
-    lb: -100.
-    ub: -0.5
-    fe_decrease_strict: True
-
-
-blur:
-    val: []
-    active: False
-    lb: 0.
-    ub: 10.
-specCurvature:
-    val: []
-    active: False
-    lb: .1
-    ub: 10.
-fitprops:
-    val: []
-    active: False
-
+parameters:
+    amp1:
+        val: 1.
+        active: False
+        lb: 0.
+        ub: 10.
+    amp2:
+        val: 1.
+        active: False
+        lb: 0.
+        ub: 10.
+    amp3:
+        val: 1.
+        active: False
+        lb: 0.
+        ub: 10.
+    lam:
+        val: 526.5
+        active: False
+        lb: 523.
+        ub: 528.
+    Te:
+        val: .5
+        active: False
+        lb: 0.01
+        ub: 3.
+    Ti:
+        val: .2
+        active: False
+        lb: 0.01
+        ub: 3.
+    Z:
+        val: 1.
+        active: False
+        lb: 1.
+        ub: 25.
+    A:
+        val: 40
+        active: False
+    fract:
+        val: 1
+        active: False
+    ne:
+        val: .2
+        active: False
+        lb: .001
+        ub: 10.
+    ud:
+        val: 0
+        active: False
+    Va:
+        val: 0
+        active: False
+    m:
+        val: 2.
+        active: False
+        lb: 2.
+        ub: 5.
+    fe:
+        val: []
+        active: False
+        length: 3999
+        type:
+            DLM:
+        lb: -100.
+        ub: -0.5
+        fe_decrease_strict: True
+    blur:
+        val: []
+        active: False
+        lb: 0.
+        ub: 10.
+    specCurvature:
+        val: []
+        active: False
+        lb: .1
+        ub: 10.
+    fitprops:
+        val: []
+        active: False
 
 D:
     active: False

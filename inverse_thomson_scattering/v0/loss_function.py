@@ -7,10 +7,10 @@ import numpy as np
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 
 
-def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
-    fit_model = get_fit_model(TSinputs, xie, sas)
-    lam = TSinputs["lam"]["val"]
-    stddev = TSinputs["D"]["PhysParams"]["widIRF"]
+def get_loss_function(config: Dict, xie, sas, data: np.ndarray):
+    fit_model = get_fit_model(config, xie, sas)
+    lam = config["parameters"]["lam"]["val"]
+    stddev = config["D"]["PhysParams"]["widIRF"]
 
     def load_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins):
         originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
@@ -22,7 +22,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
         ThryI = (jnp.amax(modlI) / jnp.amax(ThryI)) * ThryI
         ThryI = jnp.average(ThryI.reshape(1024, -1), axis=1)
 
-        if TSinputs["D"]["PhysParams"]["norm"] == 0:
+        if config["D"]["PhysParams"]["norm"] == 0:
             lamAxisI = jnp.average(lamAxisI.reshape(1024, -1), axis=1)
             ThryI = TSins["amp3"]["val"] * amps[1] * ThryI / jnp.amax(ThryI)
             lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
@@ -39,7 +39,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
         ThryE = jnp.convolve(modlE, inst_funcE, "same")
         ThryE = (jnp.amax(modlE) / jnp.amax(ThryE)) * ThryE
 
-        if TSinputs["D"]["PhysParams"]["norm"] > 0:
+        if config["D"]["PhysParams"]["norm"] > 0:
             ThryE = jnp.where(
                 lamAxisE < lam,
                 TSins["amp1"] * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
@@ -47,7 +47,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
             )
 
         ThryE = jnp.average(ThryE.reshape(1024, -1), axis=1)
-        if TSinputs["D"]["PhysParams"]["norm"] == 0:
+        if config["D"]["PhysParams"]["norm"] == 0:
             lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
             ThryE = amps[0] * ThryE / jnp.amax(ThryE)
             ThryE = jnp.where(lamAxisE < lam, TSins["amp1"]["val"] * ThryE, TSins["amp2"]["val"] * ThryE)
@@ -57,12 +57,12 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
     @jit
     def get_spectra(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
 
-        if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
+        if config["D"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = load_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
         else:
             raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
-        if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+        if config["D"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = load_electron_spec(lamAxisE, modlE, amps, TSins)
         else:
             raise NotImplementedError("Need to create an electron spectrum so we can compare it against data!")
@@ -75,17 +75,17 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
     def loss_fn(x: jnp.ndarray):
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(x)
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
-            modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"]), live_TSinputs
+            modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
         )
 
         loss = 0
         i_data = data[:, 1, :]
         e_data = data[:, 0, :]
-        if TSinputs["D"]["extraoptions"]["fit_IAW"]:
+        if config["D"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
             loss = loss + jnp.sum(jnp.square(i_data - ThryI))
 
-        if TSinputs["D"]["extraoptions"]["fit_EPWb"]:
+        if config["D"]["extraoptions"]["fit_EPWb"]:
             thry_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), e_data, 0.0)
 
@@ -94,7 +94,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
             # loss = loss + jnp.sum(jnp.square(e_data - ThryE))
 
-        if TSinputs["D"]["extraoptions"]["fit_EPWr"]:
+        if config["D"]["extraoptions"]["fit_EPWr"]:
             thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), e_data, 0.0)
 

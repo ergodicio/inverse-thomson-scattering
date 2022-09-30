@@ -13,7 +13,7 @@ from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 from inverse_thomson_scattering.v0.loss_function import get_loss_function
 
 
-def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
+def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     """
     # function description [from Ang](update once complete)
     This function takes the inputs from the ANGTSDATAFITTERGUI and preforms
@@ -65,7 +65,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     ## Hard code toggles, locations and values
     # these should only be changed if something changes in the experimental setup or data is moved around
 
-    tstype = TSinputs["D"]["extraoptions"]["spectype"]  # 1 for ARTS, 2 for TRTS, 3 for SRTS
+    tstype = config["D"]["extraoptions"]["spectype"]  # 1 for ARTS, 2 for TRTS, 3 for SRTS
 
     # lines 75 through 85 can likely be moved to the input decks
     CCDsize = [1024, 1024]  # dimensions of the CCD chip as read
@@ -127,18 +127,18 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     #    xlab = prevShot.xlab;
     #    shift_zero = prevShot.shift_zero;
 
-    [elecData, ionData, xlab, shift_zero] = loadData(shotNum, shotDay, tstype, magE, TSinputs["D"]["extraoptions"])
+    [elecData, ionData, xlab, shift_zero] = loadData(shotNum, shotDay, tstype, magE, config["D"]["extraoptions"])
 
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
-    if not TSinputs["D"]["extraoptions"]["load_ion_spec"]:
-        TSinputs["D"]["extraoptions"]["fit_IAW"] = 0
+    if not config["D"]["extraoptions"]["load_ion_spec"]:
+        config["D"]["extraoptions"]["fit_IAW"] = 0
         print("IAW data not loaded, omitting IAW fit")
-    if not TSinputs["D"]["extraoptions"]["load_ele_spec"]:
-        TSinputs["D"]["extraoptions"]["fit_EPWb"] = 0
-        TSinputs["D"]["extraoptions"]["fit_EPWr"] = 0
+    if not config["D"]["extraoptions"]["load_ele_spec"]:
+        config["D"]["extraoptions"]["fit_EPWb"] = 0
+        config["D"]["extraoptions"]["fit_EPWr"] = 0
         print("EPW data not loaded, omitting EPW fit")
 
-    if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+    if config["D"]["extraoptions"]["load_ele_spec"]:
         elecData = correctThroughput(elecData, tstype, axisyE)
     # prevShot.shotNum = shotNum;
     # prevShot.elecData = elecData;
@@ -148,10 +148,10 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
 
     # Background Shot subtraction
     if bgShot["type"] == "Shot":
-        [BGele, BGion, _, _] = loadData(bgShot["val"], shotDay, specType, magE, TSinputs["D"]["extraoptions"])
-        if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
+        [BGele, BGion, _, _] = loadData(bgShot["val"], shotDay, specType, magE, config["D"]["extraoptions"])
+        if config["D"]["extraoptions"]["load_ion_spec"]:
             ionData_bsub = ionData - conv2(BGion, np.ones([5, 3]) / 15, mode="same")
-        if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+        if config["D"]["extraoptions"]["load_ele_spec"]:
             BGele = correctThroughput(BGele, tstype, axisyE)
             if specType == 1:
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5]) / 25, mode="same")
@@ -187,13 +187,13 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     span = 2 * dpixel + 1
     # (span must be odd)
 
-    if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+    if config["D"]["extraoptions"]["load_ele_spec"]:
         LineoutTSE = [np.mean(elecData_bsub[:, a - dpixel : a + dpixel], axis=1) for a in LineoutPixelE]
         LineoutTSE_smooth = [
             np.convolve(LineoutTSE[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
         ]
 
-    if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
+    if config["D"]["extraoptions"]["load_ion_spec"]:
         LineoutTSI = [
             np.mean(ionData_bsub[:, a - IAWtime - dpixel : a - IAWtime + dpixel], axis=1) for a in LineoutPixelI
         ]
@@ -202,9 +202,9 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         ]  # was divided by 10 for some reason (removed 8-9-22)
 
     if bgShot["type"] == "Fit":
-        if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+        if config["D"]["extraoptions"]["load_ele_spec"]:
             if specType == 1:
-                [BGele, _, _, _] = loadData(bgShot["val"], shotDay, specType, magE, TSinputs["D"]["extraoptions"])
+                [BGele, _, _, _] = loadData(bgShot["val"], shotDay, specType, magE, config["D"]["extraoptions"])
                 xx = np.arange(1024)
 
                 def qaudbg(x):
@@ -248,14 +248,14 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
 
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
-    if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
+    if config["D"]["extraoptions"]["load_ion_spec"]:
         noiseI = np.mean(ionData_bsub[:, BackgroundPixel - dpixel : BackgroundPixel + dpixel], 1)
         noiseI = np.convolve(noiseI, np.ones(span) / span, "same")
         bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
         noiseI = np.mean(noiseI[bgfitx])
         noiseI = np.ones(1024) * bgscalingI * noiseI
 
-    if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+    if config["D"]["extraoptions"]["load_ele_spec"]:
         noiseE = np.mean(elecData_bsub[:, BackgroundPixel - dpixel : BackgroundPixel + dpixel], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
 
@@ -273,7 +273,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
 
     ## Plot data
     fig, ax = plt.subplots(1, 2, figsize=(16, 4))
-    if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
+    if config["D"]["extraoptions"]["load_ion_spec"]:
         imI = ax[1].imshow(
             conv2(ionData_bsub, np.ones([5, 3]) / 15, mode="same"),
             cmap,
@@ -295,7 +295,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
             [axisxI[BackgroundPixel] - shift_zero, axisxI[BackgroundPixel] - shift_zero], [axisyI[0], axisyI[-1]], "k"
         )
 
-    if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+    if config["D"]["extraoptions"]["load_ele_spec"]:
         imE = ax[0].imshow(
             conv2(elecData_bsub, np.ones([5, 3]) / 15, mode="same"),
             cmap,
@@ -318,7 +318,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         )
 
     # Normalize Data before fitting
-    if TSinputs["D"]["extraoptions"]["load_ion_spec"]:
+    if config["D"]["extraoptions"]["load_ion_spec"]:
         noiseI = noiseI / gain
         LineoutTSI_norm = [LineoutTSI_smooth[i] / gain for i, _ in enumerate(LineoutPixelI)]
         LineoutTSI_norm = LineoutTSI_norm - noiseI  # new 6-29-20
@@ -326,7 +326,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     else:
         ampI = 1
 
-    if TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+    if config["D"]["extraoptions"]["load_ele_spec"]:
         noiseE = noiseE / gain
         LineoutTSE_norm = [LineoutTSE_smooth[i] / gain for i, _ in enumerate(LineoutPixelE)]
         LineoutTSE_norm = LineoutTSE_norm - noiseE  # new 6-29-20
@@ -334,28 +334,30 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     else:
         ampE = 1
 
-    TSinputs["D"]["PhysParams"]["widIRF"] = stddev
-    TSinputs["D"]["lamrangE"] = [axisyE[0], axisyE[-2]]
-    TSinputs["D"]["lamrangI"] = [axisyI[0], axisyI[-2]]
-    TSinputs["D"]["npts"] = (len(LineoutTSE_norm) - 1) * 20
+    config["D"]["PhysParams"]["widIRF"] = stddev
+    config["D"]["lamrangE"] = [axisyE[0], axisyE[-2]]
+    config["D"]["lamrangI"] = [axisyI[0], axisyI[-2]]
+    config["D"]["npts"] = (len(LineoutTSE_norm) - 1) * 20
+
+    parameters = config["parameters"]
 
     # Setup x0
-    xie = np.linspace(-7, 7, TSinputs["fe"]["length"])
+    xie = np.linspace(-7, 7, parameters["fe"]["length"])
 
-    NumDistFunc = get_num_dist_func(TSinputs["fe"]["type"], xie)
-    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))
-    TSinputs["fe"]["lb"] = np.multiply(TSinputs["fe"]["lb"], np.ones(TSinputs["fe"]["length"]))
-    TSinputs["fe"]["ub"] = np.multiply(TSinputs["fe"]["ub"], np.ones(TSinputs["fe"]["length"]))
+    NumDistFunc = get_num_dist_func(parameters["fe"]["type"], xie)
+    parameters["fe"]["val"] = np.log(NumDistFunc(parameters["m"]["val"]))
+    parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
+    parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
 
     x0 = []
     lb = []
     ub = []
     xiter = []
-    for key in TSinputs.keys():
-        if TSinputs[key]["active"]:
-            x0.append(TSinputs[key]["val"])
-            lb.append(TSinputs[key]["lb"])
-            ub.append(TSinputs[key]["ub"])
+    for key in parameters.keys():
+        if parameters[key]["active"]:
+            x0.append(parameters[key]["val"])
+            lb.append(parameters[key]["lb"])
+            ub.append(parameters[key]["ub"])
 
     # vmapped version will look something like this
     # chiSq2, vgchiSq2 = get_chisq2(TSinputs, xie, sa, D, data)
@@ -364,30 +366,30 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     # res = spopt.minimize(vmapvgchisq, np.repeat(np.array(x0)), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False})
 
     all_data = []
-    TSinputs["D"]["PhysParams"]["amps"] = []
+    config["D"]["PhysParams"]["amps"] = []
     # run fitting code for each lineout
     for i, _ in enumerate(lineoutloc["val"]):
         # this probably needs to be done differently
-        if TSinputs["D"]["extraoptions"]["load_ion_spec"] and TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+        if config["D"]["extraoptions"]["load_ion_spec"] and config["D"]["extraoptions"]["load_ele_spec"]:
             data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
             amps = [ampE[i], ampI[i]]
-        elif TSinputs["D"]["extraoptions"]["load_ion_spec"]:
+        elif config["D"]["extraoptions"]["load_ion_spec"]:
             data = np.vstack((LineoutTSI_norm[i], LineoutTSI_norm[i]))
             amps = [ampE, ampI[i]]
-        elif TSinputs["D"]["extraoptions"]["load_ele_spec"]:
+        elif config["D"]["extraoptions"]["load_ele_spec"]:
             data = np.vstack((LineoutTSE_norm[i], LineoutTSE_norm[i]))
             amps = [ampE[i], ampI]
         else:
             raise NotImplementedError("This spectrum does not exist")
 
         all_data.append(data[None, :])
-        TSinputs["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
-        # TSinputs["D"]["PhysParams"]["amps"] = amps
+        config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
+        # config["D"]["PhysParams"]["amps"] = amps
 
     # Plot initial guess
-    fit_model = get_fit_model(TSinputs, xie, sa)
-    plotState(x0, TSinputs, TSinputs["D"]["PhysParams"]["amps"][0][0], xie, sa, all_data[0][0], fitModel2=fit_model)
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(TSinputs, xie, sa, np.concatenate(all_data))
+    fit_model = get_fit_model(config, xie, sa)
+    plotState(x0, config, config["D"]["PhysParams"]["amps"][0][0], xie, sa, all_data[0][0], fitModel2=fit_model)
+    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data))
 
     x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
     lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
@@ -400,9 +402,9 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
         res = spopt.minimize(
             vg_loss_fn,
             x0,
-            method=TSinputs["optimizer"]["method"],
+            method=config["optimizer"]["method"],
             jac=True,
-            hess=hess_fn if TSinputs["optimizer"]["hessian"] else False,
+            hess=hess_fn if config["optimizer"]["hessian"] else False,
             bounds=zip(lb, ub),
             options={"disp": False},
         )
@@ -416,8 +418,8 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
     for i, _ in enumerate(lineoutloc["val"]):
         plotState(
             res.x.reshape((len(all_data), -1))[i],
-            TSinputs,
-            TSinputs["D"]["PhysParams"]["amps"][i][0],
+            config,
+            config["D"]["PhysParams"]["amps"][i][0],
             xie,
             sa,
             all_data[i][0],
@@ -427,7 +429,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, TSinputs):
 
     print(f" full code took {round(time.time() - t0, 2)} s")
 
-    result = TSinputs
+    result = config["parameters"]
     count = 0
     xiter = np.array(xiter)
     for key in result.keys():
