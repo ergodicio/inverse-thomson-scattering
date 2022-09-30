@@ -427,7 +427,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     # Plot Result
     for i, _ in enumerate(lineoutloc["val"]):
         plotState(
-            (res.x * norms).reshape((len(all_data), -1))[i],
+            (res.x * norms + shifts).reshape((len(all_data), -1))[i],
             config,
             config["D"]["PhysParams"]["amps"][i][0],
             xie,
