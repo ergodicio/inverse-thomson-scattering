@@ -394,14 +394,16 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
     if config["optimizer"]["x_norm"]:
         norms = 2 * (ub - lb)
+        shifts = lb
     else:
         norms = np.ones_like(x0)
+        shifts = np.zeros_like(x0)
 
-    x0 = x0 / norms
-    lb = lb / norms
-    ub = ub / norms
+    x0 = (x0 - lb) / norms
+    lb = (lb - lb) / norms
+    ub = (ub - lb) / norms
 
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms)
+    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
 
     t1 = time.time()
     print("minimizing")
