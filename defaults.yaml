@@ -100,4 +100,6 @@ D:
     
 optimizer:
     method: L-BFGS-B
-    hessian: True
+    hessian: False
+    y_norm: False
+    x_norm: True

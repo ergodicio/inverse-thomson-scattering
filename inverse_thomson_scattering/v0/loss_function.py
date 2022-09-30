@@ -72,8 +72,11 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
     vmap_fit_model = jit(vmap(fit_model))
     vmap_get_spectra = jit(vmap(get_spectra))
 
-    i_norm = np.amax(data[:, 1, :])
-    e_norm = np.amax(data[:, 0, :])
+    if config["optimizer"]["y_norm"]:
+        i_norm = np.amax(data[:, 1, :])
+        e_norm = np.amax(data[:, 0, :])
+    else:
+        i_norm = e_norm = 1.0
 
     def loss_fn(x: jnp.ndarray):
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(x)

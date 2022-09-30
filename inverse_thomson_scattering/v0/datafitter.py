@@ -392,7 +392,11 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
     lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
     ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
-    norms = 2 * (ub - lb)
+    if config["optimizer"]["x_norm"]:
+        norms = 2 * (ub - lb)
+    else:
+        norms = np.ones_like(x0)
+
     x0 = x0 / norms
     lb = lb / norms
     ub = ub / norms
