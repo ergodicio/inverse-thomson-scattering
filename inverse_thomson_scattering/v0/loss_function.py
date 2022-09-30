@@ -1,4 +1,6 @@
 from typing import Dict
+
+import jax
 from jax import numpy as jnp
 from jax import jit, vmap, value_and_grad
 import numpy as np
@@ -104,6 +106,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
         return loss
 
     vg_func = jit(value_and_grad(loss_fn))
+    hess_func = jit(jax.hessian(loss_fn))
 
     def val_and_grad_loss(x: np.ndarray):
         reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
@@ -113,4 +116,4 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
 
         return value, np.array(grad).flatten()
 
-    return loss_fn, val_and_grad_loss
+    return loss_fn, val_and_grad_loss, hess_func
