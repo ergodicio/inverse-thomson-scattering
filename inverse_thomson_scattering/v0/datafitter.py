@@ -404,7 +404,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
             x0,
             method=config["optimizer"]["method"],
             jac=True,
-            hess=hess_fn if config["optimizer"]["hessian"] else False,
+            hess=hess_fn if config["optimizer"]["hessian"] else None,
             bounds=zip(lb, ub),
             options={"disp": False},
         )
