@@ -7,7 +7,7 @@ import numpy as np
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 
 
-def get_loss_function(config: Dict, xie, sas, data: np.ndarray):
+def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarray):
     fit_model = get_fit_model(config, xie, sas)
     lam = config["parameters"]["lam"]["val"]
     stddev = config["D"]["PhysParams"]["widIRF"]
@@ -109,6 +109,8 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray):
     hess_func = jit(jax.hessian(loss_fn))
 
     def val_and_grad_loss(x: np.ndarray):
+        x = x * norms
+
         reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
 
         # is reshaped_x correct?

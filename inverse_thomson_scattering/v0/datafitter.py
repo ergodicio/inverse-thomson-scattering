@@ -389,11 +389,15 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     # Plot initial guess
     fit_model = get_fit_model(config, xie, sa)
     plotState(x0, config, config["D"]["PhysParams"]["amps"][0][0], xie, sa, all_data[0][0], fitModel2=fit_model)
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data))
-
     x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
     lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
     ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
+    norms = 2 * (ub - lb)
+    x0 = x0/norms
+    lb = lb/norms
+    ub = ub/norms
+
+    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms)
 
     t1 = time.time()
     print("minimizing")
