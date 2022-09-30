@@ -72,15 +72,21 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
     vmap_fit_model = jit(vmap(fit_model))
     vmap_get_spectra = jit(vmap(get_spectra))
 
+    i_norm = np.amax(data[:, 1, :])
+    e_norm = np.amax(data[:, 0, :])
+
     def loss_fn(x: jnp.ndarray):
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(x)
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
         )
 
+        ThryE = ThryE / e_norm
+        ThryI = ThryI / i_norm
+
         loss = 0
-        i_data = data[:, 1, :]
-        e_data = data[:, 0, :]
+        i_data = data[:, 1, :] / i_norm
+        e_data = data[:, 0, :] / e_norm
         if config["D"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
             loss = loss + jnp.sum(jnp.square(i_data - ThryI))
