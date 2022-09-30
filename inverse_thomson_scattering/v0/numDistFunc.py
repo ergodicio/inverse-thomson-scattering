@@ -233,6 +233,8 @@ def GenTableName(name, *args, nout=1):
         paramsUsed = ["p1", "p2", "p3"]
     elif name in ["SpitzerDLM", "MYDLM"]:
         paramsUsed = ["p1", "p2", "p3", "p4"]
+    else:
+        raise NotImplementedError(f"{name} not implemented")
 
     # Construct name
     DFName = name

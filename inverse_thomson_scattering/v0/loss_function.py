@@ -8,10 +8,6 @@ from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
     fit_model = get_fit_model(TSinputs, xie, sas)
     lam = TSinputs["lam"]["val"]
-    # amp1 = TSinputs["amp1"]["val"]
-    # amp2 = TSinputs["amp2"]["val"]
-    # amp3 = TSinputs["amp3"]["val"]
-
     stddev = TSinputs["D"]["PhysParams"]["widIRF"]
 
     def load_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins):
@@ -75,11 +71,7 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
     vmap_get_spectra = jit(vmap(get_spectra))
 
     def loss_fn(x: jnp.ndarray):
-        # modlE, modlI, lamAxisE, lamAxisI = fit_model(x)
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(x)
-        # ThryE, ThryI, lamAxisE, lamAxisI = get_spectra(
-        #     modlE, modlI, lamAxisE, lamAxisI, TSinputs["D"]["PhysParams"]["amps"]
-        # )
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(TSinputs["D"]["PhysParams"]["amps"]), live_TSinputs
         )
@@ -117,7 +109,6 @@ def get_loss_function(TSinputs: Dict, xie, sas, data: np.ndarray):
         reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
 
         # is reshaped_x correct?
-
         value, grad = vg_func(reshaped_x)
 
         return value, np.array(grad).flatten()
