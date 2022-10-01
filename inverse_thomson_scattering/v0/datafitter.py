@@ -399,9 +399,9 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
         norms = np.ones_like(x0)
         shifts = np.zeros_like(x0)
 
-    x0 = (x0 - lb) / norms
-    lb = (lb - lb) / norms
-    ub = (ub - lb) / norms
+    x0 = (x0 - shifts) / norms
+    lb = (lb - shifts) / norms
+    ub = (ub - shifts) / norms
 
     loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
 

@@ -119,10 +119,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
 
     def val_and_grad_loss(x: np.ndarray):
         x = x * norms + shifts
-
         reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
-
-        # is reshaped_x correct?
         value, grad = vg_func(reshaped_x)
 
         return value, np.array(grad).flatten()
