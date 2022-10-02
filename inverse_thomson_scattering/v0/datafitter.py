@@ -431,7 +431,7 @@ def fit(config):
     with tempfile.TemporaryDirectory() as td:
         for i, loc in enumerate(config["lineoutloc"]["val"]):
             fig.clf()
-            ax = fig.add_subplots(1, 1, 1)
+            ax = fig.add_subplot(1, 1, 1)
             # Plot initial guess
             fig, ax = plotState(
                 init_x[i],
@@ -447,7 +447,7 @@ def fit(config):
             fig.savefig(os.path.join(td, f"before-{loc}.png"), bbox_inches="tight")
 
             fig.clf()
-            ax = fig.add_subplots(1, 1, 1)
+            ax = fig.add_subplot(1, 1, 1)
             fig, ax = plotState(
                 final_x[i],
                 config,
