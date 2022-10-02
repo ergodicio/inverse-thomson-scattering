@@ -1,9 +1,7 @@
-from os.path import join, exists
+from os.path import join
 
-# import h5py
 from pyhdf.SD import SD, SDC
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 def loadData(sNum, sDay, specType, magE, loadspecs):

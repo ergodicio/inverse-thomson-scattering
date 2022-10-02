@@ -3,7 +3,7 @@ import numpy as np
 from inverse_thomson_scattering.v0.plotters import LinePlots
 
 
-def plotState(x, config, amps, xie, sas, data, fitModel2):
+def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
     [modlE, modlI, lamAxisE, lamAxisI, tsdict] = fitModel2(x)
 
     lam = config["parameters"]["lam"]["val"]
@@ -72,15 +72,26 @@ def plotState(x, config, amps, xie, sas, data, fitModel2):
     # end
     else:
         if config["D"]["extraoptions"]["load_ion_spec"]:
-            LinePlots(lamAxisI, np.vstack((data[1, :], ThryI)), CurveNames=["Data", "Fit"], XLabel="Wavelength (nm)")
-            plt.xlim([525, 528])
+            LinePlots(
+                lamAxisI,
+                np.vstack((data[1, :], ThryI)),
+                fig,
+                ax,
+                CurveNames=["Data", "Fit"],
+                XLabel="Wavelength (nm)",
+            )
+            ax.set_xlim([525, 528])
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
-            LinePlots(lamAxisE, np.vstack((data[0, :], ThryE)), CurveNames=["Data", "Fit"], XLabel="Wavelength (nm)")
-            plt.xlim([450, 630])
-
-    # chisq = float("nan")
-    # redchi = float("nan")
+            LinePlots(
+                lamAxisE,
+                np.vstack((data[0, :], ThryE)),
+                fig,
+                ax,
+                CurveNames=["Data", "Fit"],
+                XLabel="Wavelength (nm)",
+            )
+            ax.set_xlim([450, 630])
 
     chisq = 0
     if config["D"]["extraoptions"]["fit_IAW"]:

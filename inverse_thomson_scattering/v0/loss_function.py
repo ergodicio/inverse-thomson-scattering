@@ -12,7 +12,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
     lam = config["parameters"]["lam"]["val"]
     stddev = config["D"]["PhysParams"]["widIRF"]
 
-    def load_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins):
+    def transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins):
         originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
         inst_funcI = jnp.squeeze(
             (1.0 / (stddev[1] * jnp.sqrt(2.0 * jnp.pi)))
@@ -29,7 +29,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
 
         return lamAxisI, lamAxisE, ThryI
 
-    def load_electron_spec(lamAxisE, modlE, amps, TSins):
+    def transform_electron_spec(lamAxisE, modlE, amps, TSins):
         # Conceptual_origin so the convolution donsn't shift the signal
         originE = (jnp.amax(lamAxisE) + jnp.amin(lamAxisE)) / 2.0
         inst_funcE = jnp.squeeze(
@@ -57,13 +57,13 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
     @jit
     def get_spectra(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
 
-        if config["D"]["extraoptions"]["load_ion_spec"]:
-            lamAxisI, lamAxisE, ThryI = load_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
+        if config["D"]["extraoptions"]["transform_ion_spec"]:
+            lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
         else:
             raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
-        if config["D"]["extraoptions"]["load_ele_spec"]:
-            lamAxisE, ThryE = load_electron_spec(lamAxisE, modlE, amps, TSins)
+        if config["D"]["extraoptions"]["transform_ele_spec"]:
+            lamAxisE, ThryE = transform_electron_spec(lamAxisE, modlE, amps, TSins)
         else:
             raise NotImplementedError("Need to create an electron spectrum so we can compare it against data!")
 
@@ -98,19 +98,13 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
             thry_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), e_data, 0.0)
 
-            # data_slc = data[:, 0, :]
-            # thry_slc = ThryE  # [eslc[:, 0, :]]
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
-            # loss = loss + jnp.sum(jnp.square(e_data - ThryE))
 
         if config["D"]["extraoptions"]["fit_EPWr"]:
             thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), e_data, 0.0)
 
-            # data_slc = data[:, 0, :]
-            # thry_slc = ThryE  # [eslc[:, 0, :]]
             loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
-            # loss = loss + jnp.sum(jnp.square(e_data - ThryE))
 
         return loss
 

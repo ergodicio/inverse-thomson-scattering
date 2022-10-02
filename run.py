@@ -1,59 +1,36 @@
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
 import time
-import matplotlib.pyplot as plt
-from inverse_thomson_scattering.v0 import form_factor as np_ff
-from inverse_thomson_scattering.jax import form_factor as jnp_ff
-import numpy as np
 
+import yaml
+import mlflow
 
-def make_plots():
-    fig, ax = plt.subplots(1, 2, figsize=(10, 4))
-    ax[0].plot(formf[0, :, 0], label="np/sp")
-    ax[0].plot(formf_jax[0, :, 0], label="jax")
-    ax[0].grid()
-    ax[0].legend()
-    ax[1].plot(formf[0, :, 9], label="np/sp")
-    ax[1].plot(formf_jax[0, :, 9], label="jax")
-    ax[1].grid()
-    ax[1].legend()
-    print(f"L2 norm between jax and np/sp is {np.sqrt(np.sum((formf - formf_jax) ** 2.0))}")
-    # plt.plot(lams[0,:,0],formf[0,:,1])
-    plt.show()
+from inverse_thomson_scattering.v0 import datafitter
 
 
 if __name__ == "__main__":
-    x = np.array(np.arange(-8, 8, 0.1))
-    distf = 1 / (2 * np.pi) ** (1 / 2) * np.exp(-(x**2) / 2)
-    sa = np.linspace(55, 65, 10)
-    backend = "jax"
+    with open("./defaults.yaml", "r") as fi:
+        defaults = yaml.safe_load(fi)
 
-    # if backend == "numpy":
-    t0 = time.time()
-    formf, lams = np_ff.nonMaxwThomson(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, [400, 700], 526.5, sa, distf, x)
-    t1 = time.time()
-    print(f"numpy/scipy form factor calculation {np.round(t1 - t0, 4)} s")
+    with open("./inputs.yaml", "r") as fi:
+        inputs = yaml.safe_load(fi)
 
-    # elif backend == "jax":
-    # get the functions
-    ff_fn, vg_ff_fn = jnp_ff.get_form_factor_fn([400, 700], 526.5)
+    bgshot = {"type": [], "val": []}
+    lnout = {"type": "ps", "val": [2000]}
+    bglnout = {"type": "pixel", "val": 900}
+    extraoptions = {"spectype": 2}
 
-    # run them once so they're compiled
-    _ = ff_fn(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
-    _ = vg_ff_fn(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
+    config = defaults.update(inputs)
+    config["bgshot"] = bgshot
+    config["lnout"] = lnout
+    config["bglnout"] = bglnout
+    config["extraoptions"] = extraoptions
+    config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
 
-    # then run them again to benchmark them
-    # TODO: find a better way to measure this
-    t0 = time.time()
-    formf_jax, lams_jax = ff_fn(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
-    t1 = time.time()
-    print(f"jax form factor calculation took {np.round(t1 - t0, 4)} s")
+    mlflow.set_experiment(config["mlflow"]["experiment"])
 
-    t0 = time.time()
-    val, grad = vg_ff_fn(1.0, 1.0, 1.0, 1.0, 1.0, 0.3e20, 0.0, 0.0, sa, (distf, x))
-    t1 = time.time()
-    print(f"value and gradient took {np.round(t1 - t0, 4)} s")
-    print(f"gradient was {grad}")
-    make_plots()
-    print("end")
+    with mlflow.start_run() as run:
+        t0 = time.time()
+        fit_results = datafitter.fit(config=config)
+        metrics_dict = {"datafitter_time": time.time() - t0, "loss": fit_results["loss"]}
+
+        mlflow.log_params(config)
+        mlflow.log_metrics(metrics=metrics_dict)

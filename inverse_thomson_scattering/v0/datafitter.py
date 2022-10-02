@@ -1,8 +1,12 @@
+import tempfile, os
+
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
 import time
+import mlflow
+
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.v0.loadTSdata import loadData
 from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
@@ -13,7 +17,7 @@ from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 from inverse_thomson_scattering.v0.loss_function import get_loss_function
 
 
-def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
+def fit(config):
     """
     # function description [from Ang](update once complete)
     This function takes the inputs from the ANGTSDATAFITTERGUI and preforms
@@ -45,13 +49,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
 
 
     Args:
-        shotNum:
-        bgShot:
-        lineoutloc:
-        bgloc:
-        bgscale:
-        dpixel:
-        TSinputs:
+        config:
 
     Returns:
 
@@ -75,7 +73,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     shotDay = 0  # turn on to switch file retrieval to shot day location
 
     gain = 1
-    bgscalingE = bgscale  # multiplicitive factor on the EPW BG lineout
+    bgscalingE = config["bgscale"]  # multiplicitive factor on the EPW BG lineout
     bgscalingI = 0.1  # multiplicitive factor on the IAW BG lineout
     bgshotmult = 1
     flatbg = 0
@@ -117,17 +115,19 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     cmap = mpl.colors.ListedColormap(cmap, name="myColorMap", N=cmap.shape[0])
 
     # Retrieve calibrated axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(shotNum, tstype, CCDsize)
+    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(config["shotnum"], tstype, CCDsize)
 
     # Data loading and corrections
     # Open data stored from the previous run (inactivated for now)
-    # if isfield(prevShot, 'shotNum') & & prevShot.shotNum == shotNum
+    # if isfield(prevShot, 'config["shotnum"]') & & prevShot.config["shotnum"] == config["shotnum"]
     #    elecData = prevShot.elecData;
     #    ionData = prevShot.ionData;
     #    xlab = prevShot.xlab;
     #    shift_zero = prevShot.shift_zero;
 
-    [elecData, ionData, xlab, shift_zero] = loadData(shotNum, shotDay, tstype, magE, config["D"]["extraoptions"])
+    [elecData, ionData, xlab, shift_zero] = loadData(
+        config["shotnum"], shotDay, tstype, magE, config["D"]["extraoptions"]
+    )
 
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
     if not config["D"]["extraoptions"]["load_ion_spec"]:
@@ -140,15 +140,15 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
         elecData = correctThroughput(elecData, tstype, axisyE)
-    # prevShot.shotNum = shotNum;
+    # prevShot.config["shotnum"] = config["shotnum"];
     # prevShot.elecData = elecData;
     # prevShot.ionData = ionData;
     # prevShot.xlab = xlab;
     # prevShot.shift_zero = shift_zero;
 
     # Background Shot subtraction
-    if bgShot["type"] == "Shot":
-        [BGele, BGion, _, _] = loadData(bgShot["val"], shotDay, specType, magE, config["D"]["extraoptions"])
+    if config["bgshot"]["type"] == "Shot":
+        [BGele, BGion, _, _] = loadData(config["bgshot"]["val"], shotDay, specType, magE, config["D"]["extraoptions"])
         if config["D"]["extraoptions"]["load_ion_spec"]:
             ionData_bsub = ionData - conv2(BGion, np.ones([5, 3]) / 15, mode="same")
         if config["D"]["extraoptions"]["load_ele_spec"]:
@@ -163,48 +163,53 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
         ionData_bsub = ionData
 
     # Assign lineout locations
-    if lineoutloc["type"] == "ps":
-        LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in lineoutloc["val"]]
+    if config["lineoutloc"]["type"] == "ps":
+        LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["lineoutloc"]["val"]]
         LineoutPixelI = LineoutPixelE
 
-    elif lineoutloc["type"] == "um":  # [char(hex2dec('03bc')) 'm']:
-        LineoutPixelE = np.argmin(abs(axisxE - lineoutloc["val"]))
-        LineoutPixelI = np.argmin(abs(axisxI - lineoutloc["val"]))
+    elif config["lineoutloc"]["type"] == "um":  # [char(hex2dec('03bc')) 'm']:
+        LineoutPixelE = np.argmin(abs(axisxE - config["lineoutloc"]["val"]))
+        LineoutPixelI = np.argmin(abs(axisxI - config["lineoutloc"]["val"]))
 
-    elif lineoutloc["type"] == "pixel":
-        LineoutPixelE = lineoutloc["val"]
+    elif config["lineoutloc"]["type"] == "pixel":
+        LineoutPixelE = config["lineoutloc"]["val"]
         LineoutPixelI = LineoutPixelE
 
-    if bgloc["type"] == "ps":
-        BackgroundPixel = np.argmin(abs(axisxE - bgloc["val"]))
+    if config["bgloc"]["type"] == "ps":
+        BackgroundPixel = np.argmin(abs(axisxE - config["bgloc"]["val"]))
 
-    elif bgloc["type"] == "pixel":
-        BackgroundPixel = bgloc["val"]
+    elif config["bgloc"]["type"] == "pixel":
+        BackgroundPixel = config["bgloc"]["val"]
 
-    elif bgloc["type"] == "auto":
+    elif config["bgloc"]["type"] == "auto":
         BackgroundPixel = LineoutPixelE + 100
 
-    span = 2 * dpixel + 1
+    span = 2 * config["dpixel"] + 1
     # (span must be odd)
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
-        LineoutTSE = [np.mean(elecData_bsub[:, a - dpixel : a + dpixel], axis=1) for a in LineoutPixelE]
+        LineoutTSE = [
+            np.mean(elecData_bsub[:, a - config["dpixel"] : a + config["dpixel"]], axis=1) for a in LineoutPixelE
+        ]
         LineoutTSE_smooth = [
             np.convolve(LineoutTSE[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
         ]
 
     if config["D"]["extraoptions"]["load_ion_spec"]:
         LineoutTSI = [
-            np.mean(ionData_bsub[:, a - IAWtime - dpixel : a - IAWtime + dpixel], axis=1) for a in LineoutPixelI
+            np.mean(ionData_bsub[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1)
+            for a in LineoutPixelI
         ]
         LineoutTSI_smooth = [
             np.convolve(LineoutTSI[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
         ]  # was divided by 10 for some reason (removed 8-9-22)
 
-    if bgShot["type"] == "Fit":
+    if config["bgshot"]["type"] == "Fit":
         if config["D"]["extraoptions"]["load_ele_spec"]:
             if specType == 1:
-                [BGele, _, _, _] = loadData(bgShot["val"], shotDay, specType, magE, config["D"]["extraoptions"])
+                [BGele, _, _, _] = loadData(
+                    config["bgshot"]["val"], shotDay, specType, magE, config["D"]["extraoptions"]
+                )
                 xx = np.arange(1024)
 
                 def qaudbg(x):
@@ -249,14 +254,14 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
     if config["D"]["extraoptions"]["load_ion_spec"]:
-        noiseI = np.mean(ionData_bsub[:, BackgroundPixel - dpixel : BackgroundPixel + dpixel], 1)
+        noiseI = np.mean(ionData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseI = np.convolve(noiseI, np.ones(span) / span, "same")
         bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
         noiseI = np.mean(noiseI[bgfitx])
         noiseI = np.ones(1024) * bgscalingI * noiseI
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
-        noiseE = np.mean(elecData_bsub[:, BackgroundPixel - dpixel : BackgroundPixel + dpixel], 1)
+        noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
 
         def exp2(x, a, b, c, d):
@@ -283,7 +288,8 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
             vmin=0,
         )
         ax[1].set_title(
-            "Shot : " + str(shotNum) + " : " + "TS : Thruput corrected", fontdict={"fontsize": 10, "fontweight": "bold"}
+            "Shot : " + str(config["shotnum"]) + " : " + "TS : Thruput corrected",
+            fontdict={"fontsize": 10, "fontweight": "bold"},
         )
         ax[1].set_xlabel(xlab)
         ax[1].set_ylabel("Wavelength (nm)")
@@ -305,7 +311,8 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
             vmin=0,
         )
         ax[0].set_title(
-            "Shot : " + str(shotNum) + " : " + "TS : Thruput corrected", fontdict={"fontsize": 10, "fontweight": "bold"}
+            "Shot : " + str(config["shotnum"]) + " : " + "TS : Thruput corrected",
+            fontdict={"fontsize": 10, "fontweight": "bold"},
         )
         ax[0].set_xlabel(xlab)
         ax[0].set_ylabel("Wavelength (nm)")
@@ -359,16 +366,10 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
             lb.append(parameters[key]["lb"])
             ub.append(parameters[key]["ub"])
 
-    # vmapped version will look something like this
-    # chiSq2, vgchiSq2 = get_chisq2(TSinputs, xie, sa, D, data)
-    # vmapvgchisq = jax.vmap(vgchiSq2)
-    # reshape x0 lb and ub so they are x0 time 1024
-    # res = spopt.minimize(vmapvgchisq, np.repeat(np.array(x0)), method="L-BFGS-B", jac=True, bounds=zip(lb, ub), options={"disp": False})
-
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
     # run fitting code for each lineout
-    for i, _ in enumerate(lineoutloc["val"]):
+    for i, _ in enumerate(config["lineoutloc"]["val"]):
         # this probably needs to be done differently
         if config["D"]["extraoptions"]["load_ion_spec"] and config["D"]["extraoptions"]["load_ele_spec"]:
             data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
@@ -384,11 +385,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
 
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
-        # config["D"]["PhysParams"]["amps"] = amps
 
-    # Plot initial guess
-    fit_model = get_fit_model(config, xie, sa)
-    plotState(x0, config, config["D"]["PhysParams"]["amps"][0][0], xie, sa, all_data[0][0], fitModel2=fit_model)
     x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
     lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
     ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
@@ -407,6 +404,7 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
 
     t1 = time.time()
     print("minimizing")
+    mlflow.set_tag("status", "minimizing")
     # Perform fit
     if np.shape(x0)[0] != 0:
         res = spopt.minimize(
@@ -421,23 +419,50 @@ def dattafitter(shotNum, bgShot, lineoutloc, bgloc, bgscale, dpixel, config):
     else:
         x = x0
 
-    print(f"minimization took {round(time.time() - t1, 2)} s")
-    print(res)
+    mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
-    # Plot Result
-    for i, _ in enumerate(lineoutloc["val"]):
-        plotState(
-            (res.x * norms + shifts).reshape((len(all_data), -1))[i],
-            config,
-            config["D"]["PhysParams"]["amps"][i][0],
-            xie,
-            sa,
-            all_data[i][0],
-            fitModel2=fit_model,
-        )
-    xiter.append(res.x)
+    fit_model = get_fit_model(config, xie, sa)
+    init_x = x0.reshape((len(all_data), -1))
+    final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
 
-    print(f" full code took {round(time.time() - t0, 2)} s")
+    mlflow.set_tag("status", "plotting")
+    t1 = time.time()
+    fig = plt.figure(figsize=(10, 4))
+    with tempfile.TemporaryDirectory() as td:
+        for i, loc in enumerate(config["lineoutloc"]["val"]):
+            fig.clf()
+            ax = fig.add_subplots(1, 1, 1)
+            # Plot initial guess
+            fig, ax = plotState(
+                init_x[i],
+                config,
+                config["D"]["PhysParams"]["amps"][i][0],
+                xie,
+                sa,
+                all_data[i][0],
+                fitModel2=fit_model,
+                fig=fig,
+                ax=ax,
+            )
+            fig.savefig(os.path.join(td, f"before-{loc}.png"), bbox_inches="tight")
+
+            fig.clf()
+            ax = fig.add_subplots(1, 1, 1)
+            fig, ax = plotState(
+                final_x[i],
+                config,
+                config["D"]["PhysParams"]["amps"][i][0],
+                xie,
+                sa,
+                all_data[i][0],
+                fitModel2=fit_model,
+                fig=fig,
+                ax=ax,
+            )
+            fig.savefig(os.path.join(td, f"after-{loc}.png"), bbox_inches="tight")
+        mlflow.log_artifacts(td, artifact_path="plots")
+    mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})
+    xiter.append(final_x)
 
     result = config["parameters"]
     count = 0
