@@ -462,15 +462,14 @@ def fit(config):
             fig.savefig(os.path.join(td, f"after-{loc}.png"), bbox_inches="tight")
         mlflow.log_artifacts(td, artifact_path="plots")
     mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})
-    xiter.append(final_x)
 
     result = config["parameters"]
-    count = 0
-    xiter = np.array(xiter)
-    for key in result.keys():
-        if result[key]["active"]:
-            result[key]["val"] = xiter[:, count]
-            count = count + 1
+    # count = 0
+    # xiter = np.array(xiter)
+    # for key in result.keys():
+    #     if result[key]["active"]:
+    #         result[key]["val"] = xiter[:, count]
+    #         count = count + 1
     # needs to be fixed
     # if result["fe"]["active"]:
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
