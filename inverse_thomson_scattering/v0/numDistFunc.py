@@ -65,6 +65,8 @@ def get_num_dist_func(fe_type, xie):
     #     return f1D
 
     # If input is tuple parse as normal
+    #nameCur = fe_type
+    fe_type = list(fe_type.keys())[0]
     nameCur = fe_type
 
     # # Generate Table Name
@@ -231,6 +233,8 @@ def GenTableName(name, *args, nout=1):
         paramsUsed = ["p1", "p2", "p3"]
     elif name in ["SpitzerDLM", "MYDLM"]:
         paramsUsed = ["p1", "p2", "p3", "p4"]
+    else:
+        raise NotImplementedError(f"{name} not implemented")
 
     # Construct name
     DFName = name

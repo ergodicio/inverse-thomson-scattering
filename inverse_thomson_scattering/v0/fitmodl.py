@@ -6,37 +6,38 @@ from jax import numpy as jnp
 from jax import jit
 
 
-def get_fit_model(TSins, xie, sa):
-    nonMaxwThomsonE_jax, _ = get_form_factor_fn(TSins["D"]["lamrangE"])
-    nonMaxwThomsonI_jax, _ = get_form_factor_fn(TSins["D"]["lamrangI"])
-    num_dist_func = get_num_dist_func(TSins["fe"]["type"], xie)
+def get_fit_model(config, xie, sa):
+    nonMaxwThomsonE_jax, _ = get_form_factor_fn(config["D"]["lamrangE"])
+    nonMaxwThomsonI_jax, _ = get_form_factor_fn(config["D"]["lamrangI"])
+    num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], xie)
 
     def fit_model(x):
-        param_dict = copy.deepcopy(TSins)
-        
+        # param_dict = copy.deepcopy(config)
+
+        parameters = config["parameters"]
         i = 0
-        for key in TSins.keys():
-            if TSins[key]["active"]:
-                param_dict[key]["val"] = x[i]
+        for key in parameters.keys():
+            if parameters[key]["active"]:
+                parameters[key]["val"] = x[i]
                 i = i + 1
-        if TSins["fe"]["active"]:
-            param_dict["fe"]["val"] = x[-TSins["fe"]["length"] : :]
-        elif TSins["m"]["active"]:
-            param_dict["fe"]["val"] = jnp.log(num_dist_func(TSins["m"]["val"]))
+        if parameters["fe"]["active"]:
+            parameters["fe"]["val"] = x[-parameters["fe"]["length"] : :]
+        elif parameters["m"]["active"]:
+            parameters["fe"]["val"] = jnp.log(num_dist_func(parameters["m"]["val"]))
 
-        fecur = jnp.exp(param_dict["fe"]["val"])
-        lam = param_dict["lam"]["val"]
+        fecur = jnp.exp(parameters["fe"]["val"])
+        lam = parameters["lam"]["val"]
 
-        if TSins["D"]["extraoptions"]["load_ion_spec"]:
+        if config["D"]["extraoptions"]["load_ion_spec"]:
             ThryI, lamAxisI = jit(nonMaxwThomsonI_jax)(
-                param_dict["Te"]["val"],
-                param_dict["Ti"]["val"],
-                param_dict["Z"]["val"],
-                param_dict["A"]["val"],
-                param_dict["fract"]["val"],
-                param_dict["ne"]["val"] * 1e20,
-                param_dict["Va"]["val"],
-                param_dict["ud"]["val"],
+                parameters["Te"]["val"],
+                parameters["Ti"]["val"],
+                parameters["Z"]["val"],
+                parameters["A"]["val"],
+                parameters["fract"]["val"],
+                parameters["ne"]["val"] * 1e20,
+                parameters["Va"]["val"],
+                parameters["ud"]["val"],
                 sa["sa"],
                 (fecur, xie),
                 526.5,
@@ -54,16 +55,16 @@ def get_fit_model(TSins, xie, sa):
             modlI = []
             lamAxisI = []
 
-        if TSins["D"]["extraoptions"]["load_ele_spec"]:
+        if config["D"]["extraoptions"]["load_ele_spec"]:
             ThryE, lamAxisE = jit(nonMaxwThomsonE_jax)(
-                param_dict["Te"]["val"],
-                param_dict["Ti"]["val"],
-                param_dict["Z"]["val"],
-                param_dict["A"]["val"],
-                param_dict["fract"]["val"],
-                param_dict["ne"]["val"] * 1e20,
-                param_dict["Va"]["val"],
-                param_dict["ud"]["val"],
+                parameters["Te"]["val"],
+                parameters["Ti"]["val"],
+                parameters["Z"]["val"],
+                parameters["A"]["val"],
+                parameters["fract"]["val"],
+                parameters["ne"]["val"] * 1e20,
+                parameters["Va"]["val"],
+                parameters["ud"]["val"],
                 sa["sa"],
                 (fecur, xie),
                 lam,
@@ -71,9 +72,9 @@ def get_fit_model(TSins, xie, sa):
                 # expion=D["expandedions"],
             )
 
-            # if TSins.fe['Type']=='MYDLM':
-            #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,TSins.fe['thetaphi'])
-            # elif TSins.fe['Type']=='Numeric':
+            # if parameters.fe['Type']=='MYDLM':
+            #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,parameters.fe['thetaphi'])
+            # elif parameters.fe['Type']=='Numeric':
             #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,[2*np.pi/3,0])
             # else:
             #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,expion=D['expandedions'])
@@ -89,32 +90,32 @@ def get_fit_model(TSins, xie, sa):
 
             # [modl,lamAx]=S2Signal(Thry,lamAxis,D);
 
-            if TSins["D"]["iawoff"] and (TSins["D"]["lamrangE"][0] < lam < TSins["D"]["lamrangE"][1]):
+            if config["D"]["iawoff"] and (config["D"]["lamrangE"][0] < lam < config["D"]["lamrangE"][1]):
                 # set the ion feature to 0 #should be switched to a range about lam
                 lamloc = jnp.argmin(jnp.abs(lamAxisE - lam))
                 modlE = jnp.concatenate([modlE[: lamloc - 2000], jnp.zeros(4000), modlE[lamloc + 2000 :]])
 
-            if TSins["D"]["iawfilter"][0]:
-                filterb = TSins["D"]["iawfilter"][3] - TSins["D"]["iawfilter"][2] / 2
-                filterr = TSins["D"]["iawfilter"][3] + TSins["D"]["iawfilter"][2] / 2
-                if TSins["D"]["lamrangE"][0] < filterr and TSins["D"]["lamrangE"][1] > filterb:
-                    if TSins["D"]["lamrangE"][0] < filterb:
+            if config["D"]["iawfilter"][0]:
+                filterb = config["D"]["iawfilter"][3] - config["D"]["iawfilter"][2] / 2
+                filterr = config["D"]["iawfilter"][3] + config["D"]["iawfilter"][2] / 2
+                if config["D"]["lamrangE"][0] < filterr and config["D"]["lamrangE"][1] > filterb:
+                    if config["D"]["lamrangE"][0] < filterb:
                         lamleft = jnp.argmin(jnp.abs(lamAxisE - filterb))
                     else:
                         lamleft = 0
 
-                    if TSins["D"]["lamrangE"][1] > filterr:
+                    if config["D"]["lamrangE"][1] > filterr:
                         lamright = jnp.argmin(jnp.abs(lamAxisE - filterr))
                     else:
                         lamright = lamAxisE.size
 
                     indices = (filterb < lamAxisE) & (filterr > lamAxisE)
-                    modlE = jnp.where(indices, modlE * 10 ** (-TSins["D"]["iawfilter"][1]), modlE)
-                                      
+                    modlE = jnp.where(indices, modlE * 10 ** (-config["D"]["iawfilter"][1]), modlE)
+
                     # modlE = jnp.concatenate(
                     #     [
                     #         modlE[:lamleft],
-                    #         modlE[lamleft:lamright] * 10 ** (-TSins["D"]["iawfilter"][1]),
+                    #         modlE[lamleft:lamright] * 10 ** (-config["D"]["iawfilter"][1]),
                     #         modlE[lamright:],
                     #     ]
                     # )
@@ -122,6 +123,6 @@ def get_fit_model(TSins, xie, sa):
             modlE = []
             lamAxisE = []
 
-        return modlE, modlI, lamAxisE, lamAxisI
+        return modlE, modlI, lamAxisE, lamAxisI, parameters
 
     return fit_model
