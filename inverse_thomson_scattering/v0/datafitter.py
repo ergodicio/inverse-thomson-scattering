@@ -464,6 +464,7 @@ def fit(config):
             fig.savefig(os.path.join(td, f"after-{loc}.png"), bbox_inches="tight")
         mlflow.log_artifacts(td, artifact_path="plots")
     mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})
+    mlflow.set_tag("status", "done plotting")
 
     result = config["parameters"]
     # count = 0

@@ -44,7 +44,8 @@ if __name__ == "__main__":
 
     with mlflow.start_run() as run:
         t0 = time.time()
-        mlflow.log_params(flatten(config))
+        # mlflow.log_params(flatten(config))
         fit_results = datafitter.fit(config=config)
         metrics_dict = {"datafitter_time": time.time() - t0}  # , "loss": fit_results["loss"]}
         mlflow.log_metrics(metrics=metrics_dict)
+        mlflow.set_tag("status", "completed")
