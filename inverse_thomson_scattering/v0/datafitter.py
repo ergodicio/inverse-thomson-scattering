@@ -422,16 +422,17 @@ def fit(config):
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     fit_model = get_fit_model(config, xie, sa)
-    init_x = x0.reshape((len(all_data), -1))
+    init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
     final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
 
     mlflow.set_tag("status", "plotting")
     t1 = time.time()
-    fig = plt.figure(figsize=(10, 4))
+    fig = plt.figure(figsize=(14, 6))
     with tempfile.TemporaryDirectory() as td:
         for i, loc in enumerate(config["lineoutloc"]["val"]):
             fig.clf()
-            ax = fig.add_subplot(1, 1, 1)
+            ax = fig.add_subplot(1, 2, 1)
+            ax2 = fig.add_subplot(1, 2, 2)
             # Plot initial guess
             fig, ax = plotState(
                 init_x[i],
@@ -442,12 +443,13 @@ def fit(config):
                 all_data[i][0],
                 fitModel2=fit_model,
                 fig=fig,
-                ax=ax,
+                ax=[ax, ax2],
             )
             fig.savefig(os.path.join(td, f"before-{loc}.png"), bbox_inches="tight")
 
             fig.clf()
-            ax = fig.add_subplot(1, 1, 1)
+            ax = fig.add_subplot(1, 2, 1)
+            ax2 = fig.add_subplot(1, 2, 2)
             fig, ax = plotState(
                 final_x[i],
                 config,
@@ -457,7 +459,7 @@ def fit(config):
                 all_data[i][0],
                 fitModel2=fit_model,
                 fig=fig,
-                ax=ax,
+                ax=[ax, ax2],
             )
             fig.savefig(os.path.join(td, f"after-{loc}.png"), bbox_inches="tight")
         mlflow.log_artifacts(td, artifact_path="plots")

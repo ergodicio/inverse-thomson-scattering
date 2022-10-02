@@ -76,22 +76,22 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
                 lamAxisI,
                 np.vstack((data[1, :], ThryI)),
                 fig,
-                ax,
+                ax[0],
                 CurveNames=["Data", "Fit"],
                 XLabel="Wavelength (nm)",
             )
-            ax.set_xlim([525, 528])
+            ax[0].set_xlim([525, 528])
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
             LinePlots(
                 lamAxisE,
                 np.vstack((data[0, :], ThryE)),
                 fig,
-                ax,
+                ax[1],
                 CurveNames=["Data", "Fit"],
                 XLabel="Wavelength (nm)",
             )
-            ax.set_xlim([450, 630])
+            ax[1].set_xlim([450, 630])
 
     chisq = 0
     if config["D"]["extraoptions"]["fit_IAW"]:
