@@ -107,3 +107,5 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
         chisq = chisq + sum(
             (data[0, (lamAxisE > 540) & (lamAxisE < 680)] - ThryE[(lamAxisE > 540) & (lamAxisE < 680)]) ** 2
         )
+
+    return fig, ax
