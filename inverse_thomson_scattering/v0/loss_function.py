@@ -57,12 +57,12 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
     @jit
     def get_spectra(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
 
-        if config["D"]["extraoptions"]["transform_ion_spec"]:
+        if config["D"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
         else:
             raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
-        if config["D"]["extraoptions"]["transform_ele_spec"]:
+        if config["D"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = transform_electron_spec(lamAxisE, modlE, amps, TSins)
         else:
             raise NotImplementedError("Need to create an electron spectrum so we can compare it against data!")
