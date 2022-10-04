@@ -189,7 +189,7 @@ def fit(config):
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
         LineoutTSE = [
-            np.mean(elecData_bsub[:, a - config["dpixel"] : a + config["dpixel"]], axis=1) for a in LineoutPixelE
+            np.mean(elecData_bsub[:, a - config["dpixel"]: a + config["dpixel"]], axis=1) for a in LineoutPixelE
         ]
         LineoutTSE_smooth = [
             np.convolve(LineoutTSE[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
@@ -197,7 +197,7 @@ def fit(config):
 
     if config["D"]["extraoptions"]["load_ion_spec"]:
         LineoutTSI = [
-            np.mean(ionData_bsub[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1)
+            np.mean(ionData_bsub[:, a - IAWtime - config["dpixel"]: a - IAWtime + config["dpixel"]], axis=1)
             for a in LineoutPixelI
         ]
         LineoutTSI_smooth = [
@@ -220,10 +220,10 @@ def fit(config):
 
                 corrfactor = spopt.minimize(quadbg, [0.1, 0.1, 1.15, 300])
                 newBG = (
-                    corrfactor.x[0] * (xx - corrfactor.x[3]) ** 2
-                    + corrfactor.x[1] * (xx - corrfactor.x[3])
-                    + corrfactor[2]
-                ) * BGele
+                                corrfactor.x[0] * (xx - corrfactor.x[3]) ** 2
+                                + corrfactor.x[1] * (xx - corrfactor.x[3])
+                                + corrfactor[2]
+                        ) * BGele
                 elecData_bsub = elecData - newBG
             else:
                 # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
@@ -235,12 +235,12 @@ def fit(config):
                 # [expbg, _] = spopt.curve_fit(exp2,bgfitx,LineoutTSE_smooth[bgfitx])
 
                 def power2(x, a, b, c):
-                    return a * x**b + c
+                    return a * x ** b + c
 
                 # [pwerbg, _] = spopt.curve_fit(power2,bgfitx,LineoutTSE_smooth[bgfitx])
 
                 def rat21(x, a, b, c, d):
-                    return (a * x**2 + b * x + c) / (x + d)
+                    return (a * x ** 2 + b * x + c) / (x + d)
 
                 # [ratbg, _] = spopt.curve_fit(rat21,bgfitx,LineoutTSE_smooth[bgfitx])
 
@@ -254,14 +254,14 @@ def fit(config):
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
     if config["D"]["extraoptions"]["load_ion_spec"]:
-        noiseI = np.mean(ionData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
+        noiseI = np.mean(ionData_bsub[:, BackgroundPixel - config["dpixel"]: BackgroundPixel + config["dpixel"]], 1)
         noiseI = np.convolve(noiseI, np.ones(span) / span, "same")
         bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
         noiseI = np.mean(noiseI[bgfitx])
         noiseI = np.ones(1024) * bgscalingI * noiseI
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
-        noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
+        noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"]: BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
 
         def exp2(x, a, b, c, d):
@@ -411,10 +411,10 @@ def fit(config):
             vg_loss_fn,
             x0,
             method=config["optimizer"]["method"],
-            jac=True,
+            jac=True if config["optimizer"]["grad_method"] == "AD" else False,
             hess=hess_fn if config["optimizer"]["hessian"] else None,
             bounds=zip(lb, ub),
-            options={"disp": False},
+            options={"disp": True},
         )
     else:
         x = x0
