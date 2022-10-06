@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 def correctThroughput(data, tstype, axisy):
 
     if tstype==1:
-        speccal=sio.loadmat('spectral_sensitivity.mat', variable_names='speccal')
+        imp=sio.loadmat(join('files','spectral_sensitivity.mat'), variable_names='speccal')
+        speccal=imp['speccal']
         if Fshotnum<95000:
             vq1=speccal
         else:
@@ -33,8 +34,9 @@ def correctThroughput(data, tstype, axisy):
         vq1 = speccalshift(axisy)
         
     else:
-        sens=sio.loadmat('MeasuredSensitivity_11_30_21.mat', variable_names='sens')
-    
+        imp=sio.loadmat(join('files','MeasuredSensitivity_11_30_21.mat'), variable_names='sens')
+        sens=imp['sens']
+
         sens[:,1]=1./sens[:,1]
         sens[0:17,1]=sens[18,1] #the sensitivity goes to zero in this location and is not usable
         

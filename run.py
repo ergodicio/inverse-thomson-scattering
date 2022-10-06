@@ -22,8 +22,8 @@ def update(base_dict, new_dict):
 
 if __name__ == "__main__":
 
-    for num_slices in [1, 2, 4, 8, 16, 32][::-1]:
-        slices = [int(i) for i in np.linspace(2000, 2400, num_slices)]
+    for num_slices in [5]:#[1, 2, 4, 8, 16, 32][::-1]:
+        slices = [int(i) for i in np.linspace(-800, 800, num_slices)]
         with open("./defaults.yaml", "r") as fi:
             defaults = yaml.safe_load(fi)
 
@@ -33,8 +33,8 @@ if __name__ == "__main__":
         defaults = flatten(defaults)
         defaults.update(flatten(inputs))
         config = unflatten(defaults)
-        bgshot = {"type": [], "val": []}
-        lnout = {"type": "ps", "val": slices}
+        bgshot = {"type": "Fit", "val": 102584}
+        lnout = {"type": "um", "val": slices}
         bglnout = {"type": "pixel", "val": 900}
         extraoptions = {"spectype": 2}
 
@@ -44,15 +44,15 @@ if __name__ == "__main__":
         config["extraoptions"] = extraoptions
         config["num_cores"] = int(mp.cpu_count())
 
-        config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
+        config = {**config, **dict(shotnum=102583, bgscale=1, dpixel=2)}
 
         mlflow.set_experiment(config["mlflow"]["experiment"])
 
         with mlflow.start_run() as run:
             mlflow.log_params({"num_slices": len(slices)})
             t0 = time.time()
-            # mlflow.log_params(flatten(config))
             fit_results = datafitter.fit(config=config)
-            metrics_dict = {"datafitter_time": time.time() - t0}  # , "loss": fit_results["loss"]}
+            metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}  # , "loss": fit_results["loss"]}
             mlflow.log_metrics(metrics=metrics_dict)
+            mlflow.log_params(fit_results)
             mlflow.set_tag("status", "completed")

@@ -60,7 +60,9 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         if config["D"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
         else:
-            raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
+            lamAxisI=jnp.nan
+            ThryI=jnp.nan
+            #raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = transform_electron_spec(lamAxisE, modlE, amps, TSins)
@@ -95,14 +97,14 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
             loss = loss + jnp.sum(jnp.square(i_data - ThryI))
 
         if config["D"]["extraoptions"]["fit_EPWb"]:
-            thry_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), ThryE, 0.0)
-            data_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), e_data, 0.0)
+            thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
 
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
         if config["D"]["extraoptions"]["fit_EPWr"]:
-            thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), ThryE, 0.0)
-            data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), e_data, 0.0)
+            thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
 
             loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
 
