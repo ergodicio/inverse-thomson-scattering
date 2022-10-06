@@ -55,8 +55,6 @@ parameters:
             DLM:
         lb: -100.
         ub: -0.5
-
-
     blur:
         val: []
         active: False
@@ -79,3 +77,7 @@ D:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
+
+mlflow:
+    experiment: inverse-thomson-scattering
+

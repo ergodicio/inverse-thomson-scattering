@@ -1,8 +1,11 @@
-jax
 jaxlib
+jax
 numpy
 scipy
 matplotlib
 pyhdf
 xlrd
-flatten_dict
+pyyaml
+mlflow
+boto3
+flatten-dict

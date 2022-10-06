@@ -5,6 +5,8 @@ import numpy as np
 def LinePlots(
     x,
     y,
+    fig,
+    ax,
     f=[],
     XLabel="v/v_{th}",
     YLabel="Amplitude (arb.)",
@@ -21,34 +23,28 @@ def LinePlots(
         y = y.transpose()
 
     if Residuals:
-        fig, ax1 = plt.subplots(2, sharex=True, gridspec_kw={"height_ratios": [2, 1]})
-        ax1[0].plot(x, y)
+        ax[0].plot(x, y)
         # possibly change to stem
-        ax1[1].plot(x, Residuals)
+        ax[1].plot(x, Residuals)
 
     if f:
-        fig, ax1 = plt.subplots()
-        ax1.plot(x, y, "b")
-        ax2 = ax1.twinx()
+        ax.plot(x, y, "b")
+        ax2 = ax.twinx()
         ax2.plot(x, f, "h")
 
         ax2.set_yscale("log")
 
-        ax1.tick_params(axis="y", color="k", labelcolor="k")
+        ax.tick_params(axis="y", color="k", labelcolor="k")
         ax2.tick_params(axis="y", color="g", labelcolor="g")
 
         ax2.set_ylabel("Amplitude (arb.)", color="g")
 
     else:
-        fig, ax1 = plt.subplots()
-        ax1.plot(
-            x,
-            y,
-        )
+        ax.plot(x, y)
 
-    ax1.set_title(title)
-    ax1.set_ylabel(YLabel)
-    ax1.set_xlabel(XLabel)
+    ax.set_title(title)
+    ax.set_ylabel(YLabel)
+    ax.set_xlabel(XLabel)
 
     if CurveNames:
-        ax1.legend(CurveNames)
+        ax.legend(CurveNames)

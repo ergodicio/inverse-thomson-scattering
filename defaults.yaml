@@ -103,3 +103,4 @@ optimizer:
     hessian: False
     y_norm: False
     x_norm: True
+    grad_method: AD
