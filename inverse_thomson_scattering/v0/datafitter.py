@@ -368,11 +368,18 @@ def fit(config):
             if parameters[key]["active"]:
                 if np.size(parameters[key]["val"])>1:
                     x0.append(parameters[key]["val"][i])
+                elif isinstance(parameters[key]["val"], list):
+                    x0.append(parameters[key]["val"][0])
                 else:
                     x0.append(parameters[key]["val"])
                 lb.append(parameters[key]["lb"])
                 ub.append(parameters[key]["ub"])
 
+    x0=np.array(x0)
+    lb=np.array(lb)
+    ub=np.array(ub)
+    print(x0)
+    
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
     # run fitting code for each lineout
@@ -406,16 +413,21 @@ def fit(config):
     x0 = (x0 - shifts) / norms
     lb = (lb - shifts) / norms
     ub = (ub - shifts) / norms
+    print(x0)
+    print(shifts)
+    print(norms)
 
     loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
 
+    print(loss_fn(x0))
+    print(vg_loss_fn(x0))
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
     # Perform fit
     if np.shape(x0)[0] != 0:
         res = spopt.minimize(
-            vg_loss_fn,
+            loss_fn,
             x0,
             method=config["optimizer"]["method"],
             jac=True if config["optimizer"]["grad_method"] == "AD" else False,
@@ -475,20 +487,21 @@ def fit(config):
     mlflow.log_metrics({"num_iterations": res.nit})
     mlflow.log_metrics({"num_fun_eval": res.nfev})
     mlflow.log_metrics({"num_jac_eval": res.njev})
-    #mlflow.log_params({"res_x": res.x})
+    #mlflow.log_params({"res_x": final_x})
     mlflow.set_tag("status", "done plotting")
 
-    result = config["parameters"]
-    # count = 0
-    # xiter = np.array(xiter)
-    # for key in result.keys():
-    #     if result[key]["active"]:
-    #         result[key]["val"] = xiter[:, count]
-    #         count = count + 1
+    count = 0
+    final_x.reshape((len(config["lineoutloc"]["val"]),-1))
+    for key in config["parameters"].keys():
+         if config["parameters"][key]["active"]:
+            config["parameters"][key]["val"] = final_x[:, count]
+            count = count + 1
     # needs to be fixed
     # if result["fe"]["active"]:
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
     # elif result["m"]["active"]:
     #    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
+    mlflow.log_params(config["parameters"])
+    result = config["parameters"]
 
     return result

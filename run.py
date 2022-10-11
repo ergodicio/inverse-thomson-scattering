@@ -22,7 +22,7 @@ def update(base_dict, new_dict):
 
 if __name__ == "__main__":
 
-    for num_slices in [5]:#[1, 2, 4, 8, 16, 32][::-1]:
+    for num_slices in [1,2,3,4,5,6,7,8,9,10,15,20,25,30]:
         slices = [int(i) for i in np.linspace(-800, 800, num_slices)]
         with open("./defaults.yaml", "r") as fi:
             defaults = yaml.safe_load(fi)
@@ -37,6 +37,10 @@ if __name__ == "__main__":
         lnout = {"type": "um", "val": slices}
         bglnout = {"type": "pixel", "val": 900}
         extraoptions = {"spectype": 2}
+        
+        #temporary way to get starting conditions closer to final conditions for all lineouts
+        config["parameters"]["Te"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.2, .6, .2]))
+        config["parameters"]["ne"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.1, .25, .1]))
 
         config["bgshot"] = bgshot
         config["lineoutloc"] = lnout
@@ -50,9 +54,10 @@ if __name__ == "__main__":
 
         with mlflow.start_run() as run:
             mlflow.log_params({"num_slices": len(slices)})
+            mlflow.log_params({"grad_method": config["optimizer"]["grad_method"]})
             t0 = time.time()
             fit_results = datafitter.fit(config=config)
             metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}  # , "loss": fit_results["loss"]}
             mlflow.log_metrics(metrics=metrics_dict)
-            mlflow.log_params(fit_results)
+            mlflow.log_dict(list(config),"input_deck")
             mlflow.set_tag("status", "completed")

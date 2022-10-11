@@ -43,7 +43,7 @@ parameters:
         lb: .001
         ub: 10.
     m:
-        val: [2, 2, 3, 2, 2]
+        val: 2.2
         active: True
         lb: 2.
         ub: 5.
