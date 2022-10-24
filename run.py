@@ -22,7 +22,7 @@ def update(base_dict, new_dict):
 
 if __name__ == "__main__":
 
-    for num_slices in [1,2,3,4,5,6,7,8,9,10,15,20,25,30]:
+    for num_slices in [10, 20, 30, 40, 50]:#[1,2,3,4,5,6]:#,4,5,6,7,8,9,10,15,20,25,30]:
         slices = [int(i) for i in np.linspace(-800, 800, num_slices)]
         with open("./defaults.yaml", "r") as fi:
             defaults = yaml.safe_load(fi)

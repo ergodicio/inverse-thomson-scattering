@@ -413,21 +413,19 @@ def fit(config):
     x0 = (x0 - shifts) / norms
     lb = (lb - shifts) / norms
     ub = (ub - shifts) / norms
-    print(x0)
-    print(shifts)
-    print(norms)
+    #print(x0)
+    #print(shifts)
+    #print(norms)
 
     loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
 
-    print(loss_fn(x0))
-    print(vg_loss_fn(x0))
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
     # Perform fit
     if np.shape(x0)[0] != 0:
         res = spopt.minimize(
-            loss_fn,
+            vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
             x0,
             method=config["optimizer"]["method"],
             jac=True if config["optimizer"]["grad_method"] == "AD" else False,

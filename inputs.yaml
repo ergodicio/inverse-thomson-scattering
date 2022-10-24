@@ -16,7 +16,7 @@ parameters:
         ub: 10.
     lam:
         val: 526.5
-        active: True
+        active: False
         lb: 523.
         ub: 528.
     Te:

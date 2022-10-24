@@ -81,7 +81,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         i_norm = e_norm = 1.0
 
     def loss_fn(x: jnp.ndarray):
-        print(x)
+        #print(x)
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(x)
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
@@ -112,6 +112,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         return loss
 
     vg_func = jit(value_and_grad(loss_fn))
+    loss_func = jit(loss_fn)
     hess_func = jit(jax.hessian(loss_fn))
 
     def val_and_grad_loss(x: np.ndarray):
@@ -120,5 +121,13 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         value, grad = vg_func(reshaped_x)
 
         return value, np.array(grad).flatten()
+    
+    def value(x: np.ndarray):
+        x = x * norms + shifts
+        reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
+        val = loss_func(reshaped_x)
 
-    return loss_fn, val_and_grad_loss, hess_func
+        return val
+
+
+    return value, val_and_grad_loss, hess_func
