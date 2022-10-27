@@ -426,10 +426,15 @@ def fit(config):
     final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
 
     mlflow.set_tag("status", "plotting")
+    if len(config["lineoutloc"]["val"]) > 4:
+        plot_inds = np.random.choice(config["lineoutloc"]["val"], 4, replace=False)
+    else:
+        plot_inds = config["lineoutloc"]["val"]
+
     t1 = time.time()
     fig = plt.figure(figsize=(14, 6))
     with tempfile.TemporaryDirectory() as td:
-        for i, loc in enumerate(config["lineoutloc"]["val"]):
+        for i, loc in enumerate(plot_inds):
             fig.clf()
             ax = fig.add_subplot(1, 2, 1)
             ax2 = fig.add_subplot(1, 2, 2)
