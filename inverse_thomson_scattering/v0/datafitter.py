@@ -483,6 +483,15 @@ def fit(config):
         if config["parameters"][key]["active"]:
             config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
             count = count + 1
+
+    cleaned_params = {}
+    for k, v in config["parameters"].items():
+        if isinstance(v, np.ndarray):
+            act_v = [float(val) for val in list(v)]
+        else:
+            act_v = v
+        cleaned_params[k] = act_v
+
     # needs to be fixed
     # if result["fe"]["active"]:
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
@@ -490,8 +499,8 @@ def fit(config):
     #    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
 
     with tempfile.TemporaryDirectory() as td:
-        with open(os.path.join(td, "learned_parameters.yaml"), "w") as fi:
-            yaml.safe_dump(config["parameters"], fi)
+        with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
+            yaml.safe_dump(cleaned_params, fi)
 
         mlflow.log_artifacts(td)
     result = config["parameters"]
