@@ -60,9 +60,9 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         if config["D"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
         else:
-            lamAxisI=jnp.nan
-            ThryI=jnp.nan
-            #raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
+            lamAxisI = jnp.nan
+            ThryI = jnp.nan
+            # raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = transform_electron_spec(lamAxisE, modlE, amps, TSins)
@@ -81,7 +81,6 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         i_norm = e_norm = 1.0
 
     def loss_fn(x: jnp.ndarray):
-        #print(x)
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(x)
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
@@ -128,6 +127,5 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         val = loss_func(reshaped_x)
 
         return val
-
 
     return value, val_and_grad_loss, hess_func

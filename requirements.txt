@@ -8,4 +8,5 @@ xlrd
 pyyaml
 mlflow
 boto3
-flatten-dict
+flatten - dict
+flatdict

@@ -1,11 +1,13 @@
 import tempfile, os
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
 import time
-import mlflow
+import mlflow, jax
+import yaml
 
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.v0.loadTSdata import loadData
@@ -15,6 +17,23 @@ from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.v0.plotstate import plotState
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 from inverse_thomson_scattering.v0.loss_function import get_loss_function
+
+
+def unnumpy_dict(this_dict: Dict):
+    new_dict = {}
+    for k, v in this_dict.items():
+        if isinstance(v, Dict):
+            new_v = unnumpy_dict(v)
+        elif isinstance(v, np.ndarray):
+            new_v = [float(val) for val in v]
+        elif isinstance(v, jax.numpy.ndarray):
+            new_v = [float(val) for val in v]
+        else:
+            new_v = v
+
+        new_dict[k] = new_v
+
+    return new_dict
 
 
 def fit(config):
@@ -189,7 +208,7 @@ def fit(config):
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
         LineoutTSE = [
-            np.mean(elecData_bsub[:, a - config["dpixel"]: a + config["dpixel"]], axis=1) for a in LineoutPixelE
+            np.mean(elecData_bsub[:, a - config["dpixel"] : a + config["dpixel"]], axis=1) for a in LineoutPixelE
         ]
         LineoutTSE_smooth = [
             np.convolve(LineoutTSE[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
@@ -197,7 +216,7 @@ def fit(config):
 
     if config["D"]["extraoptions"]["load_ion_spec"]:
         LineoutTSI = [
-            np.mean(ionData_bsub[:, a - IAWtime - config["dpixel"]: a - IAWtime + config["dpixel"]], axis=1)
+            np.mean(ionData_bsub[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1)
             for a in LineoutPixelI
         ]
         LineoutTSI_smooth = [
@@ -220,10 +239,10 @@ def fit(config):
 
                 corrfactor = spopt.minimize(quadbg, [0.1, 0.1, 1.15, 300])
                 newBG = (
-                                corrfactor.x[0] * (xx - corrfactor.x[3]) ** 2
-                                + corrfactor.x[1] * (xx - corrfactor.x[3])
-                                + corrfactor[2]
-                        ) * BGele
+                    corrfactor.x[0] * (xx - corrfactor.x[3]) ** 2
+                    + corrfactor.x[1] * (xx - corrfactor.x[3])
+                    + corrfactor[2]
+                ) * BGele
                 elecData_bsub = elecData - newBG
             else:
                 # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
@@ -235,12 +254,12 @@ def fit(config):
                 # [expbg, _] = spopt.curve_fit(exp2,bgfitx,LineoutTSE_smooth[bgfitx])
 
                 def power2(x, a, b, c):
-                    return a * x ** b + c
+                    return a * x**b + c
 
                 # [pwerbg, _] = spopt.curve_fit(power2,bgfitx,LineoutTSE_smooth[bgfitx])
 
                 def rat21(x, a, b, c, d):
-                    return (a * x ** 2 + b * x + c) / (x + d)
+                    return (a * x**2 + b * x + c) / (x + d)
 
                 # [ratbg, _] = spopt.curve_fit(rat21,bgfitx,LineoutTSE_smooth[bgfitx])
 
@@ -257,14 +276,14 @@ def fit(config):
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
     if config["D"]["extraoptions"]["load_ion_spec"]:
-        noiseI = np.mean(ionData_bsub[:, BackgroundPixel - config["dpixel"]: BackgroundPixel + config["dpixel"]], 1)
+        noiseI = np.mean(ionData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseI = np.convolve(noiseI, np.ones(span) / span, "same")
         bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
         noiseI = np.mean(noiseI[bgfitx])
         noiseI = np.ones(1024) * bgscalingI * noiseI
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
-        noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"]: BackgroundPixel + config["dpixel"]], 1)
+        noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
         #print(noiseE)
         def exp2(x, a, b, c, d):
@@ -448,10 +467,15 @@ def fit(config):
     final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
 
     mlflow.set_tag("status", "plotting")
+    if len(config["lineoutloc"]["val"]) > 4:
+        plot_inds = np.random.choice(config["lineoutloc"]["val"], 4, replace=False)
+    else:
+        plot_inds = config["lineoutloc"]["val"]
+
     t1 = time.time()
     fig = plt.figure(figsize=(14, 6))
     with tempfile.TemporaryDirectory() as td:
-        for i, loc in enumerate(config["lineoutloc"]["val"]):
+        for i, loc in enumerate(plot_inds):
             fig.clf()
             ax = fig.add_subplot(1, 2, 1)
             ax2 = fig.add_subplot(1, 2, 2)
@@ -485,20 +509,24 @@ def fit(config):
             )
             fig.savefig(os.path.join(td, f"after-{loc}.png"), bbox_inches="tight")
         mlflow.log_artifacts(td, artifact_path="plots")
+
+    metrics_dict = {"loss": res.fun, "num_iterations": res.nit, "num_fun_eval": res.nfev, "num_jac_eval": res.njev}
     mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})
-    mlflow.log_metrics({"loss": res.fun})
-    mlflow.log_metrics({"num_iterations": res.nit})
-    mlflow.log_metrics({"num_fun_eval": res.nfev})
-    mlflow.log_metrics({"num_jac_eval": res.njev})
-    #mlflow.log_params({"res_x": final_x})
+    mlflow.log_metrics(metrics_dict)
+
     mlflow.set_tag("status", "done plotting")
 
+    result = config["parameters"]
     count = 0
-    final_x.reshape((len(config["lineoutloc"]["val"]),-1))
+    final_x.reshape((len(config["lineoutloc"]["val"]), -1))
+
+    outputs = {}
     for key in config["parameters"].keys():
-         if config["parameters"][key]["active"]:
-            config["parameters"][key]["val"] = final_x[:, count]
+        if config["parameters"][key]["active"]:
+            # config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
+            outputs[key] = [float(val) for val in list(final_x[:, count])]
             count = count + 1
+
     # needs to be fixed
     # if result["fe"]["active"]:
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
@@ -507,4 +535,10 @@ def fit(config):
     mlflow.log_params(config["parameters"])
     result = config["parameters"]
 
+    with tempfile.TemporaryDirectory() as td:
+        with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
+            yaml.dump(outputs, fi)
+
+        mlflow.log_artifacts(td)
+    result = config["parameters"]
     return result
