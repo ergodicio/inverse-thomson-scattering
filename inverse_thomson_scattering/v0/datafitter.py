@@ -6,6 +6,7 @@ import numpy as np
 import scipy.optimize as spopt
 import time
 import mlflow
+import yaml
 
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.v0.loadTSdata import loadData
@@ -487,7 +488,11 @@ def fit(config):
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
     # elif result["m"]["active"]:
     #    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
-    mlflow.log_params(config["parameters"])
-    result = config["parameters"]
 
+    with tempfile.TemporaryDirectory() as td:
+        with open(os.path.join(td, "learned_parameters.yaml"), "w") as fi:
+            yaml.dump(config["parameters"], fi)
+
+        mlflow.log_artifacts(td)
+    result = config["parameters"]
     return result
