@@ -481,7 +481,7 @@ def fit(config):
     final_x.reshape((len(config["lineoutloc"]["val"]), -1))
     for key in config["parameters"].keys():
         if config["parameters"][key]["active"]:
-            config["parameters"][key]["val"] = final_x[:, count]
+            config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
             count = count + 1
     # needs to be fixed
     # if result["fe"]["active"]:
