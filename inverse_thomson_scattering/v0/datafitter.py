@@ -266,19 +266,20 @@ def fit(config):
     if config["D"]["extraoptions"]["load_ele_spec"]:
         noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"]: BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
-        print(noiseE)
+        #print(noiseE)
         def exp2(x, a, b, c, d):
             return a * np.exp(-b * x) + c * np.exp(-d * x)
 
         bgfitx = np.hstack(
-            [np.arange(220, 480), np.arange(580, 900)]
+            [np.arange(250, 480), np.arange(540, 900)]
         )  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
         plt.plot(bgfitx,noiseE[bgfitx])
-        plt.plot(bgfitx,exp2(bgfitx,200,0.001,200,0.001))
-        plt.show()
         #[expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
         [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[200, 0.001, 200, 0.001])
         noiseE = bgscalingE * exp2(np.arange(1024), *expbg)
+        plt.plot(bgfitx,noiseE[bgfitx])
+        plt.plot(bgfitx,exp2(bgfitx,200,0.001,200,0.001))
+        plt.show()
 
         # temporary constant addition to the background
         noiseE = noiseE + flatbg

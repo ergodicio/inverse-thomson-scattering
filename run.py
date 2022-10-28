@@ -22,7 +22,7 @@ def update(base_dict, new_dict):
 
 if __name__ == "__main__":
 
-    for num_slices in [10, 20, 30, 40, 50]:#[1,2,3,4,5,6]:#,4,5,6,7,8,9,10,15,20,25,30]:
+    for num_slices in [1]:#[10, 20, 30, 40, 50]:#[1,2,3,4,5,6]:#,4,5,6,7,8,9,10,15,20,25,30]:
         slices = [int(i) for i in np.linspace(-800, 800, num_slices)]
         with open("./defaults.yaml", "r") as fi:
             defaults = yaml.safe_load(fi)
@@ -33,14 +33,18 @@ if __name__ == "__main__":
         defaults = flatten(defaults)
         defaults.update(flatten(inputs))
         config = unflatten(defaults)
-        bgshot = {"type": "Fit", "val": 102584}
-        lnout = {"type": "um", "val": slices}
+        #bgshot = {"type": "Fit", "val": 102584}
+        bgshot = {"type": "NA", "val": 1}
+        #lnout = {"type": "um", "val": slices}
+        lnout = {"type": "ps", "val": [2500]}
         bglnout = {"type": "pixel", "val": 900}
         extraoptions = {"spectype": 2}
         
         #temporary way to get starting conditions closer to final conditions for all lineouts
-        config["parameters"]["Te"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.2, .6, .2]))
-        config["parameters"]["ne"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.1, .25, .1]))
+        #config["parameters"]["Te"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.2, .6, .2]))
+        config["parameters"]["Te"]["val"]=[.5]
+        config["parameters"]["ne"]["val"]=[.25]
+        #config["parameters"]["ne"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.1, .25, .1]))
 
         config["bgshot"] = bgshot
         config["lineoutloc"] = lnout
@@ -48,7 +52,7 @@ if __name__ == "__main__":
         config["extraoptions"] = extraoptions
         config["num_cores"] = int(mp.cpu_count())
 
-        config = {**config, **dict(shotnum=102583, bgscale=1, dpixel=2)}
+        config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
 
         mlflow.set_experiment(config["mlflow"]["experiment"])
 
