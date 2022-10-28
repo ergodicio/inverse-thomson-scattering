@@ -60,7 +60,9 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         if config["D"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
         else:
-            raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
+            lamAxisI = jnp.nan
+            ThryI = jnp.nan
+            # raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = transform_electron_spec(lamAxisE, modlE, amps, TSins)
@@ -79,6 +81,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         i_norm = e_norm = 1.0
 
     def loss_fn(x: jnp.ndarray):
+        # print(x)
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(x)
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
@@ -95,20 +98,21 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
             loss = loss + jnp.sum(jnp.square(i_data - ThryI))
 
         if config["D"]["extraoptions"]["fit_EPWb"]:
-            thry_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), ThryE, 0.0)
-            data_slc = jnp.where((lamAxisE > 410) & (lamAxisE < 510), e_data, 0.0)
+            thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
 
             loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
         if config["D"]["extraoptions"]["fit_EPWr"]:
-            thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), ThryE, 0.0)
-            data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 680), e_data, 0.0)
+            thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
 
             loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
 
         return loss
 
     vg_func = jit(value_and_grad(loss_fn))
+    loss_func = jit(loss_fn)
     hess_func = jit(jax.hessian(loss_fn))
 
     def val_and_grad_loss(x: np.ndarray):
@@ -118,4 +122,11 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
 
         return value, np.array(grad).flatten()
 
-    return loss_fn, val_and_grad_loss, hess_func
+    def value(x: np.ndarray):
+        x = x * norms + shifts
+        reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
+        val = loss_func(reshaped_x)
+
+        return val
+
+    return value, val_and_grad_loss, hess_func
