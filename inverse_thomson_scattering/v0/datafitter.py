@@ -6,7 +6,7 @@ import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
 import time
-import mlflow
+import mlflow, jax
 import yaml
 
 from scipy.signal import convolve2d as conv2
@@ -25,6 +25,8 @@ def unnumpy_dict(this_dict: Dict):
         if isinstance(v, Dict):
             new_v = unnumpy_dict(v)
         elif isinstance(v, np.ndarray):
+            new_v = [float(val) for val in v]
+        elif isinstance(v, jax.numpy.ndarray):
             new_v = [float(val) for val in v]
         else:
             new_v = v
@@ -495,9 +497,12 @@ def fit(config):
     result = config["parameters"]
     count = 0
     final_x.reshape((len(config["lineoutloc"]["val"]), -1))
+
+    outputs = {}
     for key in config["parameters"].keys():
         if config["parameters"][key]["active"]:
-            config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
+            # config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
+            outputs[key] = [float(val) for val in list(final_x[:, count])]
             count = count + 1
 
     # needs to be fixed
@@ -508,7 +513,7 @@ def fit(config):
 
     with tempfile.TemporaryDirectory() as td:
         with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
-            yaml.dump(unnumpy_dict(config["parameters"]), fi)
+            yaml.dump(outputs, fi)
 
         mlflow.log_artifacts(td)
     result = config["parameters"]

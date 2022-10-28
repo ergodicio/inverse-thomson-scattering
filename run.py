@@ -1,8 +1,10 @@
+import tempfile
 import time
 import multiprocessing as mp
 import yaml
 import numpy as np
 import mlflow
+import os
 from flatten_dict import flatten, unflatten
 
 from inverse_thomson_scattering.v0 import datafitter
@@ -38,17 +40,22 @@ if __name__ == "__main__":
         bglnout = {"type": "pixel", "val": 900}
         extraoptions = {"spectype": 2}
 
-        config["bgshot"] = bgshot
-        config["lineoutloc"] = lnout
-        config["bgloc"] = bglnout
-        config["extraoptions"] = extraoptions
-        config["num_cores"] = int(mp.cpu_count())
-
-        config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
-
         mlflow.set_experiment(config["mlflow"]["experiment"])
 
         with mlflow.start_run() as run:
+            mlflow.log_params(config)
+            with tempfile.TemporaryDirectory() as td:
+                with open(os.path.join(td, "config.yaml", "w")) as fi:
+                    yaml.safe_dump(config, fi)
+
+            config["bgshot"] = bgshot
+            config["lineoutloc"] = lnout
+            config["bgloc"] = bglnout
+            config["extraoptions"] = extraoptions
+            config["num_cores"] = int(mp.cpu_count())
+
+            config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
+
             mlflow.log_params({"num_slices": len(slices)})
             t0 = time.time()
             # mlflow.log_params(flatten(config))
