@@ -43,7 +43,7 @@ if __name__ == "__main__":
         mlflow.set_experiment(config["mlflow"]["experiment"])
 
         with mlflow.start_run() as run:
-            mlflow.log_params(config)
+            mlflow.log_params(defaults)
             with tempfile.TemporaryDirectory() as td:
                 with open(os.path.join(td, "config.yaml", "w")) as fi:
                     yaml.safe_dump(config, fi)
