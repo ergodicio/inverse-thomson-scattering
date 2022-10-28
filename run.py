@@ -61,7 +61,7 @@ if __name__ == "__main__":
         with mlflow.start_run() as run:
             log_params(config)
             with tempfile.TemporaryDirectory() as td:
-                with open(os.path.join(td, "config.yaml", "w")) as fi:
+                with open(os.path.join(td, "config.yaml"), "w") as fi:
                     yaml.safe_dump(config, fi)
 
             config["bgshot"] = bgshot
