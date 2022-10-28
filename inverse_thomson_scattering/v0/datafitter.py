@@ -491,7 +491,7 @@ def fit(config):
 
     with tempfile.TemporaryDirectory() as td:
         with open(os.path.join(td, "learned_parameters.yaml"), "w") as fi:
-            yaml.dump(config["parameters"], fi)
+            yaml.safe_dump(config["parameters"], fi)
 
         mlflow.log_artifacts(td)
     result = config["parameters"]
