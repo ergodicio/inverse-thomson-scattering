@@ -500,7 +500,7 @@ def fit(config):
 
     with tempfile.TemporaryDirectory() as td:
         with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
-            yaml.safe_dump(cleaned_params, fi)
+            yaml.dump(cleaned_params, fi)
 
         mlflow.log_artifacts(td)
     result = config["parameters"]
