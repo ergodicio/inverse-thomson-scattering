@@ -1,4 +1,5 @@
 import tempfile, os
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -16,6 +17,21 @@ from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.v0.plotstate import plotState
 from inverse_thomson_scattering.v0.fitmodl import get_fit_model
 from inverse_thomson_scattering.v0.loss_function import get_loss_function
+
+
+def unnumpy_dict(this_dict: Dict):
+    new_dict = {}
+    for k, v in this_dict.items():
+        if isinstance(v, Dict):
+            new_v = unnumpy_dict(v)
+        elif isinstance(v, np.ndarray):
+            new_v = [float(val) for val in v]
+        else:
+            new_v = v
+
+        new_dict[k] = new_v
+
+    return new_dict
 
 
 def fit(config):
@@ -484,14 +500,6 @@ def fit(config):
             config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
             count = count + 1
 
-    cleaned_params = {}
-    for k, v in config["parameters"].items():
-        if isinstance(v, np.ndarray):
-            act_v = [float(val) for val in list(v)]
-        else:
-            act_v = v
-        cleaned_params[k] = act_v
-
     # needs to be fixed
     # if result["fe"]["active"]:
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
@@ -500,7 +508,7 @@ def fit(config):
 
     with tempfile.TemporaryDirectory() as td:
         with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
-            yaml.dump(cleaned_params, fi)
+            yaml.dump(unnumpy_dict(config["parameters"]), fi)
 
         mlflow.log_artifacts(td)
     result = config["parameters"]
