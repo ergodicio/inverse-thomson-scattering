@@ -5,8 +5,11 @@ import yaml
 import numpy as np
 import mlflow
 import os
-from flatten_dict import flatten, unflatten
 import flatdict
+from flatten_dict import flatten, unflatten
+from jax import config
+
+config.update("jax_enable_x64", True)
 
 from inverse_thomson_scattering.v0 import datafitter
 
@@ -39,52 +42,56 @@ def update(base_dict, new_dict):
 
 
 if __name__ == "__main__":
+    for tstart in np.linspace(1600,3700,4):
+        tend = tstart + 400
+        for num_slices in [4]:#,16,32,64,128,256]:#,512,1024
+            #slices = [int(i) for i in np.linspace(-800, 800, num_slices)]
+            slices = [int(i) for i in np.linspace(tstart, tend, num_slices)]
+            with open("./defaults.yaml", "r") as fi:
+                defaults = yaml.safe_load(fi)
 
-    for num_slices in [1]:#[10, 20, 30, 40, 50]:#[1,2,3,4,5,6]:#,4,5,6,7,8,9,10,15,20,25,30]:
-        slices = [int(i) for i in np.linspace(-800, 800, num_slices)]
-        with open("./defaults.yaml", "r") as fi:
-            defaults = yaml.safe_load(fi)
+            with open("./inputs.yaml", "r") as fi:
+                inputs = yaml.safe_load(fi)
 
-        with open("./inputs.yaml", "r") as fi:
-            inputs = yaml.safe_load(fi)
+            defaults = flatten(defaults)
+            defaults.update(flatten(inputs))
+            config = unflatten(defaults)
+            #bgshot = {"type": "Fit", "val": 102584}
+            bgshot = {"type": "NA", "val": 1}
+            #lnout = {"type": "um", "val": slices}
+            lnout = {"type": "ps", "val": slices}#[2500]
+            bglnout = {"type": "pixel", "val": 900}
+            extraoptions = {"spectype": 2}
 
-        defaults = flatten(defaults)
-        defaults.update(flatten(inputs))
-        config = unflatten(defaults)
-        #bgshot = {"type": "Fit", "val": 102584}
-        bgshot = {"type": "NA", "val": 1}
-        #lnout = {"type": "um", "val": slices}
-        lnout = {"type": "ps", "val": [2500]}
-        bglnout = {"type": "pixel", "val": 900}
-        extraoptions = {"spectype": 2}
-        
-        #temporary way to get starting conditions closer to final conditions for all lineouts
-        #config["parameters"]["Te"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.2, .6, .2]))
-        config["parameters"]["Te"]["val"]=[.5]
-        config["parameters"]["ne"]["val"]=[.25]
-        #config["parameters"]["ne"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.1, .25, .1]))
+            #temporary way to get starting conditions closer to final conditions for all lineouts
+            #config["parameters"]["Te"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.2, .6, .2]))
+            config["parameters"]["Te"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.2,.4,.5,.55,.6,.6,.65,.65,.65,.65,.65,.5,.4,.4,.3,.3,.25,.2,.2]))
+            #config["parameters"]["ne"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.1, .25, .1]))
+            config["parameters"]["ne"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.15,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.15,.15,.15,.15]))
+            #config["parameters"]["Te"]["val"]=[.3]
+            #config["parameters"]["ne"]["val"]=[.2]
 
-        mlflow.set_experiment(config["mlflow"]["experiment"])
+            mlflow.set_experiment(config["mlflow"]["experiment"])
 
-        with mlflow.start_run() as run:
-            log_params(config)
-            with tempfile.TemporaryDirectory() as td:
-                with open(os.path.join(td, "config.yaml"), "w") as fi:
-                    yaml.safe_dump(config, fi)
+            with mlflow.start_run() as run:
+                log_params(config)
+                #with tempfile.TemporaryDirectory() as td:
+                    #with open(os.path.join(td, "config.yaml"), "w") as fi:
+                    #    yaml.safe_dump(config, fi)
 
-            config["bgshot"] = bgshot
-            config["lineoutloc"] = lnout
-            config["bgloc"] = bglnout
-            config["extraoptions"] = extraoptions
-            config["num_cores"] = int(mp.cpu_count())
+                config["bgshot"] = bgshot
+                config["lineoutloc"] = lnout
+                config["bgloc"] = bglnout
+                config["extraoptions"] = extraoptions
+                config["num_cores"] = int(mp.cpu_count())
 
-            config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
+                config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
 
-            mlflow.log_params({"num_slices": len(slices)})
-            mlflow.log_params({"grad_method": config["optimizer"]["grad_method"]})
-            t0 = time.time()
-            fit_results = datafitter.fit(config=config)
-            metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
-            mlflow.log_metrics(metrics=metrics_dict)
-            mlflow.log_dict(list(config),"input_deck")
-            mlflow.set_tag("status", "completed")
+                mlflow.log_params({"num_slices": len(slices)})
+                mlflow.log_params({"grad_method": config["optimizer"]["grad_method"]})
+                t0 = time.time()
+                fit_results = datafitter.fit(config=config)
+                metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
+                mlflow.log_metrics(metrics=metrics_dict)
+                mlflow.log_dict(list(config),"input_deck")
+                mlflow.set_tag("status", "completed")

@@ -402,7 +402,7 @@ def fit(config):
     x0=np.array(x0)
     lb=np.array(lb)
     ub=np.array(ub)
-    print(x0)
+    #print(x0)
     
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
@@ -455,27 +455,32 @@ def fit(config):
             jac=True if config["optimizer"]["grad_method"] == "AD" else False,
             hess=hess_fn if config["optimizer"]["hessian"] else None,
             bounds=zip(lb, ub),
-            options={"disp": False},
+            options={"disp": True},
         )
     else:
         x = x0
 
+    print(res.status)
+    print(res.message)
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     fit_model = get_fit_model(config, xie, sa)
     init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
     final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
 
+    print("plotting")
     mlflow.set_tag("status", "plotting")
-    if len(config["lineoutloc"]["val"]) > 4:
-        plot_inds = np.random.choice(config["lineoutloc"]["val"], 4, replace=False)
+    if len(config["lineoutloc"]["val"]) > 5:
+        plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 5, replace=False)
     else:
-        plot_inds = config["lineoutloc"]["val"]
+        #plot_inds = config["lineoutloc"]["val"]
+        plot_inds = np.arange(len(config["lineoutloc"]["val"]))
 
     t1 = time.time()
     fig = plt.figure(figsize=(14, 6))
     with tempfile.TemporaryDirectory() as td:
-        for i, loc in enumerate(plot_inds):
+        for i in plot_inds:
+            curline=config["lineoutloc"]["val"][i]
             fig.clf()
             ax = fig.add_subplot(1, 2, 1)
             ax2 = fig.add_subplot(1, 2, 2)
@@ -491,7 +496,7 @@ def fit(config):
                 fig=fig,
                 ax=[ax, ax2],
             )
-            fig.savefig(os.path.join(td, f"before-{loc}.png"), bbox_inches="tight")
+            fig.savefig(os.path.join(td, f"before-{curline}.png"), bbox_inches="tight")
 
             fig.clf()
             ax = fig.add_subplot(1, 2, 1)
@@ -507,7 +512,7 @@ def fit(config):
                 fig=fig,
                 ax=[ax, ax2],
             )
-            fig.savefig(os.path.join(td, f"after-{loc}.png"), bbox_inches="tight")
+            fig.savefig(os.path.join(td, f"after-{curline}.png"), bbox_inches="tight")
         mlflow.log_artifacts(td, artifact_path="plots")
 
     metrics_dict = {"loss": res.fun, "num_iterations": res.nit, "num_fun_eval": res.nfev, "num_jac_eval": res.njev}
@@ -532,8 +537,9 @@ def fit(config):
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
     # elif result["m"]["active"]:
     #    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
-    mlflow.log_params(config["parameters"])
-    result = config["parameters"]
+    
+    #mlflow.log_params(config["parameters"])
+    #result = config["parameters"]
 
     with tempfile.TemporaryDirectory() as td:
         with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
