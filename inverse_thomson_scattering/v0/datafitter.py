@@ -379,11 +379,21 @@ def fit(config):
     lb = []
     ub = []
     xiter = []
-    for key in parameters.keys():
-        if parameters[key]["active"]:
-            x0.append(parameters[key]["val"])
-            lb.append(parameters[key]["lb"])
-            ub.append(parameters[key]["ub"])
+    for i, _ in enumerate(config["lineoutloc"]["val"]):
+        for key in parameters.keys():
+            if parameters[key]["active"]:
+                if np.size(parameters[key]["val"])>1:
+                    x0.append(parameters[key]["val"][i])
+                elif isinstance(parameters[key]["val"], list):
+                    x0.append(parameters[key]["val"][0])
+                else:
+                    x0.append(parameters[key]["val"])
+                lb.append(parameters[key]["lb"])
+                ub.append(parameters[key]["ub"])
+
+    x0=np.array(x0)
+    lb=np.array(lb)
+    ub=np.array(ub)
 
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
@@ -405,9 +415,9 @@ def fit(config):
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
 
-    x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
-    lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
-    ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
+    #x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
+    #lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
+    #ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
     if config["optimizer"]["x_norm"]:
         norms = 2 * (ub - lb)
         shifts = lb
@@ -444,16 +454,19 @@ def fit(config):
     init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
     final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
 
+    print("plotting")
     mlflow.set_tag("status", "plotting")
     if len(config["lineoutloc"]["val"]) > 4:
-        plot_inds = np.random.choice(config["lineoutloc"]["val"], 4, replace=False)
+        plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 2, replace=False)
     else:
-        plot_inds = config["lineoutloc"]["val"]
+        #plot_inds = config["lineoutloc"]["val"]
+        plot_inds = np.arange(len(config["lineoutloc"]["val"]))
 
     t1 = time.time()
     fig = plt.figure(figsize=(14, 6))
     with tempfile.TemporaryDirectory() as td:
-        for i, loc in enumerate(plot_inds):
+        for i in plot_inds:
+            curline=config["lineoutloc"]["val"][i]
             fig.clf()
             ax = fig.add_subplot(1, 2, 1)
             ax2 = fig.add_subplot(1, 2, 2)
@@ -469,7 +482,7 @@ def fit(config):
                 fig=fig,
                 ax=[ax, ax2],
             )
-            fig.savefig(os.path.join(td, f"before-{loc}.png"), bbox_inches="tight")
+            fig.savefig(os.path.join(td, f"before-{curline}.png"), bbox_inches="tight")
 
             fig.clf()
             ax = fig.add_subplot(1, 2, 1)
@@ -485,7 +498,7 @@ def fit(config):
                 fig=fig,
                 ax=[ax, ax2],
             )
-            fig.savefig(os.path.join(td, f"after-{loc}.png"), bbox_inches="tight")
+            fig.savefig(os.path.join(td, f"after-{curline}.png"), bbox_inches="tight")
         mlflow.log_artifacts(td, artifact_path="plots")
 
     metrics_dict = {"loss": res.fun, "num_iterations": res.nit, "num_fun_eval": res.nfev, "num_jac_eval": res.njev}

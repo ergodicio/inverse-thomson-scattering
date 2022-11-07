@@ -40,42 +40,55 @@ def update(base_dict, new_dict):
 
 if __name__ == "__main__":
 
-    for num_slices in [1, 2, 4, 8, 16, 32][::-1]:
-        slices = [int(i) for i in np.linspace(2000, 2400, num_slices)]
-        with open("./defaults.yaml", "r") as fi:
-            defaults = yaml.safe_load(fi)
+    numtimes=10
+    starttimes=np.linspace(1600,3700,numtimes+1)
+    ms=[3.,3.,3.,3.5,3.,3.,2.5,2.5,2.5,2.5]
+    for ii in range(numtimes):
+        tstart=starttimes[ii]
+        tend=starttimes[ii+1]
+        
+        for num_slices in [8]:#[1, 2, 4, 8, 16, 32][::-1]:
+            slices = [int(i) for i in np.linspace(tstart, tend, num_slices)]
+            slices = slices[:-1]
+            with open("./defaults.yaml", "r") as fi:
+                defaults = yaml.safe_load(fi)
 
-        with open("./inputs.yaml", "r") as fi:
-            inputs = yaml.safe_load(fi)
+            with open("./inputs.yaml", "r") as fi:
+                inputs = yaml.safe_load(fi)
 
-        defaults = flatten(defaults)
-        defaults.update(flatten(inputs))
-        config = unflatten(defaults)
-        bgshot = {"type": [], "val": []}
-        lnout = {"type": "ps", "val": slices}
-        bglnout = {"type": "pixel", "val": 900}
-        extraoptions = {"spectype": 2}
+            defaults = flatten(defaults)
+            defaults.update(flatten(inputs))
+            config = unflatten(defaults)
+            bgshot = {"type": [], "val": []}
+            lnout = {"type": "ps", "val": slices}
+            bglnout = {"type": "pixel", "val": 900}
+            extraoptions = {"spectype": 2}
+            
+            config["parameters"]["Te"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.2,.4,.5,.55,.6,.6,.65,.65,.65,.65,.65,.5,.4,.4,.3,.3,.25,.2,.2]))
+            config["parameters"]["ne"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.15,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.15,.15,.15,.15]))
+            #config["parameters"]["m"]["val"]= np.array(np.interp(slices, np.linspace(1600,3700,19), [2.2,3.,3.,3.,3.,3.,3.5,3.5,3.5,3.,3.,3.,3.,2.5,2.5,2.5,2.5,2.5,2.5]))
+            config["parameters"]["m"]["val"]=ms[ii]
 
-        mlflow.set_experiment(config["mlflow"]["experiment"])
+            mlflow.set_experiment(config["mlflow"]["experiment"])
 
-        with mlflow.start_run() as run:
-            log_params(config)
-            with tempfile.TemporaryDirectory() as td:
-                with open(os.path.join(td, "config.yaml"), "w") as fi:
-                    yaml.safe_dump(config, fi)
+            with mlflow.start_run() as run:
+                log_params(config)
+                #with tempfile.TemporaryDirectory() as td:
+                #    with open(os.path.join(td, "config.yaml"), "w") as fi:
+                #        yaml.safe_dump(config, fi)
 
-            config["bgshot"] = bgshot
-            config["lineoutloc"] = lnout
-            config["bgloc"] = bglnout
-            config["extraoptions"] = extraoptions
-            config["num_cores"] = int(mp.cpu_count())
+                config["bgshot"] = bgshot
+                config["lineoutloc"] = lnout
+                config["bgloc"] = bglnout
+                config["extraoptions"] = extraoptions
+                config["num_cores"] = int(mp.cpu_count())
 
-            config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
+                config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
 
-            mlflow.log_params({"num_slices": len(slices)})
-            t0 = time.time()
-            # mlflow.log_params(flatten(config))
-            fit_results = datafitter.fit(config=config)
-            metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
-            mlflow.log_metrics(metrics=metrics_dict)
-            mlflow.set_tag("status", "completed")
+                mlflow.log_params({"num_slices": len(slices)})
+                t0 = time.time()
+                # mlflow.log_params(flatten(config))
+                fit_results = datafitter.fit(config=config)
+                metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
+                mlflow.log_metrics(metrics=metrics_dict)
+                mlflow.set_tag("status", "completed")

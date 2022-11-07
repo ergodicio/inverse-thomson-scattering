@@ -2,6 +2,7 @@ from os.path import join
 
 from pyhdf.SD import SD, SDC
 import numpy as np
+from inverse_thomson_scattering.v0.warpcorr import warpCorrection
 
 
 def loadData(sNum, sDay, specType, magE, loadspecs):
@@ -72,6 +73,7 @@ def loadData(sNum, sDay, specType, magE, loadspecs):
                 eDat = eDat[0, :, :] - eDat[1, :, :]
                 # for now i have remove the warp correction call this will need to be added back later 8/8/22
                 # eDat = OMEGAWarpCorrection(eDat,'EPW',5,1) #correction file need to be updated
+                eDat = warpCorrection(eDat)
                 # eDat = eDat[16:1039,16:1039]
             except BaseException:
                 print("Unable to find Streaked EPW")
