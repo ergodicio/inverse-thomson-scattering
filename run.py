@@ -11,7 +11,7 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
-from inverse_thomson_scattering.v0 import datafitter
+from inverse_thomson_scattering import datafitter
 
 
 def log_params(cfg):
@@ -42,11 +42,18 @@ def update(base_dict, new_dict):
 
 
 if __name__ == "__main__":
-    for tstart in np.linspace(1600,3700,4):
-        tend = tstart + 400
-        for num_slices in [4]:#,16,32,64,128,256]:#,512,1024
-            #slices = [int(i) for i in np.linspace(-800, 800, num_slices)]
+
+    numtimes=10
+    starttimes=np.linspace(1600,3700,numtimes+1)
+    ms=[3.,3.,3.,3.5,3.,3.,2.5,2.5,2.5,2.5]
+    for ii in range(numtimes):
+        tstart=starttimes[ii]
+        tend=starttimes[ii+1]
+        
+        for num_slices in [8]:#[1, 2, 4, 8, 16, 32][::-1]:
             slices = [int(i) for i in np.linspace(tstart, tend, num_slices)]
+            slices = slices[:-1]
+            
             with open("./defaults.yaml", "r") as fi:
                 defaults = yaml.safe_load(fi)
 
@@ -56,28 +63,26 @@ if __name__ == "__main__":
             defaults = flatten(defaults)
             defaults.update(flatten(inputs))
             config = unflatten(defaults)
+
+            bgshot = {"type": [], "val": []}
             #bgshot = {"type": "Fit", "val": 102584}
-            bgshot = {"type": "NA", "val": 1}
+            lnout = {"type": "ps", "val": slices}
             #lnout = {"type": "um", "val": slices}
-            lnout = {"type": "ps", "val": slices}#[2500]
             bglnout = {"type": "pixel", "val": 900}
             extraoptions = {"spectype": 2}
-
-            #temporary way to get starting conditions closer to final conditions for all lineouts
-            #config["parameters"]["Te"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.2, .6, .2]))
+            
             config["parameters"]["Te"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.2,.4,.5,.55,.6,.6,.65,.65,.65,.65,.65,.5,.4,.4,.3,.3,.25,.2,.2]))
-            #config["parameters"]["ne"]["val"]= list(np.interp(np.linspace(0,1,num_slices),[0,.5,1],[.1, .25, .1]))
             config["parameters"]["ne"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.15,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.15,.15,.15,.15]))
-            #config["parameters"]["Te"]["val"]=[.3]
-            #config["parameters"]["ne"]["val"]=[.2]
+            #config["parameters"]["m"]["val"]= np.array(np.interp(slices, np.linspace(1600,3700,19), [2.2,3.,3.,3.,3.,3.,3.5,3.5,3.5,3.,3.,3.,3.,2.5,2.5,2.5,2.5,2.5,2.5]))
+            config["parameters"]["m"]["val"]=ms[ii]
 
             mlflow.set_experiment(config["mlflow"]["experiment"])
 
             with mlflow.start_run() as run:
                 log_params(config)
                 #with tempfile.TemporaryDirectory() as td:
-                    #with open(os.path.join(td, "config.yaml"), "w") as fi:
-                    #    yaml.safe_dump(config, fi)
+                #    with open(os.path.join(td, "config.yaml"), "w") as fi:
+                #        yaml.safe_dump(config, fi)
 
                 config["bgshot"] = bgshot
                 config["lineoutloc"] = lnout
@@ -88,10 +93,9 @@ if __name__ == "__main__":
                 config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
 
                 mlflow.log_params({"num_slices": len(slices)})
-                mlflow.log_params({"grad_method": config["optimizer"]["grad_method"]})
                 t0 = time.time()
+                # mlflow.log_params(flatten(config))
                 fit_results = datafitter.fit(config=config)
                 metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
                 mlflow.log_metrics(metrics=metrics_dict)
-                mlflow.log_dict(list(config),"input_deck")
                 mlflow.set_tag("status", "completed")

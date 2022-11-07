@@ -15,12 +15,12 @@ parameters:
         lb: 0.
         ub: 10.
     lam:
-        val: 525.0
+        val: 524.0
         active: True
         lb: 523.
         ub: 528.
     Te:
-        val: [.2,.4,.6,.4,.2]
+        val: .5
         active: True
         lb: 0.01
         ub: 3.
@@ -39,7 +39,7 @@ parameters:
         val: 40
         active: False
     ne:
-        val: [.08,.2,.25,.2,.08]
+        val: .2
         active: True
         lb: .001
         ub: 10.
@@ -74,7 +74,7 @@ parameters:
 D:
     extraoptions:
         spectype: 2
-        load_ion_spec: False
+        load_ion_spec: True
         load_ele_spec: True
         fit_IAW: False
         fit_EPWb: True
@@ -82,4 +82,3 @@ D:
 
 mlflow:
     experiment: inverse-thomson-scattering
-
