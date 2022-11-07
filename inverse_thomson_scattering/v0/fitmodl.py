@@ -32,6 +32,10 @@ def get_fit_model(config, xie, sa):
         parameters["Te"]["val"]=jnp.linspace((1-parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],(1+parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],10)
         parameters["ne"]["val"]=jnp.linspace((1-parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],(1+parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],10)
 
+        #Add gradients to electron temperature and density just being applied to EPW
+        cur_Te=jnp.linspace((1-parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],(1+parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],10)
+        cur_ne=jnp.linspace((1-parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],(1+parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],10)
+        
         fecur = jnp.exp(parameters["fe"]["val"])
         lam = parameters["lam"]["val"]
 
@@ -42,7 +46,7 @@ def get_fit_model(config, xie, sa):
                 parameters["Z"]["val"],
                 parameters["A"]["val"],
                 parameters["fract"]["val"],
-                parameters["ne"]["val"] * 1e20,
+                parameters["ne"]["val"] * jnp.array([1e20]),
                 parameters["Va"]["val"],
                 parameters["ud"]["val"],
                 sa["sa"],
@@ -64,12 +68,12 @@ def get_fit_model(config, xie, sa):
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
             ThryE, lamAxisE = jit(nonMaxwThomsonE_jax)(
-                parameters["Te"]["val"],
+                cur_Te,
                 parameters["Ti"]["val"],
                 parameters["Z"]["val"],
                 parameters["A"]["val"],
                 parameters["fract"]["val"],
-                parameters["ne"]["val"] * 1e20,
+                cur_ne * 1e20,
                 parameters["Va"]["val"],
                 parameters["ud"]["val"],
                 sa["sa"],

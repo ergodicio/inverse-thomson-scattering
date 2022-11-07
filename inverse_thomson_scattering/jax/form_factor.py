@@ -61,13 +61,11 @@ def get_form_factor_fn(lamrang):
         omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts)  # , True)
 
         # calculate k and omega vectors
-        #omgpe = constants * jnp.sqrt(jnp.transpose(ne))  # plasma frequency Rad/cm
-        omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])
-        omg = omgs - omgL
-        omg = omg[jnp.newaxis, ..., jnp.newaxis]
+        omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
         omgs = omgs[jnp.newaxis, ..., jnp.newaxis]
+        omg = omgs - omgL
+
         ks = jnp.sqrt(omgs**2 - omgpe**2) / C
-        #ks = ks[..., jnp.newaxis]
         kL = jnp.sqrt(omgL**2 - omgpe**2) / C
         #kL = kL[..., jnp.newaxis]
         k = jnp.sqrt(ks**2 + kL**2 - 2 * ks * kL * jnp.cos(sarad))
@@ -79,7 +77,6 @@ def get_form_factor_fn(lamrang):
 
         # electrons
         vTe = jnp.sqrt(Te[..., jnp.newaxis, jnp.newaxis] / Me)  # electron thermal velocity
-        #klde = (vTe[..., jnp.newaxis] / omgpe[..., jnp.newaxis]) * k
         klde = (vTe / omgpe) * k
 
         # ions
@@ -188,7 +185,6 @@ def get_form_factor_fn(lamrang):
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
         # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * C / omgs
-        #lams = lams[jnp.newaxis, ..., jnp.newaxis]
         PsLam = PsOmg * 2 * jnp.pi * C / lams**2
         # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam

@@ -402,7 +402,6 @@ def fit(config):
     x0=np.array(x0)
     lb=np.array(lb)
     ub=np.array(ub)
-    #print(x0)
     
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
@@ -470,8 +469,9 @@ def fit(config):
 
     print("plotting")
     mlflow.set_tag("status", "plotting")
-    if len(config["lineoutloc"]["val"]) > 5:
-        plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 5, replace=False)
+
+    if len(config["lineoutloc"]["val"]) > 4:
+        plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 2, replace=False)
     else:
         #plot_inds = config["lineoutloc"]["val"]
         plot_inds = np.arange(len(config["lineoutloc"]["val"]))
