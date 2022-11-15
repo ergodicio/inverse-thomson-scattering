@@ -49,7 +49,7 @@ def test_run():
         tstart = starttimes[ii]
         tend = starttimes[ii + 1]
 
-        for num_slices in [1]:  # 8]:  # [1, 2, 4, 8, 16, 32][::-1]:
+        for num_slices in [2]:  # 8]:  # [1, 2, 4, 8, 16, 32][::-1]:
             slices = [int(i) for i in np.linspace(tstart, tend, num_slices)]
             slices = slices[:-1]
 
