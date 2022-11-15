@@ -4,7 +4,9 @@ from inverse_thomson_scattering.jax.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from jax import numpy as jnp
 from jax import jit
+#from jax.config import config
 
+#config.update('jax_disable_jit', True)
 
 def get_fit_model(config, xie, sa):
     nonMaxwThomsonE_jax, _ = get_form_factor_fn(config["D"]["lamrangE"])
@@ -13,6 +15,7 @@ def get_fit_model(config, xie, sa):
 
     def fit_model(x):
         # param_dict = copy.deepcopy(config)
+        #print(x)
 
         parameters = config["parameters"]
         i = 0
@@ -25,6 +28,10 @@ def get_fit_model(config, xie, sa):
         elif parameters["m"]["active"]:
             parameters["fe"]["val"] = jnp.log(num_dist_func(parameters["m"]["val"]))
 
+        #Add gradients to electron temperature and density just being applied to EPW
+        cur_Te=jnp.linspace((1-parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],(1+parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],10)
+        cur_ne=jnp.linspace((1-parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],(1+parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],10)
+        
         fecur = jnp.exp(parameters["fe"]["val"])
         lam = parameters["lam"]["val"]
 
@@ -35,7 +42,7 @@ def get_fit_model(config, xie, sa):
                 parameters["Z"]["val"],
                 parameters["A"]["val"],
                 parameters["fract"]["val"],
-                parameters["ne"]["val"] * 1e20,
+                parameters["ne"]["val"] * jnp.array([1e20]),
                 parameters["Va"]["val"],
                 parameters["ud"]["val"],
                 sa["sa"],
@@ -57,12 +64,12 @@ def get_fit_model(config, xie, sa):
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
             ThryE, lamAxisE = jit(nonMaxwThomsonE_jax)(
-                parameters["Te"]["val"],
+                cur_Te,
                 parameters["Ti"]["val"],
                 parameters["Z"]["val"],
                 parameters["A"]["val"],
                 parameters["fract"]["val"],
-                parameters["ne"]["val"] * 1e20,
+                cur_ne * 1e20,
                 parameters["Va"]["val"],
                 parameters["ud"]["val"],
                 sa["sa"],

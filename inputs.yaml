@@ -15,7 +15,7 @@ parameters:
         lb: 0.
         ub: 10.
     lam:
-        val: 526.5
+        val: 524.0
         active: True
         lb: 523.
         ub: 528.
@@ -24,6 +24,7 @@ parameters:
         active: True
         lb: 0.01
         ub: 3.
+        gradient: 2.
     Ti:
         val: .2
         active: False
@@ -42,8 +43,9 @@ parameters:
         active: True
         lb: .001
         ub: 10.
+        gradient: 1.
     m:
-        val: 2.
+        val: 3.
         active: True
         lb: 2.
         ub: 5.

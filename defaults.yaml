@@ -24,6 +24,7 @@ parameters:
         active: False
         lb: 0.01
         ub: 3.
+        gradient: 0.0
     Ti:
         val: .2
         active: False
@@ -45,6 +46,7 @@ parameters:
         active: False
         lb: .001
         ub: 10.
+        gradient: 0.0
     ud:
         val: 0
         active: False
