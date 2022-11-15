@@ -7,8 +7,35 @@ from jax import numpy as jnp
 from jax import jit, value_and_grad, vmap
 from inverse_thomson_scattering import ratintn
 from inverse_thomson_scattering import lamParse
+import numpy as np
+import scipy.interpolate as sp
 
-from inverse_thomson_scattering.form_factor import zprimeMaxw
+def zprimeMaxw(xi):
+    """
+    This function calculates the derivitive of the Z - function given an array of normilzed phase velocities(xi) as
+    defined in Chapter 5. For values of xi between - 10 and 10 a table is used. Outside of this range the assumtotic
+    approximation(see Eqn. 5.2.10) is used.
+    xi is expected to be ascending
+    Args:
+        xi:
+    Returns:
+    """
+
+    rdWT = np.vstack(np.loadtxt("files/rdWT.txt"))
+    idWT = np.vstack(np.loadtxt("files/idWT.txt"))
+
+    ai = xi < -10
+    bi = xi > 10
+    ci = ~(ai + bi)
+
+    rinterp = sp.interp1d(rdWT[:, 0], rdWT[:, 1], "linear")
+    rZp = np.concatenate((xi[ai] ** -2, rinterp(xi), xi[bi] ** -2))
+    iinterp = sp.interp1d(idWT[:, 0], idWT[:, 1], "linear")
+    iZp = np.concatenate((0 * xi[ai], iinterp(xi), 0 * xi[bi]))
+
+    Zp = np.vstack((rZp, iZp))
+    # print(np.shape(Zp))
+    return Zp
 
 
 def get_form_factor_fn(lamrang):
@@ -61,13 +88,13 @@ def get_form_factor_fn(lamrang):
         omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts)  # , True)
 
         # calculate k and omega vectors
-        omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis]) # plasma frequency Rad/cm
-        omg = omgs - omgL
-        omg = omg[jnp.newaxis, ..., jnp.newaxis]
+        omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
         omgs = omgs[jnp.newaxis, ..., jnp.newaxis]
-        
+        omg = omgs - omgL
+
         ks = jnp.sqrt(omgs**2 - omgpe**2) / C
         kL = jnp.sqrt(omgL**2 - omgpe**2) / C
+        #kL = kL[..., jnp.newaxis]
         k = jnp.sqrt(ks**2 + kL**2 - 2 * ks * kL * jnp.cos(sarad))
 
         kdotv = k * Va
@@ -90,6 +117,7 @@ def get_form_factor_fn(lamrang):
         
 
         vTi = jnp.sqrt(Ti / Mi)  # ion thermal velocity
+        # kldi = jnp.transpose(vTi / omgpi, [1, 0, 2, 3]) * k
         kldi = (vTi / omgpi) * (k[..., jnp.newaxis])
 
         # ion susceptibilities
@@ -184,7 +212,6 @@ def get_form_factor_fn(lamrang):
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
         # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * C / omgs
-        #lams = lams[jnp.newaxis, ..., jnp.newaxis]
         PsLam = PsOmg * 2 * jnp.pi * C / lams**2
         # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam

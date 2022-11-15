@@ -10,6 +10,7 @@ import mlflow, jax
 import yaml
 
 from scipy.signal import convolve2d as conv2
+from numpy.linalg import inv
 from inverse_thomson_scattering.loadTSdata import loadData
 from inverse_thomson_scattering.correctThroughput import correctThroughput
 from inverse_thomson_scattering.getCalibrations import getCalibrations
@@ -74,10 +75,6 @@ def fit(config):
 
     """
 
-    ## Persistents
-    # used to prevent reloading and one time analysis (not sure if there is a way to do this in python, omitted for now)
-    # persistent prevShot
-
     t0 = time.time()
     ## Hard code toggles, locations and values
     # these should only be changed if something changes in the experimental setup or data is moved around
@@ -136,14 +133,6 @@ def fit(config):
     # Retrieve calibrated axes
     [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(config["shotnum"], tstype, CCDsize)
 
-    # Data loading and corrections
-    # Open data stored from the previous run (inactivated for now)
-    # if isfield(prevShot, 'config["shotnum"]') & & prevShot.config["shotnum"] == config["shotnum"]
-    #    elecData = prevShot.elecData;
-    #    ionData = prevShot.ionData;
-    #    xlab = prevShot.xlab;
-    #    shift_zero = prevShot.shift_zero;
-
     [elecData, ionData, xlab, shift_zero] = loadData(
         config["shotnum"], shotDay, tstype, magE, config["D"]["extraoptions"]
     )
@@ -157,24 +146,29 @@ def fit(config):
         config["D"]["extraoptions"]["fit_EPWr"] = 0
         print("EPW data not loaded, omitting EPW fit")
 
+    #If no data is loaded or being fit plot the input and quit
+    if config["lineoutloc"]["val"]==[] or (config["D"]["extraoptions"]["fit_IAW"]+config["D"]["extraoptions"]["fit_EPWb"]+config["D"]["extraoptions"]["fit_EPWr"]) == 0 or (elecData==[] and ionData==[]):
+        print("No data loaded, plotting input")
+        plotinput(config, sa)
+        return result = []
+    
+    
     if config["D"]["extraoptions"]["load_ele_spec"]:
         elecData = correctThroughput(elecData, tstype, axisyE)
-    # prevShot.config["shotnum"] = config["shotnum"];
-    # prevShot.elecData = elecData;
-    # prevShot.ionData = ionData;
-    # prevShot.xlab = xlab;
-    # prevShot.shift_zero = shift_zero;
 
-    # Background Shot subtraction
+    # Background Shot
     if config["bgshot"]["type"] == "Shot":
         [BGele, BGion, _, _] = loadData(config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"])
         if config["D"]["extraoptions"]["load_ion_spec"]:
+            BGion = conv2(BGion, np.ones([5, 3]) / 15, mode="same")
             ionData_bsub = ionData - conv2(BGion, np.ones([5, 3]) / 15, mode="same")
         if config["D"]["extraoptions"]["load_ele_spec"]:
             BGele = correctThroughput(BGele, tstype, axisyE)
             if tstype == 1:
+                BGele = conv2(BGele, np.ones([5, 5]) / 25, mode="same")
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5]) / 25, mode="same")
             else:
+                BGele = conv2(BGele, np.ones([5, 3]) / 15, mode="same")
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 3]) / 15, mode="same")
 
     else:
@@ -208,7 +202,8 @@ def fit(config):
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
         LineoutTSE = [
-            np.mean(elecData_bsub[:, a - config["dpixel"] : a + config["dpixel"]], axis=1) for a in LineoutPixelE
+            np.mean(elecData[:, a - config["dpixel"] : a + config["dpixel"]], axis=1) for a in LineoutPixelE
+            #np.mean(elecData_bsub[:, a - config["dpixel"] : a + config["dpixel"]], axis=1) for a in LineoutPixelE
         ]
         LineoutTSE_smooth = [
             np.convolve(LineoutTSE[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
@@ -216,7 +211,8 @@ def fit(config):
 
     if config["D"]["extraoptions"]["load_ion_spec"]:
         LineoutTSI = [
-            np.mean(ionData_bsub[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1)
+            np.mean(ionData[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1)
+            #np.mean(ionData_bsub[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1)
             for a in LineoutPixelI
         ]
         LineoutTSI_smooth = [
@@ -243,7 +239,8 @@ def fit(config):
                     + corrfactor.x[1] * (xx - corrfactor.x[3])
                     + corrfactor[2]
                 ) * BGele
-                elecData_bsub = elecData - newBG
+                BGele = newBG
+                #elecData_bsub = elecData - newBG
             else:
                 # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
                 bgfitx = np.hstack([np.arange(100, 200), np.arange(800, 1023)])
@@ -266,12 +263,16 @@ def fit(config):
                 def rat11(x, a, b, c):
                     return (a * x + b) / (x + c)
 
+                LineoutBGE=[]
                 for i, _ in enumerate(config["lineoutloc"]["val"]):
                     [rat1bg, _] = spopt.curve_fit(rat11, bgfitx, LineoutTSE_smooth[i][bgfitx],[-16,200000,170])
                     #plt.plot(rat11(np.arange(1024), *rat1bg))
                     #plt.plot(LineoutTSE_smooth[i])
                     #plt.show()
-                    LineoutTSE_smooth[i] = LineoutTSE_smooth[i] - rat11(np.arange(1024), *rat1bg)
+                    #LineoutTSE_smooth[i] = LineoutTSE_smooth[i] - rat11(np.arange(1024), *rat1bg)
+                    #the behaviour of this fit is different now when a BG shot is included (no effect without a BG shot
+                    LineoutBGE.append(rat11(np.arange(1024), *rat1bg)[None,:])
+                print(np.shape(LineoutBGE))
 
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
@@ -281,11 +282,18 @@ def fit(config):
         bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
         noiseI = np.mean(noiseI[bgfitx])
         noiseI = np.ones(1024) * bgscalingI * noiseI
+        
+        if 'BGion' in locals():
+            LineoutBGI = [
+            np.mean(BGion[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1) for a in LineoutPixelI]
+            noiseI = noiseI + LineoutBGI
+        else:
+            noiseI = noiseI * np.ones((len(LineoutPixelI),1))
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
         noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
-        #print(noiseE)
+        #This model is in conflict with the fitted background since they both affect the data but are performed on different data
         def exp2(x, a, b, c, d):
             return a * np.exp(-b * x) + c * np.exp(-d * x)
 
@@ -359,6 +367,7 @@ def fit(config):
         ampI = np.amax(LineoutTSI_norm, axis=1)
     else:
         ampI = 1
+        noiseI = [];
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
         noiseE = noiseE / gain
@@ -406,6 +415,8 @@ def fit(config):
     
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
+    config["D"]["PhysParams"]["noiseI"] = []
+    config["D"]["PhysParams"]["noiseE"] = []
     # run fitting code for each lineout
     for i, _ in enumerate(config["lineoutloc"]["val"]):
         # this probably needs to be done differently
@@ -423,6 +434,8 @@ def fit(config):
 
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
+        config["D"]["PhysParams"]["noiseE"].append(np.array(noiseE)[None, :])
+        config["D"]["PhysParams"]["noiseI"].append(np.array(noiseI)[None, :])
 
     #x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
     #lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
@@ -440,6 +453,9 @@ def fit(config):
     #print(x0)
     #print(shifts)
     #print(norms)
+    bnds= list(zip(lb,ub))
+    #testa, testb = zip(*bnds)
+    #print(bnds)
 
     loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
 
@@ -448,25 +464,49 @@ def fit(config):
     mlflow.set_tag("status", "minimizing")
     # Perform fit
     if np.shape(x0)[0] != 0:
-        res = spopt.minimize(
-            vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
-            x0,
-            method=config["optimizer"]["method"],
-            jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-            hess=hess_fn if config["optimizer"]["hessian"] else None,
-            bounds=zip(lb, ub),
-            options={"disp": True},
-        )
+        if config["optimizer"]["method"]=="basinhopping":
+            res = spopt.basinhopping(vg_loss_fn, x0, T=5e6, niter= 10, stepsize=0.004, disp=True,
+                                     minimizer_kwargs = {"method": "L-BFGS-B", "jac": True,
+                                                         "bounds": bnds,
+                                                         "options": {"disp": True}})
+        elif config["optimizer"]["method"]=="shgo":
+            res = spopt.shgo(vg_loss_fn, bounds=bnds,
+                             minimizer_kwargs = {"method": "L-BFGS-B", "jac": True},
+                             options={"disp": True, "jac": True})
+        elif config["optimizer"]["method"]=="dual_annealing":
+            res = spopt.dual_annealing(loss_fn, bounds=bnds, maxiter = 20, initial_temp=500, maxfun = 1e5,
+                             minimizer_kwargs = {"method": "L-BFGS-B", "jac": vg_loss_fn(1), "bounds": bnds, "options": {"disp": True, "maxiter": 100}},
+                             x0=x0)
+        else:
+            res = spopt.minimize(
+                vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
+                x0,
+                method=config["optimizer"]["method"],
+                jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+                hess=hess_fn if config["optimizer"]["hessian"] else None,
+                bounds=zip(lb, ub),
+                options={"disp": True},
+            )
     else:
         x = x0
 
-    print(res.status)
-    print(res.message)
+    #print(res.status)
+    #print(res.message)
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     fit_model = get_fit_model(config, xie, sa)
     init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
     final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
+    print(final_x)
+    print(loss_fn(res.x))
+    print(vg_loss_fn(res.x))
+    cov_mat = 2.*inv(hess_fn(res.x))
+    print(cov_mat)
+    sigmas = np.sqrt(np.diag(cov_mat))
+    print(sigmas)
+    sigmas = sigmas.reshape((len(all_data), -1))
+    print(sigmas)
+    
 
     print("plotting")
     mlflow.set_tag("status", "plotting")
@@ -515,7 +555,8 @@ def fit(config):
             fig.savefig(os.path.join(td, f"after-{curline}.png"), bbox_inches="tight")
         mlflow.log_artifacts(td, artifact_path="plots")
 
-    metrics_dict = {"loss": res.fun, "num_iterations": res.nit, "num_fun_eval": res.nfev, "num_jac_eval": res.njev}
+    print(res)
+    metrics_dict = {"loss": res.fun, "num_iterations": res.nit, "num_fun_eval": res.nfev}
     mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})
     mlflow.log_metrics(metrics_dict)
 
@@ -530,6 +571,7 @@ def fit(config):
         if config["parameters"][key]["active"]:
             # config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
             outputs[key] = [float(val) for val in list(final_x[:, count])]
+            outputs[key]["uncertainty"] = [float(val) for val in list(sigmas[:, count])]
             count = count + 1
 
     # needs to be fixed
@@ -547,4 +589,58 @@ def fit(config):
 
         mlflow.log_artifacts(td)
     result = config["parameters"]
+
+    def plotinput(config, sa, fit_model):
+        parameters = config["parameters"]
+
+        # Setup x0
+        xie = np.linspace(-7, 7, parameters["fe"]["length"])
+
+        NumDistFunc = get_num_dist_func(parameters["fe"]["type"], xie)
+        parameters["fe"]["val"] = np.log(NumDistFunc(parameters["m"]["val"]))
+        parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
+        parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
+
+        x0 = []
+        lb = []
+        ub = []
+        xiter = []
+        for i, _ in enumerate(config["lineoutloc"]["val"]):
+            for key in parameters.keys():
+                if parameters[key]["active"]:
+                    if np.size(parameters[key]["val"])>1:
+                        x0.append(parameters[key]["val"][i])
+                    elif isinstance(parameters[key]["val"], list):
+                        x0.append(parameters[key]["val"][0])
+                    else:
+                        x0.append(parameters[key]["val"])
+                    lb.append(parameters[key]["lb"])
+                    ub.append(parameters[key]["ub"])
+
+        x0=np.array(x0)
+        fit_model = get_fit_model(config, xie, sa)
+
+        print("plotting")
+        mlflow.set_tag("status", "plotting")
+
+        fig = plt.figure(figsize=(14, 6))
+        with tempfile.TemporaryDirectory() as td:
+            fig.clf()
+            ax = fig.add_subplot(1, 2, 1)
+            ax2 = fig.add_subplot(1, 2, 2)
+            fig, ax = plotState(
+                x0,
+                config,
+                [1, 1],
+                xie,
+                sa,
+                [],
+                fitModel2=fit_model,
+                fig=fig,
+                ax=[ax, ax2],
+                )
+            fig.savefig(os.path.join(td, "simulated_spectrum.png"), bbox_inches="tight")
+            mlflow.log_artifacts(td, artifact_path="plots")
+        return
+    
     return result

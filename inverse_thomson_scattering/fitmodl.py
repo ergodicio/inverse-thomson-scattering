@@ -27,15 +27,11 @@ def get_fit_model(config, xie, sa):
             parameters["fe"]["val"] = x[-parameters["fe"]["length"] : :]
         elif parameters["m"]["active"]:
             parameters["fe"]["val"] = jnp.log(num_dist_func(parameters["m"]["val"]))
-            
-        #Add gradients to electron temperature and density
-        parameters["Te"]["val"]=jnp.linspace((1-parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],(1+parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],10)
-        parameters["ne"]["val"]=jnp.linspace((1-parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],(1+parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],10)
 
         #Add gradients to electron temperature and density just being applied to EPW
         cur_Te=jnp.linspace((1-parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],(1+parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],10)
         cur_ne=jnp.linspace((1-parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],(1+parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],10)
-        
+
         fecur = jnp.exp(parameters["fe"]["val"])
         lam = parameters["lam"]["val"]
 

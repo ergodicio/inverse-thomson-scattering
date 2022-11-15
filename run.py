@@ -43,14 +43,15 @@ def update(base_dict, new_dict):
 
 if __name__ == "__main__":
 
-    numtimes=10
-    starttimes=np.linspace(1600,3700,numtimes+1)
+    numtimes=1
+    starttimes=np.linspace(2400,3700,numtimes+1)
     ms=[3.,3.,3.,3.5,3.,3.,2.5,2.5,2.5,2.5]
     for ii in range(numtimes):
         tstart=starttimes[ii]
         tend=starttimes[ii+1]
         
-        for num_slices in [8]:#[1, 2, 4, 8, 16, 32][::-1]:
+        for num_slices in [2]:#[8]:#[1, 2, 4, 8, 16, 32][::-1]:
+            #creates one less slice then num_slices
             slices = [int(i) for i in np.linspace(tstart, tend, num_slices)]
             slices = slices[:-1]
             
