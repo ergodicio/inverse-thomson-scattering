@@ -5,6 +5,9 @@ from jax import numpy as jnp
 from jax import jit, vmap, value_and_grad
 import numpy as np
 from inverse_thomson_scattering.fitmodl import get_fit_model
+#from jax.config import config
+
+#config.update('jax_disable_jit', True)
 
 
 def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarray, shifts: np.ndarray):
@@ -85,6 +88,9 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
         )
 
+        ThryE = ThryE + config["D"]["PhysParams"]["noiseE"]
+        ThryI = ThryI + config["D"]["PhysParams"]["noiseI"]
+        
         ThryE = ThryE / e_norm
         ThryI = ThryI / i_norm
 
@@ -97,18 +103,27 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
             loss = loss + jnp.sum(jnp.square(i_data - ThryI) /i_data)
 
         if config["D"]["extraoptions"]["fit_EPWb"]:
-            thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
-            data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
+            #thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
+            #data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
 
             #loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
-            loss = loss + jnp.sum(jnp.square(data_slc - thry_slc) /data_slc)
+            #loss = loss + jnp.sum(jnp.square(data_slc - thry_slc) /data_slc)
+            sqdev = jnp.square(e_data - ThryE) /ThryE
+            sqdev = jnp.where((lamAxisE > 450) & (lamAxisE < 510), sqdev, 0.0)
+            
+            loss = loss + jnp.sum(sqdev)
 
         if config["D"]["extraoptions"]["fit_EPWr"]:
-            thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
-            data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
+            #thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
+            #data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
 
-            loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
-            loss = loss + jnp.sum(jnp.square(data_slc - thry_slc) /data_slc)
+            #loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+            #loss = loss + jnp.sum(jnp.square(data_slc - thry_slc) /data_slc)
+            
+            sqdev = jnp.square(e_data - ThryE) /ThryE
+            sqdev = jnp.where((lamAxisE > 540) & (lamAxisE < 625), sqdev, 0.0)
+            
+            loss = loss + jnp.sum(sqdev)
 
         return loss
 

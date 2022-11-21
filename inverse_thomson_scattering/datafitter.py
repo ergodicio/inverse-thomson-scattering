@@ -150,7 +150,7 @@ def fit(config):
     if config["lineoutloc"]["val"]==[] or (config["D"]["extraoptions"]["fit_IAW"]+config["D"]["extraoptions"]["fit_EPWb"]+config["D"]["extraoptions"]["fit_EPWr"]) == 0 or (elecData==[] and ionData==[]):
         print("No data loaded, plotting input")
         plotinput(config, sa)
-        return result = []
+        return []
     
     
     if config["D"]["extraoptions"]["load_ele_spec"]:
@@ -310,6 +310,16 @@ def fit(config):
 
         # temporary constant addition to the background
         noiseE = noiseE + flatbg
+        
+        if 'BGele' in locals():
+            LineoutBGE2 = [
+            np.mean(BGele[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1) for a in LineoutPixelI]
+            noiseE = noiseE + LineoutBGE2
+        else:
+            noiseE = noiseE * np.ones((len(LineoutPixelE),1))
+            
+        if 'LineoutBGE' in locals():
+            noiseE = noiseE + LineoutBGE
 
     ## Plot data
     fig, ax = plt.subplots(1, 2, figsize=(16, 4))
@@ -323,7 +333,7 @@ def fit(config):
             vmin=0,
         )
         ax[1].set_title(
-            "Shot : " + str(config["shotnum"]) + " : " + "TS : Thruput corrected",
+            "Shot : " + str(config["shotnum"]) + " : " + "TS : Corrected and background subtracted",
             fontdict={"fontsize": 10, "fontweight": "bold"},
         )
         ax[1].set_xlabel(xlab)
@@ -346,7 +356,7 @@ def fit(config):
             vmin=0,
         )
         ax[0].set_title(
-            "Shot : " + str(config["shotnum"]) + " : " + "TS : Thruput corrected",
+            "Shot : " + str(config["shotnum"]) + " : " + "TS : Corrected and background subtracted",
             fontdict={"fontsize": 10, "fontweight": "bold"},
         )
         ax[0].set_xlabel(xlab)
@@ -363,24 +373,29 @@ def fit(config):
     if config["D"]["extraoptions"]["load_ion_spec"]:
         noiseI = noiseI / gain
         LineoutTSI_norm = [LineoutTSI_smooth[i] / gain for i, _ in enumerate(LineoutPixelI)]
-        LineoutTSI_norm = LineoutTSI_norm - noiseI  # new 6-29-20
-        ampI = np.amax(LineoutTSI_norm, axis=1)
+        LineoutTSI_norm = np.array(LineoutTSI_norm)
+        #LineoutTSI_norm = LineoutTSI_norm - noiseI  # new 6-29-20
+        ampI = np.amax(LineoutTSI_norm-noiseI, axis=1)
     else:
         ampI = 1
-        noiseI = [];
+        noiseI = []
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
         noiseE = noiseE / gain
         LineoutTSE_norm = [LineoutTSE_smooth[i] / gain for i, _ in enumerate(LineoutPixelE)]
-        LineoutTSE_norm = LineoutTSE_norm - noiseE  # new 6-29-20
-        ampE = np.amax(LineoutTSE_norm[:, 100:-1], axis=1)  # attempts to ignore 3w comtamination
+        LineoutTSE_norm = np.array(LineoutTSE_norm)
+        #LineoutTSE_norm = LineoutTSE_norm - noiseE  # new 6-29-20
+        ampE = np.amax(LineoutTSE_norm[:, 100:-1]-noiseE[:, 100:-1], axis=1)  # attempts to ignore 3w comtamination
     else:
         ampE = 1
+        noiseE = []
 
     config["D"]["PhysParams"]["widIRF"] = stddev
     config["D"]["lamrangE"] = [axisyE[0], axisyE[-2]]
     config["D"]["lamrangI"] = [axisyI[0], axisyI[-2]]
     config["D"]["npts"] = (len(LineoutTSE_norm) - 1) * 20
+    config["D"]["PhysParams"]["noiseI"] = noiseI
+    config["D"]["PhysParams"]["noiseE"] = noiseE
 
     parameters = config["parameters"]
 
@@ -415,8 +430,6 @@ def fit(config):
     
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
-    config["D"]["PhysParams"]["noiseI"] = []
-    config["D"]["PhysParams"]["noiseE"] = []
     # run fitting code for each lineout
     for i, _ in enumerate(config["lineoutloc"]["val"]):
         # this probably needs to be done differently
@@ -434,8 +447,6 @@ def fit(config):
 
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
-        config["D"]["PhysParams"]["noiseE"].append(np.array(noiseE)[None, :])
-        config["D"]["PhysParams"]["noiseI"].append(np.array(noiseI)[None, :])
 
     #x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
     #lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
@@ -497,10 +508,18 @@ def fit(config):
     fit_model = get_fit_model(config, xie, sa)
     init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
     final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
-    print(final_x)
-    print(loss_fn(res.x))
+    #print(final_x)
+    #print(loss_fn(res.x))
     print(vg_loss_fn(res.x))
-    cov_mat = 2.*inv(hess_fn(res.x))
+    #print(hess_fn(np.array(res.x.reshape((len(all_data), -1)))))
+    hess_val = hess_fn(np.array(res.x.reshape((len(all_data), -1))))
+    hess_val = hess_val.reshape(len(res.x),len(res.x))
+    #print(np.shape(res.x))
+    #print(np.shape(res.x.reshape((len(all_data), -1))))
+    print(np.shape(hess_val))
+    print(hess_val)
+    
+    cov_mat = 2.*inv(hess_val)
     print(cov_mat)
     sigmas = np.sqrt(np.diag(cov_mat))
     print(sigmas)

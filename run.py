@@ -50,7 +50,7 @@ if __name__ == "__main__":
         tstart=starttimes[ii]
         tend=starttimes[ii+1]
         
-        for num_slices in [2]:#[8]:#[1, 2, 4, 8, 16, 32][::-1]:
+        for num_slices in [3]:#[8]:#[1, 2, 4, 8, 16, 32][::-1]:
             #creates one less slice then num_slices
             slices = [int(i) for i in np.linspace(tstart, tend, num_slices)]
             slices = slices[:-1]
