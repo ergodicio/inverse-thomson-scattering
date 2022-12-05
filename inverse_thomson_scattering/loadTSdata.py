@@ -32,8 +32,24 @@ def loadData(sNum, sDay, specType, magE, loadspecs):
 
         xlab = "Scattering angle (degrees)"
         zero = 0
+        
+        iDat = []
         loadspecs["load_ion_spec"] = False
-        loadspecs["load_ele_spec"] = True
+        
+        if loadspecs["load_ele_spec"]:
+            try:
+                eDatfile = SD(hdfnameE, SDC.READ)
+                sds_obj = eDatfile.select("Streak_array")  # select sds
+                eDat = sds_obj.get()  # get sds data
+                eDat = eDat.astype("float64")
+                eDat = eDat[0, :, :] - eDat[1, :, :]
+            except BaseException:
+                print("Unable to find Streaked EPW")
+                eDat = []
+                loadspecs["load_ele_spec"] = False
+        else:
+            eDat = []
+            
 
     elif specType == 2:
         if sDay:

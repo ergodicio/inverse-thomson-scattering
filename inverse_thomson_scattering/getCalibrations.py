@@ -1,6 +1,8 @@
 #Supplies wavelength, space, time, and throughput calibrations based off of shot numbers including historical values
 #new calibration values should be added here as they are calculated
 import numpy as np
+import scipy.io as sio
+from os.path import join,exists
 
 def getCalibrations(shotNum,tstype,CCDsize):
 
@@ -21,6 +23,7 @@ def getCalibrations(shotNum,tstype,CCDsize):
         IAWDisp = 1 #dummy since ARTS does not measure ion spectra
         IAWoff = 1 #dummy
         stddevI = 1 #dummy
+        magE = 1 #dummy
         stddevE = .9  # nominally this is ~.8 or .9 for h2
         angularFWHM = 1  # see Joe's FDR slides ~1-1.2
         IAWtime = 0 # means nothing here just kept to allow one code to be used for both
@@ -102,7 +105,9 @@ def getCalibrations(shotNum,tstype,CCDsize):
             axisxI = axisxI - IAWtcc * magI
             axisxI = axisxI + 200
     else:
-        axisxE = np.vstack(np.loadtxt("files/angsFRED.txt"))
+        imp = sio.loadmat(join('files','angsFRED.mat'), variable_names='angsFRED')
+        axisxE = imp['angsFRED'][0,:]
+        #axisxE = np.vstack(np.loadtxt("files/angsFRED.txt"))
         axisxI = np.arange(1,CCDsize[1]+1)
         
     stddev=[stddevE, stddevI]

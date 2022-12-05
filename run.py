@@ -50,7 +50,7 @@ if __name__ == "__main__":
         tstart=starttimes[ii]
         tend=starttimes[ii+1]
         
-        for num_slices in [3]:#[8]:#[1, 2, 4, 8, 16, 32][::-1]:
+        for num_slices in [2]:#[8]:#[1, 2, 4, 8, 16, 32][::-1]:
             #creates one less slice then num_slices
             slices = [int(i) for i in np.linspace(tstart, tend, num_slices)]
             slices = slices[:-1]
@@ -65,8 +65,8 @@ if __name__ == "__main__":
             defaults.update(flatten(inputs))
             config = unflatten(defaults)
 
-            bgshot = {"type": [], "val": []}
-            #bgshot = {"type": "Fit", "val": 102584}
+            #bgshot = {"type": [], "val": []}
+            bgshot = {"type": "Fit", "val": 94477}
             lnout = {"type": "ps", "val": slices}
             #lnout = {"type": "um", "val": slices}
             bglnout = {"type": "pixel", "val": 900}
@@ -91,7 +91,7 @@ if __name__ == "__main__":
                 config["extraoptions"] = extraoptions
                 config["num_cores"] = int(mp.cpu_count())
 
-                config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
+                config = {**config, **dict(shotnum=94475, bgscale=1, dpixel=2)}
 
                 mlflow.log_params({"num_slices": len(slices)})
                 t0 = time.time()

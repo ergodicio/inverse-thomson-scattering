@@ -73,8 +73,8 @@ parameters:
 
 D:
     extraoptions:
-        spectype: 2
-        load_ion_spec: True
+        spectype: 1
+        load_ion_spec: False
         load_ele_spec: True
         fit_IAW: False
         fit_EPWb: True

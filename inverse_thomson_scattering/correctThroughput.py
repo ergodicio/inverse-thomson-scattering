@@ -6,17 +6,20 @@ import scipy.io as sio
 from os.path import join,exists
 import matplotlib.pyplot as plt
 
-def correctThroughput(data, tstype, axisy):
+def correctThroughput(data, tstype, axisy, shotNum):
 
     if tstype==1:
         imp=sio.loadmat(join('files','spectral_sensitivity.mat'), variable_names='speccal')
         speccal=imp['speccal']
-        if Fshotnum<95000:
-            vq1=speccal
+        #not sure if this transpose is correct, need to check once plotting is working
+        speccal = np.transpose(speccal)
+        if shotNum<95000:
+            vq1=1./speccal
         else:
             specax=np.array(0,1023)*.214116+449.5272;
             speccalshift = sp.interp1d(specax, speccal, "linear", bounds_error=False, fill_value=speccal[0])
-            vq1 = speccalshift(axisy)
+            vq1 = 1./speccalshift(axisy)
+        print(np.shape(vq1))
     
     elif tstype==2:
         wb = xlrd.open_workbook(join('files','Copy of MeasuredSensitivity_9.21.15.xls'))
