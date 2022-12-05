@@ -167,12 +167,12 @@ def fit(config):
 
     # Background Shot subtraction
     if config["bgshot"]["type"] == "Shot":
-        [BGele, BGion, _, _] = loadData(config["bgshot"]["val"], shotDay, specType, magE, config["D"]["extraoptions"])
+        [BGele, BGion, _, _] = loadData(config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"])
         if config["D"]["extraoptions"]["load_ion_spec"]:
             ionData_bsub = ionData - conv2(BGion, np.ones([5, 3]) / 15, mode="same")
         if config["D"]["extraoptions"]["load_ele_spec"]:
             BGele = correctThroughput(BGele, tstype, axisyE)
-            if specType == 1:
+            if tstype == 1:
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5]) / 25, mode="same")
             else:
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 3]) / 15, mode="same")
@@ -187,8 +187,8 @@ def fit(config):
         LineoutPixelI = LineoutPixelE
 
     elif config["lineoutloc"]["type"] == "um":  # [char(hex2dec('03bc')) 'm']:
-        LineoutPixelE = np.argmin(abs(axisxE - config["lineoutloc"]["val"]))
-        LineoutPixelI = np.argmin(abs(axisxI - config["lineoutloc"]["val"]))
+        LineoutPixelE = [np.argmin(abs(axisxE - loc)) for loc in config["lineoutloc"]["val"]]
+        LineoutPixelI = LineoutPixelE
 
     elif config["lineoutloc"]["type"] == "pixel":
         LineoutPixelE = config["lineoutloc"]["val"]
@@ -225,9 +225,9 @@ def fit(config):
 
     if config["bgshot"]["type"] == "Fit":
         if config["D"]["extraoptions"]["load_ele_spec"]:
-            if specType == 1:
+            if tstype == 1:
                 [BGele, _, _, _] = loadData(
-                    config["bgshot"]["val"], shotDay, specType, magE, config["D"]["extraoptions"]
+                    config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"]
                 )
                 xx = np.arange(1024)
 
@@ -246,7 +246,7 @@ def fit(config):
                 elecData_bsub = elecData - newBG
             else:
                 # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
-                bgfitx = np.hstack([np.arange(100, 200), np.arange(800, 1024)])
+                bgfitx = np.hstack([np.arange(100, 200), np.arange(800, 1023)])
 
                 def exp2(x, a, b, c, d):
                     return a * np.exp(b * x) + c * np.exp(d * x)
@@ -266,9 +266,12 @@ def fit(config):
                 def rat11(x, a, b, c):
                     return (a * x + b) / (x + c)
 
-                [rat1bg, _] = spopt.curve_fit(rat11, bgfitx, LineoutTSE_smooth[bgfitx])
-
-                LineoutTSE_smooth = LineoutTSE_smooth - rat11(np.arange(1024), rat1bg)
+                for i, _ in enumerate(config["lineoutloc"]["val"]):
+                    [rat1bg, _] = spopt.curve_fit(rat11, bgfitx, LineoutTSE_smooth[i][bgfitx],[-16,200000,170])
+                    #plt.plot(rat11(np.arange(1024), *rat1bg))
+                    #plt.plot(LineoutTSE_smooth[i])
+                    #plt.show()
+                    LineoutTSE_smooth[i] = LineoutTSE_smooth[i] - rat11(np.arange(1024), *rat1bg)
 
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
@@ -282,15 +285,20 @@ def fit(config):
     if config["D"]["extraoptions"]["load_ele_spec"]:
         noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
-
+        #print(noiseE)
         def exp2(x, a, b, c, d):
             return a * np.exp(-b * x) + c * np.exp(-d * x)
 
         bgfitx = np.hstack(
-            [np.arange(200, 480), np.arange(540, 900)]
+            [np.arange(250, 480), np.arange(540, 900)]
         )  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
-        [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
+        plt.plot(bgfitx,noiseE[bgfitx])
+        #[expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
+        [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[200, 0.001, 200, 0.001])
         noiseE = bgscalingE * exp2(np.arange(1024), *expbg)
+        plt.plot(bgfitx,noiseE[bgfitx])
+        plt.plot(bgfitx,exp2(bgfitx,200,0.001,200,0.001))
+        plt.show()
 
         # temporary constant addition to the background
         noiseE = noiseE + flatbg
@@ -428,6 +436,9 @@ def fit(config):
     x0 = (x0 - shifts) / norms
     lb = (lb - shifts) / norms
     ub = (ub - shifts) / norms
+    #print(x0)
+    #print(shifts)
+    #print(norms)
 
     loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
 
@@ -437,7 +448,7 @@ def fit(config):
     # Perform fit
     if np.shape(x0)[0] != 0:
         res = spopt.minimize(
-            vg_loss_fn,
+            vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
             x0,
             method=config["optimizer"]["method"],
             jac=True if config["optimizer"]["grad_method"] == "AD" else False,
@@ -448,6 +459,8 @@ def fit(config):
     else:
         x = x0
 
+    print(res.status)
+    print(res.message)
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     fit_model = get_fit_model(config, xie, sa)
@@ -456,6 +469,7 @@ def fit(config):
 
     print("plotting")
     mlflow.set_tag("status", "plotting")
+
     if len(config["lineoutloc"]["val"]) > 4:
         plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 2, replace=False)
     else:
@@ -523,6 +537,9 @@ def fit(config):
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
     # elif result["m"]["active"]:
     #    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
+    
+    #mlflow.log_params(config["parameters"])
+    #result = config["parameters"]
 
     with tempfile.TemporaryDirectory() as td:
         with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:

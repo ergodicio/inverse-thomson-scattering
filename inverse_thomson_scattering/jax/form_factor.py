@@ -1,7 +1,7 @@
 from jax import config
 
 config.update("jax_enable_x64", True)
-# config.update('jax_disable_jit',True)
+#config.update('jax_disable_jit',True)
 
 from jax import numpy as jnp
 from jax import jit, value_and_grad, vmap
@@ -28,10 +28,10 @@ def get_form_factor_fn(lamrang):
 
     def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lam):
         """
-        NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma
-         conditions and scattering angles. The spectral density function is calculated with and without the ion contribution
-         which can be set to an independent grid from the electron contribution. Distribution functions can be one or two
-         dimensional and the appropriate susceptibility is calculated with the rational integration.
+        NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions and scattering angles. The spectral density function is calculated with and without the ion contribution which can be set to an independent grid from the electron contribution. Distribution functions can be one or two dimensional and the appropriate susceptibility is calculated with the rational integration.
+         
+         
+         
         :param Te: electron temperature in keV [1 by number of plasma conditions]
         :param Ti: ion temperature in keV [1 by number of ion species]
         :param Z: ionization state [1 by number of ion species]
@@ -67,6 +67,7 @@ def get_form_factor_fn(lamrang):
 
         ks = jnp.sqrt(omgs**2 - omgpe**2) / C
         kL = jnp.sqrt(omgL**2 - omgpe**2) / C
+        #kL = kL[..., jnp.newaxis]
         k = jnp.sqrt(ks**2 + kL**2 - 2 * ks * kL * jnp.cos(sarad))
 
         kdotv = k * Va
@@ -86,6 +87,7 @@ def get_form_factor_fn(lamrang):
         Zbar = jnp.sum(Z * fract)
         ni = fract * ne[..., jnp.newaxis, jnp.newaxis, jnp.newaxis] / Zbar
         omgpi = constants * Z * jnp.sqrt(ni * Me / Mi)
+        
 
         vTi = jnp.sqrt(Ti / Mi)  # ion thermal velocity
         # kldi = jnp.transpose(vTi / omgpi, [1, 0, 2, 3]) * k

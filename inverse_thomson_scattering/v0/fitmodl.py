@@ -4,7 +4,9 @@ from inverse_thomson_scattering.jax.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
 from jax import numpy as jnp
 from jax import jit
+#from jax.config import config
 
+#config.update('jax_disable_jit', True)
 
 def get_fit_model(config, xie, sa):
     nonMaxwThomsonE_jax, _ = get_form_factor_fn(config["D"]["lamrangE"])
@@ -13,6 +15,7 @@ def get_fit_model(config, xie, sa):
 
     def fit_model(x):
         # param_dict = copy.deepcopy(config)
+        #print(x)
 
         parameters = config["parameters"]
         i = 0
