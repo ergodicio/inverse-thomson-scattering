@@ -5,12 +5,14 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
+import scipy.io as sio
 import time
 import mlflow, jax
 import yaml
 
 from scipy.signal import convolve2d as conv2
 from numpy.linalg import inv
+from os.path import join,exists
 from inverse_thomson_scattering.loadTSdata import loadData
 from inverse_thomson_scattering.correctThroughput import correctThroughput
 from inverse_thomson_scattering.getCalibrations import getCalibrations
@@ -114,7 +116,9 @@ def fit(config):
             ),
         )
     else:
-        sa = dict(sa=np.arange(19, 139, 0.5), weights=np.vstack(np.loadtxt("files/angleWghtsFredfine.txt")))
+        imp=sio.loadmat(join('files','angleWghtsFredfine.mat'), variable_names='weightMatrix')
+        weights=imp['weightMatrix']
+        sa = dict(sa=np.arange(19, 139, 0.5), weights=weights)
 
     # Define jet colormap with 0=white (this might be moved and just loaded here)
     upper = mpl.cm.jet(np.arange(256))
@@ -154,7 +158,7 @@ def fit(config):
     
     
     if config["D"]["extraoptions"]["load_ele_spec"]:
-        elecData = correctThroughput(elecData, tstype, axisyE)
+        elecData = correctThroughput(elecData, tstype, axisyE, config["shotnum"])
 
     # Background Shot
     if config["bgshot"]["type"] == "Shot":
@@ -163,7 +167,7 @@ def fit(config):
             BGion = conv2(BGion, np.ones([5, 3]) / 15, mode="same")
             ionData_bsub = ionData - conv2(BGion, np.ones([5, 3]) / 15, mode="same")
         if config["D"]["extraoptions"]["load_ele_spec"]:
-            BGele = correctThroughput(BGele, tstype, axisyE)
+            BGele = correctThroughput(BGele, tstype, axisyE, config["shotnum"])
             if tstype == 1:
                 BGele = conv2(BGele, np.ones([5, 5]) / 25, mode="same")
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5]) / 25, mode="same")
@@ -227,20 +231,21 @@ def fit(config):
                 )
                 xx = np.arange(1024)
 
-                def qaudbg(x):
-                    np.sum(
+                def quadbg(x):
+                    res = np.sum(
                         (elecData[1000, :] - ((x[0] * (xx - x[3]) ** 2 + x[1] * (xx - x[3]) + x[2]) * BGele[1000, :]))
                         ** 2
                     )
+                    return res
 
                 corrfactor = spopt.minimize(quadbg, [0.1, 0.1, 1.15, 300])
                 newBG = (
                     corrfactor.x[0] * (xx - corrfactor.x[3]) ** 2
                     + corrfactor.x[1] * (xx - corrfactor.x[3])
-                    + corrfactor[2]
+                    + corrfactor.x[2]
                 ) * BGele
                 BGele = newBG
-                #elecData_bsub = elecData - newBG
+                elecData_bsub = elecData - newBG
             else:
                 # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
                 bgfitx = np.hstack([np.arange(100, 200), np.arange(800, 1023)])
@@ -347,6 +352,13 @@ def fit(config):
         )
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
+        imE = ax[0].imshow(
+            conv2(elecData_bsub, np.ones([5, 3]) / 15, mode="same"),
+            cmap,
+            interpolation="none",
+            aspect="auto",
+            vmin=0,
+        )
         imE = ax[0].imshow(
             conv2(elecData_bsub, np.ones([5, 3]) / 15, mode="same"),
             cmap,
@@ -510,21 +522,27 @@ def fit(config):
     final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
     #print(final_x)
     #print(loss_fn(res.x))
-    print(vg_loss_fn(res.x))
+    #print(vg_loss_fn(res.x))
+    
     #print(hess_fn(np.array(res.x.reshape((len(all_data), -1)))))
-    hess_val = hess_fn(np.array(res.x.reshape((len(all_data), -1))))
-    hess_val = hess_val.reshape(len(res.x),len(res.x))
+    #hess_val = hess_fn(np.array(res.x.reshape((len(all_data), -1))))
+    hess_val = hess_fn(res.x)
+    print(hess_val)
+    #hess_fn2=jax.jacfwd(jax.jacrev(loss_fn))
+    #hess_val2 = hess_fn2(res.x)
+    #print(hess_val2)
+    #hess_val = hess_val.reshape(len(res.x),len(res.x))
     #print(np.shape(res.x))
     #print(np.shape(res.x.reshape((len(all_data), -1))))
-    print(np.shape(hess_val))
-    print(hess_val)
+    #print(np.shape(hess_val))
+    #print(hess_val)
     
-    cov_mat = 2.*inv(hess_val)
-    print(cov_mat)
-    sigmas = np.sqrt(np.diag(cov_mat))
-    print(sigmas)
-    sigmas = sigmas.reshape((len(all_data), -1))
-    print(sigmas)
+    #cov_mat = 2.*inv(hess_val)
+    #print(cov_mat)
+    #sigmas = np.sqrt(np.diag(cov_mat))
+    #print(sigmas)
+    #sigmas = sigmas.reshape((len(all_data), -1))
+    #print(sigmas)
     
 
     print("plotting")
@@ -590,7 +608,7 @@ def fit(config):
         if config["parameters"][key]["active"]:
             # config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
             outputs[key] = [float(val) for val in list(final_x[:, count])]
-            outputs[key]["uncertainty"] = [float(val) for val in list(sigmas[:, count])]
+            #outputs[key]["uncertainty"] = [float(val) for val in list(sigmas[:, count])]
             count = count + 1
 
     # needs to be fixed
