@@ -1,37 +1,49 @@
-import copy
+from typing import Dict
 
-from inverse_thomson_scattering.jax.form_factor import get_form_factor_fn
-from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
+from inverse_thomson_scattering.form_factor import get_form_factor_fn
+from inverse_thomson_scattering.numDistFunc import get_num_dist_func
 from jax import numpy as jnp
 from jax import jit
-#from jax.config import config
 
-#config.update('jax_disable_jit', True)
+# from jax.config import config
+
+# config.update('jax_disable_jit', True)
+
 
 def get_fit_model(config, xie, sa):
     nonMaxwThomsonE_jax, _ = get_form_factor_fn(config["D"]["lamrangE"])
     nonMaxwThomsonI_jax, _ = get_form_factor_fn(config["D"]["lamrangI"])
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], xie)
 
-    def fit_model(x):
+    def fit_model(fitted_params: Dict):
         # param_dict = copy.deepcopy(config)
-        #print(x)
+        # print(x)
 
         parameters = config["parameters"]
-        i = 0
+        # i = 0
+
         for key in parameters.keys():
             if parameters[key]["active"]:
-                parameters[key]["val"] = x[i]
-                i = i + 1
-        if parameters["fe"]["active"]:
-            parameters["fe"]["val"] = x[-parameters["fe"]["length"] : :]
-        elif parameters["m"]["active"]:
+                parameters[key]["val"] = fitted_params[key]
+                # i = i + 1
+        # TODO fitting fe is not working because we need to rework the param_dict <> x conversion
+        # if parameters["fe"]["active"]:
+        #     parameters["fe"]["val"] =  x[-parameters["fe"]["length"] : :]
+        if parameters["m"]["active"]:
             parameters["fe"]["val"] = jnp.log(num_dist_func(parameters["m"]["val"]))
 
-        #Add gradients to electron temperature and density just being applied to EPW
-        cur_Te=jnp.linspace((1-parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],(1+parameters["Te"]["gradient"]/200)*parameters["Te"]["val"],10)
-        cur_ne=jnp.linspace((1-parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],(1+parameters["ne"]["gradient"]/200)*parameters["ne"]["val"],10)
-        
+        # Add gradients to electron temperature and density just being applied to EPW
+        cur_Te = jnp.linspace(
+            (1 - parameters["Te"]["gradient"] / 200) * parameters["Te"]["val"],
+            (1 + parameters["Te"]["gradient"] / 200) * parameters["Te"]["val"],
+            10,
+        )
+        cur_ne = jnp.linspace(
+            (1 - parameters["ne"]["gradient"] / 200) * parameters["ne"]["val"],
+            (1 + parameters["ne"]["gradient"] / 200) * parameters["ne"]["val"],
+            10,
+        )
+
         fecur = jnp.exp(parameters["fe"]["val"])
         lam = parameters["lam"]["val"]
 

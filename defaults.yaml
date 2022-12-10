@@ -106,3 +106,6 @@ optimizer:
     y_norm: False
     x_norm: True
     grad_method: AD
+
+mlflow:
+    experiment: inverse-thomson-scattering

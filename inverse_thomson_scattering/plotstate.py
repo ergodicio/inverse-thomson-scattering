@@ -1,6 +1,5 @@
-import matplotlib.pyplot as plt
 import numpy as np
-from inverse_thomson_scattering.v0.plotters import LinePlots
+from inverse_thomson_scattering.plotters import LinePlots
 
 
 def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):

@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import inv
 import scipy.interpolate as sp
 import inspect
-from inverse_thomson_scattering.v0.numDistFunc import NumDistFunc
+from inverse_thomson_scattering.numDistFunc import NumDistFunc
 
 class ThomsonInputs:
 

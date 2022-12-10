@@ -2,7 +2,7 @@ from os.path import join
 
 from pyhdf.SD import SD, SDC
 import numpy as np
-from inverse_thomson_scattering.v0.warpcorr import warpCorrection
+from inverse_thomson_scattering.warpcorr import warpCorrection
 
 
 def loadData(sNum, sDay, specType, magE, loadspecs):
