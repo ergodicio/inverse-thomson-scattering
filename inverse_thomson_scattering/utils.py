@@ -1,3 +1,8 @@
+import mlflow
+import flatdict
+from matplotlib import pyplot as plt
+import numpy as np
+
 
 def log_params(cfg):
     flattened_dict = dict(flatdict.FlatDict(cfg, delimiter="."))
@@ -24,4 +29,3 @@ def update(base_dict, new_dict):
             combined_dict[k] = new_dict[k]
 
     return combined_dict
-

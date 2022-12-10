@@ -9,7 +9,7 @@ from inverse_thomson_scattering.fitmodl import get_fit_model
 
 
 def get_loss_function(
-    config: Dict, xie, sas, data: np.ndarray, norms: np.ndarray, shifts: np.ndarray, starting_params: np.ndarray
+    config: Dict, xie, sas, norms: np.ndarray, shifts: np.ndarray, starting_params: np.ndarray
 ):
     fit_model = get_fit_model(config, xie, sas)
     lam = config["parameters"]["lam"]["val"]
@@ -83,12 +83,12 @@ def get_loss_function(
     else:
         i_norm = e_norm = 1.0
 
-    class compare_TS_spectra(hk.Module):
+    class TSSpectraFitter(hk.Module):
         def __init__(self, cfg):
-            super(compare_TS_spectra, self).__init__()
+            super(TSSpectraFitter, self).__init__()
             self.cfg = cfg
 
-        def map_params(self):
+        def initialize_params(self):
             these_params = {}
             for param_name, param_config in self.cfg["parameters"].items():
                 if param_config["active"]:
@@ -101,8 +101,9 @@ def get_loss_function(
                     these_params[param_name] = jnp.array(param_config["val"])
             return these_params
 
-        def __call__(self, *args, **kwargs):
-            params = self.map_params()
+
+        def __call__(self, batch, *args, **kwargs):
+            params = self.initialize_params()
             for k, v in params.items():
                 params[k] = v[None, None]
             modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(params)
@@ -114,8 +115,8 @@ def get_loss_function(
             ThryI = ThryI / i_norm
 
             loss = 0
-            i_data = data[:, 1, :] / i_norm
-            e_data = data[:, 0, :] / e_norm
+            i_data = batch[:, 1, :] / i_norm
+            e_data = batch[:, 0, :] / e_norm
             if self.cfg["D"]["extraoptions"]["fit_IAW"]:
                 #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
                 loss = loss + jnp.sum(jnp.square(i_data - ThryI))
@@ -135,7 +136,7 @@ def get_loss_function(
             return loss
 
     def loss_fn(x):
-        calc_loss = compare_TS_spectra(config)
+        calc_loss = TSSpectraFitter(config)
         return calc_loss(x)
 
     print(starting_params.shape)

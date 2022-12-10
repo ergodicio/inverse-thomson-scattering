@@ -51,13 +51,6 @@ def test_epw():
 
     np.testing.assert_allclose(omgs2, omgs, rtol=1e-2)
 
-    # if abs(Deltas[0] / omgs[0]) < 0.005 and abs(Deltas[1] / omgs[1]) < 0.005:
-    #     test1 = True
-    #     print("EPW peaks are within 0.5% of Bohm-Gross values")
-    # else:
-    #     test1 = False
-    #     print("EPW peaks are NOT within 0.5% of Bohm-Gross values")
-
 
 if __name__ == "__main__":
     test_epw()

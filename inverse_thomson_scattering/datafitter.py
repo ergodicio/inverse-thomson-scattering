@@ -438,7 +438,7 @@ def fit(config):
     # print(shifts)
     # print(norms)
 
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts, x0)
+    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, norms, shifts, x0)
 
     t1 = time.time()
     print("minimizing")

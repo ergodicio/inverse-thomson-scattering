@@ -220,8 +220,8 @@ from inverse_thomson_scattering import lamParse
 
 def zprimeMaxw(xi):
     """
-    This function calculates the derivitive of the Z - function given an array of normilzed phase velocities(xi) as
-    defined in Chapter 5. For values of xi between - 10 and 10 a table is used. Outside of this range the assumtotic
+    This function calculates the derivative of the Z - function given an array of normalized phase velocities(xi) as
+    defined in Chapter 5. For values of xi between - 10 and 10 a table is used. Outside of this range the asymptotic
     approximation(see Eqn. 5.2.10) is used.
     xi is expected to be ascending
 

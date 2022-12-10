@@ -9,8 +9,7 @@ from jax import config
 config.update("jax_enable_x64", True)
 config.update("jax_disable_jit", True)
 
-from inverse_thomson_scattering import datafitter
-from inverse_thomson_scattering.utils import misc
+from inverse_thomson_scattering import datafitter, utils
 
 
 if __name__ == "__main__":
@@ -103,7 +102,7 @@ if __name__ == "__main__":
             mlflow.set_experiment(config["mlflow"]["experiment"])
 
             with mlflow.start_run() as run:
-                misc.log_params(config)
+                utils.log_params(config)
                 # with tempfile.TemporaryDirectory() as td:
                 #    with open(os.path.join(td, "config.yaml"), "w") as fi:
                 #        yaml.safe_dump(config, fi)
