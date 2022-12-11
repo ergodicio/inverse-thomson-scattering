@@ -1,7 +1,4 @@
-import mlflow
-import flatdict
-from matplotlib import pyplot as plt
-import numpy as np
+import mlflow, flatdict
 
 
 def log_params(cfg):

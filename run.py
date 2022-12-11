@@ -7,10 +7,8 @@ from flatten_dict import flatten, unflatten
 from jax import config
 
 config.update("jax_enable_x64", True)
-config.update("jax_disable_jit", True)
 
 from inverse_thomson_scattering import datafitter, utils
-
 
 if __name__ == "__main__":
 
@@ -21,7 +19,7 @@ if __name__ == "__main__":
         tstart = starttimes[ii]
         tend = starttimes[ii + 1]
 
-        for num_slices in [2]:  # 8]:#[1, 2, 4, 8, 16, 32][::-1]:
+        for num_slices in [8]:  # [1, 2, 4, 8, 16, 32][::-1]:
             slices = [int(i) for i in np.linspace(tstart, tend, num_slices)]
             slices = slices[:-1]
 

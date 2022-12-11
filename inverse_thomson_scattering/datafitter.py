@@ -19,23 +19,6 @@ from inverse_thomson_scattering.fitmodl import get_fit_model
 from inverse_thomson_scattering.loss_function import get_loss_function
 
 
-def unnumpy_dict(this_dict: Dict):
-    new_dict = {}
-    for k, v in this_dict.items():
-        if isinstance(v, Dict):
-            new_v = unnumpy_dict(v)
-        elif isinstance(v, np.ndarray):
-            new_v = [float(val) for val in v]
-        elif isinstance(v, jax.numpy.ndarray):
-            new_v = [float(val) for val in v]
-        else:
-            new_v = v
-
-        new_dict[k] = new_v
-
-    return new_dict
-
-
 def fit(config):
     """
     # function description [from Ang](update once complete)
@@ -381,25 +364,28 @@ def fit(config):
     parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
     parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
 
-    x0 = []
-    lb = []
-    ub = []
+    x0 = {}
+    lb = {}
+    ub = {}
     xiter = []
     for i, _ in enumerate(config["lineoutloc"]["val"]):
         for key in parameters.keys():
             if parameters[key]["active"]:
+                x0[key] = []
+                lb[key] = []
+                ub[key] = []
                 if np.size(parameters[key]["val"]) > 1:
-                    x0.append(parameters[key]["val"][i])
+                    x0[key].append(parameters[key]["val"][i])
                 elif isinstance(parameters[key]["val"], list):
-                    x0.append(parameters[key]["val"][0])
+                    x0[key].append(parameters[key]["val"][0])
                 else:
-                    x0.append(parameters[key]["val"])
-                lb.append(parameters[key]["lb"])
-                ub.append(parameters[key]["ub"])
+                    x0[key].append(parameters[key]["val"])
+                lb[key].append(parameters[key]["lb"])
+                ub[key].append(parameters[key]["ub"])
 
-    x0 = np.array(x0)
-    lb = np.array(lb)
-    ub = np.array(ub)
+    x0 = {k: np.array(v) for k, v in x0.items()}
+    lb = {k: np.array(v) for k, v in lb.items()}
+    ub = {k: np.array(v) for k, v in ub.items()}
 
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
@@ -421,39 +407,39 @@ def fit(config):
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
 
-    # x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
-    # lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
-    # ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
+    norms = {}
+    shifts = {}
     if config["optimizer"]["x_norm"]:
-        norms = 2 * (ub - lb)
-        shifts = lb
+        for k, v in x0.items():
+            norms[k] = 2 * (ub[k] - lb[k])
+            shifts[k] = lb[k]
     else:
-        norms = np.ones_like(x0)
-        shifts = np.zeros_like(x0)
+        for k, v in x0.items():
+            norms[k] = np.ones_like(x0)
+            shifts[k] = np.zeros_like(x0)
 
-    x0 = (x0 - shifts) / norms
-    lb = (lb - shifts) / norms
-    ub = (ub - shifts) / norms
-    # print(x0)
-    # print(shifts)
-    # print(norms)
+    x0 = {k: (v - shifts[k]) / norms[k] for k, v in x0.items()}
+    lb = {k: (v - shifts[k]) / norms[k] for k, v in lb.items()}
+    ub = {k: (v - shifts[k]) / norms[k] for k, v in ub.items()}
 
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(
-        config, xie, sa, dummy_data=data, norms=norms, shifts=shifts, starting_params=x0
-    )
+    x0_arr = np.array([v for k, v in x0.items()])
+    lb_arr = np.array([v for k, v in lb.items()])
+    ub_arr = np.array([v for k, v in ub.items()])
+
+    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
 
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
     # Perform fit
-    if np.shape(x0)[0] != 0:
+    if np.shape(x0_arr)[0] != 0:
         res = spopt.minimize(
             vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
-            x0,
+            x0_arr,
             method=config["optimizer"]["method"],
             jac=True if config["optimizer"]["grad_method"] == "AD" else False,
             hess=hess_fn if config["optimizer"]["hessian"] else None,
-            bounds=zip(lb, ub),
+            bounds=zip(lb_arr, ub_arr),
             options={"disp": True},
         )
     else:
@@ -463,57 +449,60 @@ def fit(config):
     print(res.message)
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
-    fit_model = get_fit_model(config, xie, sa)
-    init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
-    final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
+    print(x0_arr)
+    print(res.x)
 
-    print("plotting")
-    mlflow.set_tag("status", "plotting")
+    # fit_model = get_fit_model(config, xie, sa)
+    # init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
+    # final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
 
-    if len(config["lineoutloc"]["val"]) > 4:
-        plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 2, replace=False)
-    else:
-        # plot_inds = config["lineoutloc"]["val"]
-        plot_inds = np.arange(len(config["lineoutloc"]["val"]))
-
-    t1 = time.time()
-    fig = plt.figure(figsize=(14, 6))
-    with tempfile.TemporaryDirectory() as td:
-        for i in plot_inds:
-            curline = config["lineoutloc"]["val"][i]
-            fig.clf()
-            ax = fig.add_subplot(1, 2, 1)
-            ax2 = fig.add_subplot(1, 2, 2)
-            # Plot initial guess
-            fig, ax = plotState(
-                init_x[i],
-                config,
-                config["D"]["PhysParams"]["amps"][i][0],
-                xie,
-                sa,
-                all_data[i][0],
-                fitModel2=fit_model,
-                fig=fig,
-                ax=[ax, ax2],
-            )
-            fig.savefig(os.path.join(td, f"before-{curline}.png"), bbox_inches="tight")
-
-            fig.clf()
-            ax = fig.add_subplot(1, 2, 1)
-            ax2 = fig.add_subplot(1, 2, 2)
-            fig, ax = plotState(
-                final_x[i],
-                config,
-                config["D"]["PhysParams"]["amps"][i][0],
-                xie,
-                sa,
-                all_data[i][0],
-                fitModel2=fit_model,
-                fig=fig,
-                ax=[ax, ax2],
-            )
-            fig.savefig(os.path.join(td, f"after-{curline}.png"), bbox_inches="tight")
-        mlflow.log_artifacts(td, artifact_path="plots")
+    # print("plotting")
+    # mlflow.set_tag("status", "plotting")
+    #
+    # if len(config["lineoutloc"]["val"]) > 4:
+    #     plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 2, replace=False)
+    # else:
+    #     # plot_inds = config["lineoutloc"]["val"]
+    #     plot_inds = np.arange(len(config["lineoutloc"]["val"]))
+    #
+    # t1 = time.time()
+    # fig = plt.figure(figsize=(14, 6))
+    # with tempfile.TemporaryDirectory() as td:
+    #     for i in plot_inds:
+    #         curline = config["lineoutloc"]["val"][i]
+    #         fig.clf()
+    #         ax = fig.add_subplot(1, 2, 1)
+    #         ax2 = fig.add_subplot(1, 2, 2)
+    #         # Plot initial guess
+    #         fig, ax = plotState(
+    #             init_x[i],
+    #             config,
+    #             config["D"]["PhysParams"]["amps"][i][0],
+    #             xie,
+    #             sa,
+    #             all_data[i][0],
+    #             fitModel2=fit_model,
+    #             fig=fig,
+    #             ax=[ax, ax2],
+    #         )
+    #         fig.savefig(os.path.join(td, f"before-{curline}.png"), bbox_inches="tight")
+    #
+    #         fig.clf()
+    #         ax = fig.add_subplot(1, 2, 1)
+    #         ax2 = fig.add_subplot(1, 2, 2)
+    #         fig, ax = plotState(
+    #             final_x[i],
+    #             config,
+    #             config["D"]["PhysParams"]["amps"][i][0],
+    #             xie,
+    #             sa,
+    #             all_data[i][0],
+    #             fitModel2=fit_model,
+    #             fig=fig,
+    #             ax=[ax, ax2],
+    #         )
+    #         fig.savefig(os.path.join(td, f"after-{curline}.png"), bbox_inches="tight")
+    #     mlflow.log_artifacts(td, artifact_path="plots")
 
     metrics_dict = {"loss": res.fun, "num_iterations": res.nit, "num_fun_eval": res.nfev, "num_jac_eval": res.njev}
     mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})

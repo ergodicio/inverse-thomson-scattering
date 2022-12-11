@@ -71,8 +71,10 @@ def loadData(sNum, sDay, specType, magE, loadspecs):
                 eDat = sds_obj.get()  # get sds data
                 eDat = eDat.astype("float64")
                 eDat = eDat[0, :, :] - eDat[1, :, :]
-                eDat = warpCorrection(eDat) #correction file need to be updated
-                #eDat = eDat[16:1039,16:1039]
+
+                eDat = warpCorrection(eDat)  # correction file need to be updated
+                # eDat = eDat[16:1039,16:1039]
+
             except BaseException:
                 print("Unable to find Streaked EPW")
                 eDat = []
