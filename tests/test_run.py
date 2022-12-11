@@ -150,3 +150,7 @@ def test_run():
                 metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
                 mlflow.log_metrics(metrics=metrics_dict)
                 mlflow.set_tag("status", "completed")
+
+
+if __name__ == "__main__":
+    test_run()
