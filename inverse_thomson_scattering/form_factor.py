@@ -286,6 +286,13 @@ def get_form_factor_fn(lamrang):
         :return:
         """
 
+
+        for val in [Te,Ti,Z,A,fract,ne,Va,ud,sa,fe,lam]:
+            if hasattr(val, "shape"):
+                print(val.shape)
+            else:
+                print(val)
+
         Mi = jnp.array(A) * Mp  # ion mass
         re = 2.8179e-13  # classical electron radius cm
         Esq = Me * C**2 * re  # sq of the electron charge keV cm
