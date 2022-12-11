@@ -97,7 +97,7 @@ def lamParse(lamrang, lam, npts, fineion=True):
     # else:
     min_lam = lamrang[0]
     max_lam = lamrang[1]
-    npts = 20480
+    npts = 1024
 
     # if fineion and (min_lam < lam and max_lam > lam):
     #     lamAxis = jnp.linspace(min_lam, max_lam, npts)

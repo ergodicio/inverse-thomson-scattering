@@ -10,11 +10,10 @@ def get_fit_model(config, xie, sa):
     nonMaxwThomsonE_jax, _ = get_form_factor_fn(config["D"]["lamrangE"])
     nonMaxwThomsonI_jax, _ = get_form_factor_fn(config["D"]["lamrangI"])
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], xie)
+    parameters = config["parameters"]
 
     def fit_model(fitted_params: Dict):
-        parameters = config["parameters"]
         # i = 0
-
         for key in parameters.keys():
             if parameters[key]["active"]:
                 parameters[key]["val"] = fitted_params[key]

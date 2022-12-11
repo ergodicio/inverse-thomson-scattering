@@ -2,6 +2,8 @@ import yaml, time
 from jax import config
 
 config.update("jax_enable_x64", True)
+config.update("jax_disable_jit", True)
+
 import multiprocessing as mp
 from flatten_dict import flatten, unflatten
 import mlflow
@@ -77,3 +79,7 @@ def test_data():
         else:
             test3 = False
             print("Fit values do NOT agree with known values")
+
+
+if __name__ == "__main__":
+    test_data()

@@ -9,7 +9,7 @@ from inverse_thomson_scattering.fitmodl import get_fit_model
 
 
 def get_loss_function(
-    config: Dict, xie, sas, norms: np.ndarray, shifts: np.ndarray, starting_params: np.ndarray
+    config: Dict, xie, sas, dummy_data: np.ndarray, norms: np.ndarray, shifts: np.ndarray, starting_params: np.ndarray
 ):
     fit_model = get_fit_model(config, xie, sas)
     lam = config["parameters"]["lam"]["val"]
@@ -78,8 +78,8 @@ def get_loss_function(
     vmap_get_spectra = jit(vmap(get_spectra))
 
     if config["optimizer"]["y_norm"]:
-        i_norm = np.amax(data[:, 1, :])
-        e_norm = np.amax(data[:, 0, :])
+        i_norm = np.amax(dummy_data[:, 1, :])
+        e_norm = np.amax(dummy_data[:, 0, :])
     else:
         i_norm = e_norm = 1.0
 
@@ -100,7 +100,6 @@ def get_loss_function(
                 else:
                     these_params[param_name] = jnp.array(param_config["val"])
             return these_params
-
 
         def __call__(self, batch, *args, **kwargs):
             params = self.initialize_params()
@@ -149,14 +148,14 @@ def get_loss_function(
 
     def val_and_grad_loss(x: np.ndarray):
         x = x * norms + shifts
-        reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
+        reshaped_x = jnp.array(x.reshape((dummy_data.shape[0], -1)))
         value, grad = vg_func(reshaped_x)
 
         return value, np.array(grad).flatten()
 
     def value(x: np.ndarray):
         x = x * norms + shifts
-        reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
+        reshaped_x = jnp.array(x.reshape((dummy_data.shape[0], -1)))
         val = loss_func(reshaped_x)
 
         return val

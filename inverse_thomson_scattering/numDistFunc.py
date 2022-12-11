@@ -39,11 +39,6 @@ def get_num_dist_func(fe_type, xie):
     curDist={'name',param2,param3}
     xs are the query points (referenced to parm1)"""
 
-    # persistent IT;
-    # persistent DFNOld;
-    # get xs from args
-    # if len(args) > 0 and isinstance(args[0], np.ndarray):
-    #     xs = args[0]
     xs = xie
     #     if xs[0] < xs[-1]:
     #         xs = xs[::-1]
@@ -65,7 +60,7 @@ def get_num_dist_func(fe_type, xie):
     #     return f1D
 
     # If input is tuple parse as normal
-    #nameCur = fe_type
+    # nameCur = fe_type
     fe_type = list(fe_type.keys())[0]
     nameCur = fe_type
 
@@ -101,7 +96,7 @@ def get_num_dist_func(fe_type, xie):
         bi = xs > max(params["x"])
         ci = ~(ai + bi)
 
-    x_float_inds = np.interp(xs, params["x"], np.linspace(0, params["x"].size, params["x"].size))
+    x_float_inds = np.interp(xs, params["x"], np.linspace(0, params["x"].size - 1, params["x"].size))
 
     def NumDistFunc(m):
         # if len(curDist) == 1:
@@ -114,7 +109,8 @@ def get_num_dist_func(fe_type, xie):
         # elif len(curDist) == 2:
         # X1, X2 = np.meshgrid(xs[ci], m)
 
-        m_float_inds = jnp.array([jnp.interp(m, params["m"], np.linspace(0, params["m"].size, params["m"].size))])
+        m_float_inds = jnp.array(jnp.interp(m, params["m"], np.linspace(0, params["m"].size - 1, params["m"].size)))
+        m_float_inds = m_float_inds.reshape((1,))
 
         ind_x_mesh, ind_m_mesh = jnp.meshgrid(x_float_inds, m_float_inds)
         indices = jnp.concatenate([ind_x_mesh.flatten()[:, None], ind_m_mesh.flatten()[:, None]], axis=1)
