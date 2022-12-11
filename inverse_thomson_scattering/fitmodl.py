@@ -9,8 +9,8 @@ from jax import jit
 
 
 def get_fit_model(config, xie, sa):
-    nonMaxwThomsonE_jax = get_form_factor_fn(config["D"]["lamrangE"], backend="haiku")
-    nonMaxwThomsonI_jax = get_form_factor_fn(config["D"]["lamrangI"], backend="haiku")
+    nonMaxwThomsonE_jax = get_form_factor_fn(config["D"]["lamrangE"], backend="jax")
+    nonMaxwThomsonI_jax = get_form_factor_fn(config["D"]["lamrangI"], backend="jax")
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], xie)
 
     def fit_model(fitted_params):

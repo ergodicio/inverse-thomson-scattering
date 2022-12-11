@@ -426,7 +426,9 @@ def fit(config):
     lb_arr = np.array([v for k, v in lb.items()])
     ub_arr = np.array([v for k, v in ub.items()])
 
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
+    loss_fn, vg_loss_fn, hess_fn = get_loss_function(
+        config, xie, sa, np.concatenate(all_data), norms, shifts, backend="haiku"
+    )
 
     t1 = time.time()
     print("minimizing")
