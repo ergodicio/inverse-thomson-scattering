@@ -4,7 +4,7 @@ import jax
 from jax import numpy as jnp
 from jax import jit, vmap, value_and_grad
 import numpy as np
-from inverse_thomson_scattering.v0.fitmodl import get_fit_model
+from inverse_thomson_scattering.fitmodl import get_fit_model
 
 
 def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarray, shifts: np.ndarray):

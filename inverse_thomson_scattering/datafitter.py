@@ -10,13 +10,13 @@ import mlflow, jax
 import yaml
 
 from scipy.signal import convolve2d as conv2
-from inverse_thomson_scattering.v0.loadTSdata import loadData
-from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
-from inverse_thomson_scattering.v0.getCalibrations import getCalibrations
-from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
-from inverse_thomson_scattering.v0.plotstate import plotState
-from inverse_thomson_scattering.v0.fitmodl import get_fit_model
-from inverse_thomson_scattering.v0.loss_function import get_loss_function
+from inverse_thomson_scattering.loadTSdata import loadData
+from inverse_thomson_scattering.correctThroughput import correctThroughput
+from inverse_thomson_scattering.getCalibrations import getCalibrations
+from inverse_thomson_scattering.numDistFunc import get_num_dist_func
+from inverse_thomson_scattering.plotstate import plotState
+from inverse_thomson_scattering.fitmodl import get_fit_model
+from inverse_thomson_scattering.loss_function import get_loss_function
 
 
 def unnumpy_dict(this_dict: Dict):
