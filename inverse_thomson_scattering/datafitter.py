@@ -427,7 +427,7 @@ def fit(config):
     ub_arr = np.array([v for k, v in ub.items()])
 
     loss_fn, vg_loss_fn, hess_fn = get_loss_function(
-        config, xie, sa, np.concatenate(all_data), norms, shifts, backend="haiku"
+        config, xie, sa, np.concatenate(all_data), norms, shifts, backend="jax"
     )
 
     t1 = time.time()
@@ -447,13 +447,15 @@ def fit(config):
     else:
         x = x0
 
-    print(res.status)
-    print(res.message)
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
-    print(x0_arr)
-    print(res.x)
+    i = 0
+    final_x = []
+    for k, v in x0.items():
+        final_x.append((res.x[i] * norms[k] + shifts[k]).reshape((len(all_data), -1)))
+        i += 1
 
+    final_x = np.concatenate(final_x, axis=-1)
     # fit_model = get_fit_model(config, xie, sa)
     # init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
     # final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
@@ -537,5 +539,7 @@ def fit(config):
             yaml.dump(outputs, fi)
 
         mlflow.log_artifacts(td)
-    result = config["parameters"]
-    return result
+
+    return outputs
+    # result = config["parameters"]
+    # return result
