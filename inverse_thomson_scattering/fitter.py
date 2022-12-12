@@ -17,10 +17,11 @@ from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.loss_function import get_loss_function
 
 
-def initialize_parameters(config: Dict, parameters: Dict) -> Dict:
+def initialize_parameters(config: Dict) -> Dict:
     init_params = {}
     lb = {}
     ub = {}
+    parameters = config["parameters"]
     for i, _ in enumerate(config["lineoutloc"]["val"]):
         for key in parameters.keys():
             if parameters[key]["active"]:
@@ -414,7 +415,7 @@ def fit(config):
     parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
     parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
 
-    units = initialize_parameters(config, parameters)
+    units = initialize_parameters(config)
 
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
@@ -462,9 +463,7 @@ def fit(config):
     i = 0
     final_x = []
     for k, v in units["pytree"]["init_params"].items():
-        final_x.append(
-            (res.x[i] * units["norms"][k] + units["shifts"][k]).reshape((len(all_data), -1))
-        )
+        final_x.append((res.x[i] * units["norms"][k] + units["shifts"][k]).reshape((len(all_data), -1)))
         i += 1
 
     final_x = np.concatenate(final_x, axis=-1)

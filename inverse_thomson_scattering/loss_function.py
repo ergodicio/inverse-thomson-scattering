@@ -5,7 +5,6 @@ import jax
 from jax import numpy as jnp
 
 from jax import jit, value_and_grad
-from jax.flatten_util import ravel_pytree
 import haiku as hk
 import numpy as np
 from inverse_thomson_scattering.generate_spectra import get_forward_pass
@@ -221,18 +220,24 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
             return loss
 
         loss_fn = hk.without_apply_rng(hk.transform(loss_fn))
-        init_params = loss_fn.init(jax.random.PRNGKey(42), dummy_data)
-        flattened_weights, unravel_pytree = ravel_pytree(init_params)
         vg_func = jit(value_and_grad(loss_fn.apply))
         loss_func = jit(loss_fn.apply)
         hess_func = jit(jax.hessian(loss_fn.apply))
 
         def val_and_grad_loss(x: np.ndarray):
-            # reshaped_x = jnp.array(x.reshape((dummy_data.shape[0], -1)))
-            pytree_weights = unravel_pytree(x)
+            pytree_weights = {"ts_spectra_generator": {}}
+            i = 0
+            for key in config["parameters"].keys():
+                if config["parameters"][key]["active"]:
+                    pytree_weights["ts_spectra_generator"][key] = jnp.array(x[i].reshape((dummy_data.shape[0], -1)))
+                    i += 1
+
             value, grad = vg_func(pytree_weights, dummy_data)
-            grad, _ = ravel_pytree(grad)
-            return value, np.array(grad).flatten()
+            grads = []
+            for key in config["parameters"].keys():
+                if config["parameters"][key]["active"]:
+                    grads.append(grad["ts_spectra_generator"][key])
+            return value, np.array(np.concatenate(grads)).flatten()
 
     def value(x: np.ndarray):
         x = x * norms + shifts
