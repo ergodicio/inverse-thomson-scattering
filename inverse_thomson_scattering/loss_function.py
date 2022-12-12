@@ -7,7 +7,6 @@ from jax import numpy as jnp
 from jax import jit, value_and_grad
 from jax.flatten_util import ravel_pytree
 import haiku as hk
-from haiku import vmap
 import numpy as np
 from inverse_thomson_scattering.generate_spectra import get_forward_pass
 
@@ -155,30 +154,27 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
 
     else:
 
-        class TSSpectraFitter(hk.Module):
+        class TSSpectraGenerator(hk.Module):
             def __init__(self, cfg):
-                super(TSSpectraFitter, self).__init__()
+                super(TSSpectraGenerator, self).__init__()
                 self.cfg = cfg
 
             def initialize_params(self):
                 these_params = {}
                 for param_name, param_config in self.cfg["parameters"].items():
                     if param_config["active"]:
-                        these_params[param_name] = (
-                            hk.get_parameter(
-                                param_name,
-                                shape=[1, 1],
-                                init=hk.initializers.RandomUniform(
-                                    minval=param_config["lb"], maxval=param_config["ub"]
-                                ),
-                            )
-                            * norms[param_name]
-                            + shifts[param_name]
+                        these_params[param_name] = hk.get_parameter(
+                            param_name,
+                            shape=[1, 1],
+                            init=hk.initializers.RandomUniform(minval=param_config["lb"], maxval=param_config["ub"]),
                         )
                     else:
-                        these_params[param_name] = jnp.array(param_config["val"]).reshape(
-                            (1, -1)
-                        )  # * norms[param_name] + shifts[param_name]
+                        these_params[param_name] = jnp.array(param_config["val"]).reshape((1, -1))
+
+                for param_name, param_config in self.cfg["parameters"].items():
+                    if param_config["active"]:
+                        these_params[param_name] = these_params[param_name] * norms[param_name] + shifts[param_name]
+
                 return these_params
 
             def __call__(self, batch):
@@ -196,30 +192,33 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
                 ThryE = ThryE / e_norm
                 ThryI = ThryI / i_norm
 
-                loss = 0
                 i_data = batch[:, 1, :] / i_norm
                 e_data = batch[:, 0, :] / e_norm
-                if self.cfg["D"]["extraoptions"]["fit_IAW"]:
-                    #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-                    loss = loss + jnp.sum(jnp.square(i_data - ThryI))
 
-                if self.cfg["D"]["extraoptions"]["fit_EPWb"]:
-                    thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
-                    data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
-
-                    loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
-
-                if self.cfg["D"]["extraoptions"]["fit_EPWr"]:
-                    thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
-                    data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
-
-                    loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
-
-                return loss
+                return e_data, i_data, ThryE, ThryI, lamAxisE, lamAxisI
 
         def loss_fn(batch):
-            calc_loss = TSSpectraFitter(config)
-            return calc_loss(batch)
+            loss = 0.0
+            Spectrumator = TSSpectraGenerator(config)
+            e_data, i_data, ThryE, ThryI, lamAxisE, lamAxisI = Spectrumator(batch)
+
+            if config["D"]["extraoptions"]["fit_IAW"]:
+                #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+                loss = loss + jnp.sum(jnp.square(i_data - ThryI))
+
+            if config["D"]["extraoptions"]["fit_EPWb"]:
+                thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
+                data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
+
+                loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+
+            if config["D"]["extraoptions"]["fit_EPWr"]:
+                thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
+                data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
+
+                loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+
+            return loss
 
         loss_fn = hk.without_apply_rng(hk.transform(loss_fn))
         init_params = loss_fn.init(jax.random.PRNGKey(42), dummy_data)
@@ -229,8 +228,8 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
         hess_func = jit(jax.hessian(loss_fn.apply))
 
         def val_and_grad_loss(x: np.ndarray):
-            reshaped_x = jnp.array(x.reshape((dummy_data.shape[0], -1)))
-            pytree_weights = unravel_pytree(reshaped_x[0])
+            # reshaped_x = jnp.array(x.reshape((dummy_data.shape[0], -1)))
+            pytree_weights = unravel_pytree(x)
             value, grad = vg_func(pytree_weights, dummy_data)
             grad, _ = ravel_pytree(grad)
             return value, np.array(grad).flatten()

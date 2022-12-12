@@ -1,4 +1,5 @@
 import tempfile, os
+from typing import Dict
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -14,6 +15,56 @@ from inverse_thomson_scattering.process.correct_throughput import correct_throug
 from inverse_thomson_scattering.misc.calibration import get_calibrations
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.loss_function import get_loss_function
+
+
+def initialize_parameters(config: Dict, parameters: Dict) -> Dict:
+    init_params = {}
+    lb = {}
+    ub = {}
+    for i, _ in enumerate(config["lineoutloc"]["val"]):
+        for key in parameters.keys():
+            if parameters[key]["active"]:
+                init_params[key] = []
+                lb[key] = []
+                ub[key] = []
+                if np.size(parameters[key]["val"]) > 1:
+                    init_params[key].append(parameters[key]["val"][i])
+                elif isinstance(parameters[key]["val"], list):
+                    init_params[key].append(parameters[key]["val"][0])
+                else:
+                    init_params[key].append(parameters[key]["val"])
+                lb[key].append(parameters[key]["lb"])
+                ub[key].append(parameters[key]["ub"])
+
+    init_params = {k: np.array(v) for k, v in init_params.items()}
+    lb = {k: np.array(v) for k, v in lb.items()}
+    ub = {k: np.array(v) for k, v in ub.items()}
+
+    norms = {}
+    shifts = {}
+    if config["optimizer"]["x_norm"]:
+        for k, v in init_params.items():
+            norms[k] = 2 * (ub[k] - lb[k])
+            shifts[k] = lb[k]
+    else:
+        for k, v in init_params.items():
+            norms[k] = np.ones_like(init_params)
+            shifts[k] = np.zeros_like(init_params)
+
+    init_params = {k: (v - shifts[k]) / norms[k] for k, v in init_params.items()}
+    lower_bound = {k: (v - shifts[k]) / norms[k] for k, v in lb.items()}
+    upper_bound = {k: (v - shifts[k]) / norms[k] for k, v in ub.items()}
+
+    init_params_arr = np.array([v for k, v in init_params.items()])
+    lb_arr = np.array([v for k, v in lower_bound.items()])
+    ub_arr = np.array([v for k, v in upper_bound.items()])
+
+    return {
+        "pytree": {"init_params": init_params, "lb": lb, "rb": ub},
+        "array": {"init_params": init_params_arr, "lb": lb_arr, "ub": ub_arr},
+        "norms": norms,
+        "shifts": shifts,
+    }
 
 
 def fit(config):
@@ -363,28 +414,7 @@ def fit(config):
     parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
     parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
 
-    x0 = {}
-    lb = {}
-    ub = {}
-    xiter = []
-    for i, _ in enumerate(config["lineoutloc"]["val"]):
-        for key in parameters.keys():
-            if parameters[key]["active"]:
-                x0[key] = []
-                lb[key] = []
-                ub[key] = []
-                if np.size(parameters[key]["val"]) > 1:
-                    x0[key].append(parameters[key]["val"][i])
-                elif isinstance(parameters[key]["val"], list):
-                    x0[key].append(parameters[key]["val"][0])
-                else:
-                    x0[key].append(parameters[key]["val"])
-                lb[key].append(parameters[key]["lb"])
-                ub[key].append(parameters[key]["ub"])
-
-    x0 = {k: np.array(v) for k, v in x0.items()}
-    lb = {k: np.array(v) for k, v in lb.items()}
-    ub = {k: np.array(v) for k, v in ub.items()}
+    units = initialize_parameters(config, parameters)
 
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
@@ -406,57 +436,40 @@ def fit(config):
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
 
-    norms = {}
-    shifts = {}
-    if config["optimizer"]["x_norm"]:
-        for k, v in x0.items():
-            norms[k] = 2 * (ub[k] - lb[k])
-            shifts[k] = lb[k]
-    else:
-        for k, v in x0.items():
-            norms[k] = np.ones_like(x0)
-            shifts[k] = np.zeros_like(x0)
-
-    x0 = {k: (v - shifts[k]) / norms[k] for k, v in x0.items()}
-    lb = {k: (v - shifts[k]) / norms[k] for k, v in lb.items()}
-    ub = {k: (v - shifts[k]) / norms[k] for k, v in ub.items()}
-
-    x0_arr = np.array([v for k, v in x0.items()])
-    lb_arr = np.array([v for k, v in lb.items()])
-    ub_arr = np.array([v for k, v in ub.items()])
-
     loss_fn, vg_loss_fn, hess_fn = get_loss_function(
-        config, xie, sa, np.concatenate(all_data), norms, shifts, backend="jax"
+        config, xie, sa, np.concatenate(all_data), units["norms"], units["shifts"], backend="jax"
     )
 
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
     # Perform fit
-    if np.shape(x0_arr)[0] != 0:
+    if np.shape(units["array"]["init_params"])[0] != 0:
         res = spopt.minimize(
             vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
-            x0_arr,
+            units["array"]["init_params"],
             method=config["optimizer"]["method"],
             jac=True if config["optimizer"]["grad_method"] == "AD" else False,
             hess=hess_fn if config["optimizer"]["hessian"] else None,
-            bounds=zip(lb_arr, ub_arr),
+            bounds=zip(units["array"]["lb"], units["array"]["ub"]),
             options={"disp": True},
         )
     else:
-        x = x0
+        x = units["pytree"]["init_params"]
 
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     i = 0
     final_x = []
-    for k, v in x0.items():
-        final_x.append((res.x[i] * norms[k] + shifts[k]).reshape((len(all_data), -1)))
+    for k, v in units["pytree"]["init_params"].items():
+        final_x.append(
+            (res.x[i] * units["norms"][k] + units["shifts"][k]).reshape((len(all_data), -1))
+        )
         i += 1
 
     final_x = np.concatenate(final_x, axis=-1)
     # fit_model = get_fit_model(config, xie, sa)
-    # init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
+    # init_x = (init_params * norms + shifts).reshape((len(all_data), -1))
     # final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
 
     # print("plotting")
