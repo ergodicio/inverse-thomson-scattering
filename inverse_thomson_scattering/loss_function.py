@@ -92,8 +92,8 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
-    vmap_forward_pass = jit(vmap(forward_pass))
-    vmap_postprocess = jit(vmap(postprocess))
+    vmap_forward_pass = vmap(forward_pass)
+    vmap_postprocess = vmap(postprocess)
 
     if config["optimizer"]["y_norm"]:
         i_norm = np.amax(dummy_data[:, 1, :])

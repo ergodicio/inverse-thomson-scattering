@@ -438,7 +438,7 @@ def fit(config):
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
 
     loss_fn, vg_loss_fn, hess_fn = get_loss_function(
-        config, xie, sa, np.concatenate(all_data), units["norms"], units["shifts"], backend="jax"
+        config, xie, sa, np.concatenate(all_data), units["norms"], units["shifts"], backend="haiku"
     )
 
     t1 = time.time()
