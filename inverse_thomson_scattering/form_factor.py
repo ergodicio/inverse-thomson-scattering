@@ -8,7 +8,8 @@ import scipy.interpolate as sp
 from jax import numpy as jnp
 from jax import jit
 import haiku as hk
-from inverse_thomson_scattering import ratintn, lamParse
+from inverse_thomson_scattering import ratintn
+from inverse_thomson_scattering.misc import lam_parse
 
 
 def zprimeMaxw(xi):
@@ -94,7 +95,7 @@ def get_form_factor_fn(lamrang, backend="jax"):
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
 
-        omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts)  # , True)
+        omgL, omgs, lamAxis, _ = lam_parse.lamParse(lamrang, lam, npts)  # , True)
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm

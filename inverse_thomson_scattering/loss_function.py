@@ -9,7 +9,7 @@ from jax.flatten_util import ravel_pytree
 import haiku as hk
 from haiku import vmap
 import numpy as np
-from inverse_thomson_scattering.fitmodl import get_fit_model
+from inverse_thomson_scattering.generate_spectra import get_forward_pass
 
 
 def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dict, shifts: Dict, backend="jax"):
@@ -26,7 +26,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
     Returns:
 
     """
-    fit_model = get_fit_model(config, xie, sas)
+    forward_pass = get_forward_pass(config, xie, sas)
     lam = config["parameters"]["lam"]["val"]
     stddev = config["D"]["PhysParams"]["widIRF"]
 
@@ -78,7 +78,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
         return lamAxisE, ThryE
 
     @jit
-    def get_spectra(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
+    def postprocess(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
 
         if config["D"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
@@ -94,8 +94,8 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
-    vmap_fit_model = jit(vmap(fit_model))
-    vmap_get_spectra = jit(vmap(get_spectra))
+    vmap_forward_pass = jit(vmap(forward_pass))
+    vmap_postprocess = jit(vmap(postprocess))
 
     if config["optimizer"]["y_norm"]:
         i_norm = np.amax(dummy_data[:, 1, :])
@@ -104,6 +104,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
         i_norm = e_norm = 1.0
 
     if backend == "jax":
+
         def loss_fn(x: jnp.ndarray):
             these_params = {}
             i = 0
@@ -114,8 +115,8 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
                 else:
                     these_params[param_name] = jnp.array(param_config["val"]).reshape((1, -1))
 
-            modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(these_params)
-            ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
+            modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(these_params)
+            ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess(
                 modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
             )
 
@@ -182,8 +183,8 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
 
             def __call__(self, batch):
                 params = self.initialize_params()
-                modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(params)
-                ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
+                modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)
+                ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess(
                     modlE,
                     modlI,
                     lamAxisE,

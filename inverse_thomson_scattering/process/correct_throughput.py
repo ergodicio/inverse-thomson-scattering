@@ -7,7 +7,7 @@ from os.path import join, exists
 import matplotlib.pyplot as plt
 
 
-def correctThroughput(data, tstype, axisy):
+def correct_throughput(data, tstype, axisy):
 
     if tstype == 1:
         imp = sio.loadmat(join("files", "spectral_sensitivity.mat"), variable_names="speccal")

@@ -2,7 +2,6 @@
 import jax.scipy.interpolate
 from jax import numpy as jnp
 import numpy as np
-import scipy.interpolate as sp
 import scipy.io as sio
 from os.path import join, exists
 
@@ -98,7 +97,7 @@ def get_num_dist_func(fe_type, xie):
 
     x_float_inds = np.interp(xs, params["x"], np.linspace(0, params["x"].size - 1, params["x"].size))
 
-    def NumDistFunc(m):
+    def num_dist_func(m):
         # if len(curDist) == 1:
         #     if len(np.shape(IT)) == 2:
         #         [X1, X2] = np.meshgrid(xs[ci], params["m"])
@@ -157,7 +156,7 @@ def get_num_dist_func(fe_type, xie):
 
         return jnp.squeeze(f1D)
 
-    return NumDistFunc
+    return num_dist_func
 
 
 def GenTableName(name, *args, nout=1):

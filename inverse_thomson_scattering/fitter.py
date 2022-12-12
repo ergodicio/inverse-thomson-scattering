@@ -1,21 +1,18 @@
 import tempfile, os
-from typing import Dict
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
 import time
-import mlflow, jax
+import mlflow
 import yaml
 
 from scipy.signal import convolve2d as conv2
-from inverse_thomson_scattering.loadTSdata import loadData
-from inverse_thomson_scattering.correctThroughput import correctThroughput
-from inverse_thomson_scattering.getCalibrations import getCalibrations
-from inverse_thomson_scattering.numDistFunc import get_num_dist_func
-from inverse_thomson_scattering.plotstate import plotState
-from inverse_thomson_scattering.fitmodl import get_fit_model
+from inverse_thomson_scattering.misc.load_ts_data import load_data
+from inverse_thomson_scattering.process.correct_throughput import correct_throughput
+from inverse_thomson_scattering.misc.calibration import get_calibrations
+from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.loss_function import get_loss_function
 
 
@@ -117,7 +114,7 @@ def fit(config):
     cmap = mpl.colors.ListedColormap(cmap, name="myColorMap", N=cmap.shape[0])
 
     # Retrieve calibrated axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(config["shotnum"], tstype, CCDsize)
+    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(config["shotnum"], tstype, CCDsize)
 
     # Data loading and corrections
     # Open data stored from the previous run (inactivated for now)
@@ -127,7 +124,7 @@ def fit(config):
     #    xlab = prevShot.xlab;
     #    shift_zero = prevShot.shift_zero;
 
-    [elecData, ionData, xlab, shift_zero] = loadData(
+    [elecData, ionData, xlab, shift_zero] = load_data(
         config["shotnum"], shotDay, tstype, magE, config["D"]["extraoptions"]
     )
 
@@ -141,7 +138,7 @@ def fit(config):
         print("EPW data not loaded, omitting EPW fit")
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
-        elecData = correctThroughput(elecData, tstype, axisyE)
+        elecData = correct_throughput(elecData, tstype, axisyE)
     # prevShot.config["shotnum"] = config["shotnum"];
     # prevShot.elecData = elecData;
     # prevShot.ionData = ionData;
@@ -150,11 +147,11 @@ def fit(config):
 
     # Background Shot subtraction
     if config["bgshot"]["type"] == "Shot":
-        [BGele, BGion, _, _] = loadData(config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"])
+        [BGele, BGion, _, _] = load_data(config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"])
         if config["D"]["extraoptions"]["load_ion_spec"]:
             ionData_bsub = ionData - conv2(BGion, np.ones([5, 3]) / 15, mode="same")
         if config["D"]["extraoptions"]["load_ele_spec"]:
-            BGele = correctThroughput(BGele, tstype, axisyE)
+            BGele = correct_throughput(BGele, tstype, axisyE)
             if tstype == 1:
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5]) / 25, mode="same")
             else:
@@ -209,7 +206,9 @@ def fit(config):
     if config["bgshot"]["type"] == "Fit":
         if config["D"]["extraoptions"]["load_ele_spec"]:
             if tstype == 1:
-                [BGele, _, _, _] = loadData(config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"])
+                [BGele, _, _, _] = load_data(
+                    config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"]
+                )
                 xx = np.arange(1024)
 
                 def qaudbg(x):

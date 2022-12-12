@@ -8,7 +8,8 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
-from inverse_thomson_scattering import datafitter, utils
+from inverse_thomson_scattering import fitter
+from inverse_thomson_scattering.misc import utils
 
 if __name__ == "__main__":
 
@@ -116,7 +117,7 @@ if __name__ == "__main__":
                 mlflow.log_params({"num_slices": len(slices)})
                 t0 = time.time()
                 # mlflow.log_params(flatten(config))
-                fit_results = datafitter.fit(config=config)
-                metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
+                fit_results = fitter.fit(config=config)
+                metrics_dict = {"fit_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
                 mlflow.log_metrics(metrics=metrics_dict)
                 mlflow.set_tag("status", "completed")

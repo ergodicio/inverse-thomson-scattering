@@ -10,7 +10,8 @@ config.update("jax_enable_x64", True)
 # config.update("jax_disable_jit", True)
 # config.update("jax_check_tracer_leaks", True)
 
-from inverse_thomson_scattering import datafitter, utils
+from inverse_thomson_scattering import fitter
+from inverse_thomson_scattering.misc import utils
 
 
 def test_data():
@@ -52,8 +53,8 @@ def test_data():
         mlflow.log_params({"num_slices": 1})
         t0 = time.time()
         # mlflow.log_params(flatten(config))
-        fit_results = datafitter.fit(config=config)
-        metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
+        fit_results = fitter.fit(config=config)
+        metrics_dict = {"fit_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
         mlflow.log_metrics(metrics=metrics_dict)
         mlflow.set_tag("status", "completed")
 

@@ -9,7 +9,7 @@ config.update("jax_enable_x64", True)
 
 from scipy.signal import find_peaks
 from inverse_thomson_scattering.form_factor import get_form_factor_fn
-from inverse_thomson_scattering.numDistFunc import get_num_dist_func
+from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 
 def test_epw():
