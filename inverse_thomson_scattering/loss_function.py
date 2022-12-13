@@ -1,16 +1,37 @@
 from typing import Dict
+from functools import partial
 
 import jax
 from jax import numpy as jnp
-from jax import jit, vmap, value_and_grad
+
+from jax import jit, value_and_grad
+import haiku as hk
 import numpy as np
-from inverse_thomson_scattering.fitmodl import get_fit_model
+from inverse_thomson_scattering.generate_spectra import get_forward_pass
 
 
-def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarray, shifts: np.ndarray):
-    fit_model = get_fit_model(config, xie, sas)
+def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dict, shifts: Dict, backend="jax"):
+    """
+
+    Args:
+        config:
+        xie:
+        sas:
+        dummy_data:
+        norms:
+        shifts:
+
+    Returns:
+
+    """
+    forward_pass = get_forward_pass(config, xie, sas)
     lam = config["parameters"]["lam"]["val"]
     stddev = config["D"]["PhysParams"]["widIRF"]
+
+    if backend == "jax":
+        vmap = jax.vmap
+    else:
+        vmap = partial(hk.vmap, split_rng=False)
 
     def transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins):
         originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
@@ -30,7 +51,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         return lamAxisI, lamAxisE, ThryI
 
     def transform_electron_spec(lamAxisE, modlE, amps, TSins):
-        # Conceptual_origin so the convolution donsn't shift the signal
+        # Conceptual_origin so the convolution doesn't shift the signal
         originE = (jnp.amax(lamAxisE) + jnp.amin(lamAxisE)) / 2.0
         inst_funcE = jnp.squeeze(
             (1.0 / (stddev[0] * jnp.sqrt(2.0 * jnp.pi)))
@@ -55,7 +76,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
         return lamAxisE, ThryE
 
     @jit
-    def get_spectra(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
+    def postprocess(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
 
         if config["D"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
@@ -71,59 +92,157 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
-    vmap_fit_model = jit(vmap(fit_model))
-    vmap_get_spectra = jit(vmap(get_spectra))
+    vmap_forward_pass = vmap(forward_pass)
+    vmap_postprocess = vmap(postprocess)
 
     if config["optimizer"]["y_norm"]:
-        i_norm = np.amax(data[:, 1, :])
-        e_norm = np.amax(data[:, 0, :])
+        i_norm = np.amax(dummy_data[:, 1, :])
+        e_norm = np.amax(dummy_data[:, 0, :])
     else:
         i_norm = e_norm = 1.0
 
-    def loss_fn(x: jnp.ndarray):
-        modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(x)
-        ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
-            modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
-        )
+    if backend == "jax":
 
-        ThryE = ThryE / e_norm
-        ThryI = ThryI / i_norm
+        def loss_fn(x: jnp.ndarray):
+            these_params = {}
+            i = 0
+            for param_name, param_config in config["parameters"].items():
+                if param_config["active"]:
+                    these_params[param_name] = x[0, i].reshape((1, -1)) * norms[param_name] + shifts[param_name]
+                    i += 1
+                else:
+                    these_params[param_name] = jnp.array(param_config["val"]).reshape((1, -1))
 
-        loss = 0
-        i_data = data[:, 1, :] / i_norm
-        e_data = data[:, 0, :] / e_norm
-        if config["D"]["extraoptions"]["fit_IAW"]:
-            #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-            loss = loss + jnp.sum(jnp.square(i_data - ThryI))
+            modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(these_params)
+            ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess(
+                modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
+            )
 
-        if config["D"]["extraoptions"]["fit_EPWb"]:
-            thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
-            data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
+            ThryE = ThryE / e_norm
+            ThryI = ThryI / i_norm
 
-            loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
+            loss = 0
+            i_data = dummy_data[:, 1, :] / i_norm
+            e_data = dummy_data[:, 0, :] / e_norm
+            if config["D"]["extraoptions"]["fit_IAW"]:
+                #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+                loss = loss + jnp.sum(jnp.square(i_data - ThryI))
 
-        if config["D"]["extraoptions"]["fit_EPWr"]:
-            thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
-            data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
+            if config["D"]["extraoptions"]["fit_EPWb"]:
+                thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
+                data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
 
-            loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+                loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
 
-        return loss
+            if config["D"]["extraoptions"]["fit_EPWr"]:
+                thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
+                data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
 
-    vg_func = jit(value_and_grad(loss_fn))
-    loss_func = jit(loss_fn)
-    hess_func = jit(jax.hessian(loss_fn))
+                loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
 
-    def val_and_grad_loss(x: np.ndarray):
-        x = x * norms + shifts
-        reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
-        value, grad = vg_func(reshaped_x)
+            return loss
 
-        return value, np.array(grad).flatten()
-    
+        vg_func = jit(value_and_grad(loss_fn))
+        loss_func = jit(loss_fn)
+        hess_func = jit(jax.hessian(loss_fn))
+
+        def val_and_grad_loss(x: np.ndarray):
+            reshaped_x = jnp.array(x.reshape((dummy_data.shape[0], -1)))
+            value, grad = vg_func(reshaped_x)
+            return value, np.array(grad).flatten()
+
+    else:
+
+        class TSSpectraGenerator(hk.Module):
+            def __init__(self, cfg):
+                super(TSSpectraGenerator, self).__init__()
+                self.cfg = cfg
+
+            def initialize_params(self):
+                these_params = {}
+                for param_name, param_config in self.cfg["parameters"].items():
+                    if param_config["active"]:
+                        these_params[param_name] = hk.get_parameter(
+                            param_name,
+                            shape=[1, 1],
+                            init=hk.initializers.RandomUniform(minval=param_config["lb"], maxval=param_config["ub"]),
+                        )
+                    else:
+                        these_params[param_name] = jnp.array(param_config["val"]).reshape((1, -1))
+
+                for param_name, param_config in self.cfg["parameters"].items():
+                    if param_config["active"]:
+                        these_params[param_name] = these_params[param_name] * norms[param_name] + shifts[param_name]
+
+                return these_params
+
+            def __call__(self, batch):
+                params = self.initialize_params()
+                # params = self.neural_network_parameterizer(batch)
+                modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)
+                ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess(
+                    modlE,
+                    modlI,
+                    lamAxisE,
+                    lamAxisI,
+                    jnp.concatenate(self.cfg["D"]["PhysParams"]["amps"]),
+                    live_TSinputs,
+                )
+
+                ThryE = ThryE / e_norm
+                ThryI = ThryI / i_norm
+
+                i_data = batch[:, 1, :] / i_norm
+                e_data = batch[:, 0, :] / e_norm
+
+                return e_data, i_data, ThryE, ThryI, lamAxisE, lamAxisI
+
+        def loss_fn(batch):
+            loss = 0.0
+            Spectrumator = TSSpectraGenerator(config)
+            e_data, i_data, ThryE, ThryI, lamAxisE, lamAxisI = Spectrumator(batch)
+
+            if config["D"]["extraoptions"]["fit_IAW"]:
+                #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+                loss = loss + jnp.sum(jnp.square(i_data - ThryI))
+
+            if config["D"]["extraoptions"]["fit_EPWb"]:
+                thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
+                data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
+
+                loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+
+            if config["D"]["extraoptions"]["fit_EPWr"]:
+                thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
+                data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
+
+                loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+
+            return loss
+
+        loss_fn = hk.without_apply_rng(hk.transform(loss_fn))
+        vg_func = jit(value_and_grad(loss_fn.apply))
+        loss_func = jit(loss_fn.apply)
+        hess_func = jit(jax.hessian(loss_fn.apply))
+
+        def val_and_grad_loss(x: np.ndarray):
+            pytree_weights = {"ts_spectra_generator": {}}
+            i = 0
+            for key in config["parameters"].keys():
+                if config["parameters"][key]["active"]:
+                    pytree_weights["ts_spectra_generator"][key] = jnp.array(x[i].reshape((dummy_data.shape[0], -1)))
+                    i += 1
+
+            value, grad = vg_func(pytree_weights, dummy_data)
+            grads = []
+            for key in config["parameters"].keys():
+                if config["parameters"][key]["active"]:
+                    grads.append(grad["ts_spectra_generator"][key])
+            return value, np.array(np.concatenate(grads)).flatten()
+
     def value(x: np.ndarray):
         x = x * norms + shifts
-        reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
+        reshaped_x = jnp.array(x.reshape((dummy_data.shape[0], -1)))
         val = loss_func(reshaped_x)
 
         return val

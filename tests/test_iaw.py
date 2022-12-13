@@ -8,7 +8,7 @@ config.update("jax_enable_x64", True)
 from numpy.testing import assert_allclose
 from scipy.signal import find_peaks
 from inverse_thomson_scattering.form_factor import get_form_factor_fn
-from inverse_thomson_scattering.numDistFunc import get_num_dist_func
+from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 
 def test_iaw():
@@ -25,7 +25,7 @@ def test_iaw():
     re = 2.8179e-13  # classical electron radius cm
     Esq = Me * C**2 * re  # sq of the electron charge keV cm
 
-    nonMaxwThomsonI_jax, _ = get_form_factor_fn([525, 528])
+    nonMaxwThomsonI_jax = get_form_factor_fn([525, 528], backend="jax")
     xie = np.linspace(-7, 7, 1024)
     sa = np.array([60])
     num_dist_func = get_num_dist_func({"DLM": []}, xie)

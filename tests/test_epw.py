@@ -9,12 +9,12 @@ config.update("jax_enable_x64", True)
 
 from scipy.signal import find_peaks
 from inverse_thomson_scattering.form_factor import get_form_factor_fn
-from inverse_thomson_scattering.numDistFunc import get_num_dist_func
+from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 
 def test_epw():
     # Test #1: Bohm-Gross test, calculate a spectrum and compare the resonance to the Bohm gross dispersion relation
-    nonMaxwThomsonE_jax, _ = get_form_factor_fn([400, 700])
+    nonMaxwThomsonE_jax = get_form_factor_fn([400, 700], backend="jax")
     xie = np.linspace(-7, 7, 1024)
     sa = np.array([60])
     num_dist_func = get_num_dist_func({"DLM": []}, xie)
