@@ -227,8 +227,4 @@ def get_form_factor_fn(lamrang, backend="jax"):
         # formfactorE = PsLamE # commented because unused
         return formfactor, lams
 
-    def cost_fn(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe):
-        formf, _ = nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe)
-        return jnp.sum(formf)
-
-    return jit(nonMaxwThomson)  # , jit(value_and_grad(cost_fn))
+    return jit(nonMaxwThomson)

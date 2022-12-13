@@ -178,6 +178,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dic
 
             def __call__(self, batch):
                 params = self.initialize_params()
+                # params = self.neural_network_parameterizer(batch)
                 modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)
                 ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess(
                     modlE,
