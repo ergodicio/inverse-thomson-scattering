@@ -67,10 +67,10 @@ if __name__ == "__main__":
 
             #bgshot = {"type": [], "val": []}
             bgshot = {"type": "Fit", "val": 94477}
-            lnout = {"type": "ps", "val": slices}
+            #lnout = {"type": "ps", "val": slices}
             #lnout = {"type": "um", "val": slices}
+            lnout = {"type": "pixel", "val": [500]}
             bglnout = {"type": "pixel", "val": 900}
-            extraoptions = {"spectype": 2}
             
             config["parameters"]["Te"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.2,.4,.5,.55,.6,.6,.65,.65,.65,.65,.65,.5,.4,.4,.3,.3,.25,.2,.2]))
             config["parameters"]["ne"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.15,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.15,.15,.15,.15]))
@@ -88,7 +88,6 @@ if __name__ == "__main__":
                 config["bgshot"] = bgshot
                 config["lineoutloc"] = lnout
                 config["bgloc"] = bglnout
-                config["extraoptions"] = extraoptions
                 config["num_cores"] = int(mp.cpu_count())
 
                 config = {**config, **dict(shotnum=94475, bgscale=1, dpixel=2)}

@@ -169,7 +169,7 @@ def fit(config):
         if config["D"]["extraoptions"]["load_ele_spec"]:
             BGele = correctThroughput(BGele, tstype, axisyE, config["shotnum"])
             if tstype == 1:
-                BGele = conv2(BGele, np.ones([5, 5]) / 25, mode="same")
+                BGele = conv2(BGele, np.ones([5, 5]) / 25, mode="same") #1/27 for H2 and 1/24 for kr
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5]) / 25, mode="same")
             else:
                 BGele = conv2(BGele, np.ones([5, 3]) / 15, mode="same")
