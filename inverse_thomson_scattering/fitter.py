@@ -437,26 +437,32 @@ def fit(config):
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
 
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(
-        config, xie, sa, np.concatenate(all_data), units["norms"], units["shifts"], backend="haiku"
+    loss_fn, vg_loss_fn, hess_fn, init_params = get_loss_function(
+        config, xie, sa, np.concatenate(all_data), units["norms"], units["shifts"]
     )
+
+    if init_params is None:
+        init_params = units["array"]["init_params"]
+        bounds = zip(units["array"]["lb"], units["array"]["ub"])
+    else:
+        bounds = None
 
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
     # Perform fit
-    if np.shape(units["array"]["init_params"])[0] != 0:
-        res = spopt.minimize(
-            vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
-            units["array"]["init_params"],
-            method=config["optimizer"]["method"],
-            jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-            hess=hess_fn if config["optimizer"]["hessian"] else None,
-            bounds=zip(units["array"]["lb"], units["array"]["ub"]),
-            options={"disp": True},
-        )
-    else:
-        x = units["pytree"]["init_params"]
+    # if np.shape(units["array"]["init_params"])[0] != 0:
+    res = spopt.minimize(
+        vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
+        init_params,
+        method=config["optimizer"]["method"],
+        jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+        hess=hess_fn if config["optimizer"]["hessian"] else None,
+        bounds=bounds,
+        options={"disp": True},
+    )
+    # else:
+    #     x = units["pytree"]["init_params"]
 
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 

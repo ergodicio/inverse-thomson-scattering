@@ -18,10 +18,10 @@ def test_data():
     # Test #3: Data test, compare fit to a preknown fit result
     # currently just runs one line of shot 101675 for the electron, should be expanded in the future
 
-    with open("./defaults.yaml", "r") as fi:
+    with open("tests/configs/defaults.yaml", "r") as fi:
         defaults = yaml.safe_load(fi)
 
-    with open("./inputs.yaml", "r") as fi:
+    with open("tests/configs/inputs.yaml", "r") as fi:
         inputs = yaml.safe_load(fi)
 
     defaults = flatten(defaults)
