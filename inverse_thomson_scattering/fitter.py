@@ -324,64 +324,64 @@ def fit(config):
         bgfitx = np.hstack(
             [np.arange(250, 480), np.arange(540, 900)]
         )  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
-        plt.plot(bgfitx, noiseE[bgfitx])
+        # plt.plot(bgfitx, noiseE[bgfitx])
         # [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
         [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[200, 0.001, 200, 0.001])
         noiseE = bgscalingE * exp2(np.arange(1024), *expbg)
-        plt.plot(bgfitx, noiseE[bgfitx])
-        plt.plot(bgfitx, exp2(bgfitx, 200, 0.001, 200, 0.001))
-        plt.show()
+        # plt.plot(bgfitx, noiseE[bgfitx])
+        # plt.plot(bgfitx, exp2(bgfitx, 200, 0.001, 200, 0.001))
+        # plt.show()
 
         # temporary constant addition to the background
         noiseE = noiseE + flatbg
 
     ## Plot data
-    fig, ax = plt.subplots(1, 2, figsize=(16, 4))
-    if config["D"]["extraoptions"]["load_ion_spec"]:
-        imI = ax[1].imshow(
-            conv2(ionData_bsub, np.ones([5, 3]) / 15, mode="same"),
-            cmap,
-            interpolation="none",
-            extent=[axisxI[0] - shift_zero, axisxI[-1] - shift_zero, axisyI[-1], axisyI[0]],
-            aspect="auto",
-            vmin=0,
-        )
-        ax[1].set_title(
-            "Shot : " + str(config["shotnum"]) + " : " + "TS : Thruput corrected",
-            fontdict={"fontsize": 10, "fontweight": "bold"},
-        )
-        ax[1].set_xlabel(xlab)
-        ax[1].set_ylabel("Wavelength (nm)")
-        plt.colorbar(imI, ax=ax[1])
-        ax[1].plot(
-            [axisxI[LineoutPixelI] - shift_zero, axisxI[LineoutPixelI] - shift_zero], [axisyI[0], axisyI[-1]], "r"
-        )
-        ax[1].plot(
-            [axisxI[BackgroundPixel] - shift_zero, axisxI[BackgroundPixel] - shift_zero], [axisyI[0], axisyI[-1]], "k"
-        )
-
-    if config["D"]["extraoptions"]["load_ele_spec"]:
-        imE = ax[0].imshow(
-            conv2(elecData_bsub, np.ones([5, 3]) / 15, mode="same"),
-            cmap,
-            interpolation="none",
-            extent=[axisxE[0] - shift_zero, axisxE[-1] - shift_zero, axisyE[-1], axisyE[0]],
-            aspect="auto",
-            vmin=0,
-        )
-        ax[0].set_title(
-            "Shot : " + str(config["shotnum"]) + " : " + "TS : Thruput corrected",
-            fontdict={"fontsize": 10, "fontweight": "bold"},
-        )
-        ax[0].set_xlabel(xlab)
-        ax[0].set_ylabel("Wavelength (nm)")
-        plt.colorbar(imE, ax=ax[0])
-        ax[0].plot(
-            [axisxE[LineoutPixelE] - shift_zero, axisxE[LineoutPixelE] - shift_zero], [axisyE[0], axisyE[-1]], "r"
-        )
-        ax[0].plot(
-            [axisxE[BackgroundPixel] - shift_zero, axisxE[BackgroundPixel] - shift_zero], [axisyE[0], axisyE[-1]], "k"
-        )
+    # fig, ax = plt.subplots(1, 2, figsize=(16, 4))
+    # if config["D"]["extraoptions"]["load_ion_spec"]:
+    #     imI = ax[1].imshow(
+    #         conv2(ionData_bsub, np.ones([5, 3]) / 15, mode="same"),
+    #         cmap,
+    #         interpolation="none",
+    #         extent=[axisxI[0] - shift_zero, axisxI[-1] - shift_zero, axisyI[-1], axisyI[0]],
+    #         aspect="auto",
+    #         vmin=0,
+    #     )
+    #     ax[1].set_title(
+    #         "Shot : " + str(config["shotnum"]) + " : " + "TS : Thruput corrected",
+    #         fontdict={"fontsize": 10, "fontweight": "bold"},
+    #     )
+    #     ax[1].set_xlabel(xlab)
+    #     ax[1].set_ylabel("Wavelength (nm)")
+    #     plt.colorbar(imI, ax=ax[1])
+    #     ax[1].plot(
+    #         [axisxI[LineoutPixelI] - shift_zero, axisxI[LineoutPixelI] - shift_zero], [axisyI[0], axisyI[-1]], "r"
+    #     )
+    #     ax[1].plot(
+    #         [axisxI[BackgroundPixel] - shift_zero, axisxI[BackgroundPixel] - shift_zero], [axisyI[0], axisyI[-1]], "k"
+    #     )
+    #
+    # if config["D"]["extraoptions"]["load_ele_spec"]:
+    #     imE = ax[0].imshow(
+    #         conv2(elecData_bsub, np.ones([5, 3]) / 15, mode="same"),
+    #         cmap,
+    #         interpolation="none",
+    #         extent=[axisxE[0] - shift_zero, axisxE[-1] - shift_zero, axisyE[-1], axisyE[0]],
+    #         aspect="auto",
+    #         vmin=0,
+    #     )
+    #     ax[0].set_title(
+    #         "Shot : " + str(config["shotnum"]) + " : " + "TS : Thruput corrected",
+    #         fontdict={"fontsize": 10, "fontweight": "bold"},
+    #     )
+    #     ax[0].set_xlabel(xlab)
+    #     ax[0].set_ylabel("Wavelength (nm)")
+    #     plt.colorbar(imE, ax=ax[0])
+    #     ax[0].plot(
+    #         [axisxE[LineoutPixelE] - shift_zero, axisxE[LineoutPixelE] - shift_zero], [axisyE[0], axisyE[-1]], "r"
+    #     )
+    #     ax[0].plot(
+    #         [axisxE[BackgroundPixel] - shift_zero, axisxE[BackgroundPixel] - shift_zero], [axisyE[0], axisyE[-1]], "k"
+    #     )
 
     # Normalize Data before fitting
     if config["D"]["extraoptions"]["load_ion_spec"]:
