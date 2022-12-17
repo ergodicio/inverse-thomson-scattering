@@ -58,12 +58,12 @@ def test_data():
         mlflow.log_metrics(metrics=metrics_dict)
         mlflow.set_tag("status", "completed")
 
-        assert_allclose(fit_results["amp1"][0], 0.9257, rtol=1e-1)
-        assert_allclose(fit_results["amp2"][0], 0.6727, rtol=1e-1)  # 0.98734!
-        assert_allclose(fit_results["lam"][0], 524.2455, rtol=5e-3)
-        assert_allclose(fit_results["Te"][0], 0.67585, rtol=1e-1)  # 0.57567
-        assert_allclose(fit_results["ne"][0], 0.21792, rtol=5e-2)
-        assert_allclose(fit_results["m"][0], 3.3673, rtol=15e-2)
+        assert_allclose(fit_results["amp1"], 0.9257, rtol=1e-1)
+        assert_allclose(fit_results["amp2"], 0.6727, rtol=1e-1)  # 0.98734!
+        assert_allclose(fit_results["lam"], 524.2455, rtol=5e-3)
+        assert_allclose(fit_results["Te"], 0.67585, rtol=1e-1)  # 0.57567
+        assert_allclose(fit_results["ne"], 0.21792, rtol=5e-2)
+        assert_allclose(fit_results["m"], 3.3673, rtol=15e-2)
 
 
 if __name__ == "__main__":

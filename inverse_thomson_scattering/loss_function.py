@@ -1,3 +1,4 @@
+import copy
 from typing import Dict
 from functools import partial
 
@@ -25,7 +26,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
     Returns:
 
     """
-    forward_pass = get_forward_pass(config, xie, sas)
+    forward_pass = get_forward_pass(config, xie, sas, backend="haiku")
     lam = config["parameters"]["lam"]["val"]
     stddev = config["D"]["PhysParams"]["widIRF"]
 
@@ -108,13 +109,16 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             self.param_extractors = []
             for i in range(num_spectra):
                 layers = []
-                for _ in range(3):
-                    layers.append(hk.Conv1D(8, 3))
-                    layers.append(jax.nn.relu)
+                for _ in range(8):
+                    layers.append(hk.Conv1D(output_channels=8, kernel_shape=3, stride=2))
+                    layers.append(jax.nn.tanh)
+
+                layers.append(hk.Conv1D(1, 3))
+                layers.append(jax.nn.tanh)
 
                 layers.append(hk.Flatten())
                 layers.append(hk.Linear(8))
-                layers.append(jax.nn.relu)
+                layers.append(jax.nn.leaky_relu)
 
                 self.param_extractors.append(hk.Sequential(layers))
 
@@ -149,7 +153,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
                 i_slice = 0
                 for param_name, param_config in self.cfg["parameters"].items():
                     if param_config["active"]:
-                        these_params[param_name] = jnp.tanh(all_params[i_slice, i]).reshape((1,1)) * 0.5 + 0.5
+                        these_params[param_name] = jax.nn.sigmoid(all_params[i_slice, i]).reshape((1, 1))
                         i = i + 1
                     else:
                         these_params[param_name] = jnp.array(param_config["val"]).reshape((1, -1))
@@ -187,7 +191,9 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             ThryE = ThryE / e_norm
             ThryI = ThryI / i_norm
 
-            return ThryE, ThryI, lamAxisE, lamAxisI
+            return ThryE, ThryI, lamAxisE, lamAxisI, params
+
+    config_for_loss = copy.deepcopy(config)
 
     def loss_fn(batch):
 
@@ -197,8 +203,8 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
         normed_batch = jnp.concatenate([e_data[:, None, :], i_data[:, None, :]], axis=1)
 
         loss = 0.0
-        Spectrumator = TSSpectraGenerator(config)
-        ThryE, ThryI, lamAxisE, lamAxisI = Spectrumator(normed_batch)
+        spectrumator = TSSpectraGenerator(config_for_loss)
+        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator(normed_batch)
 
         if config["D"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
@@ -216,11 +222,10 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
 
             loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
 
-        return loss
+        return loss, [ThryE, e_data, params]
 
     loss_fn = hk.without_apply_rng(hk.transform(loss_fn))
-    vg_func = jit(value_and_grad(loss_fn.apply))
-    loss_func = jit(loss_fn.apply)
+    vg_func = jit(value_and_grad(loss_fn.apply, has_aux=True))
     hess_func = jit(jax.hessian(loss_fn.apply))
 
     rng_key = jax.random.PRNGKey(42)
@@ -255,17 +260,29 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
     def val_and_grad_loss(weights: np.ndarray):
 
         pytree_weights = unravel_pytree(weights)
-        value, grad = vg_func(pytree_weights, dummy_batch)
+        (value, aux), grad = vg_func(pytree_weights, dummy_batch)
         temp_grad, _ = ravel_pytree(grad)
         flattened_grads = np.array(temp_grad).flatten()
-
         return value, flattened_grads
 
-    def value(x: np.ndarray):
-        x = x * norms + shifts
-        reshaped_x = jnp.array(x.reshape((dummy_batch.shape[0], -1)))
-        val = loss_func(reshaped_x)
+    config_for_params = copy.deepcopy(config)
 
-        return val
+    def __get_params__(batch):
+        i_data = batch[:, 1, :] / i_norm
+        e_data = batch[:, 0, :] / e_norm
 
-    return value, val_and_grad_loss, hess_func, flattened_initial_params
+        normed_batch = jnp.concatenate([e_data[:, None, :], i_data[:, None, :]], axis=1)
+        spectrumator = TSSpectraGenerator(config_for_params)
+        params = spectrumator.initialize_params(normed_batch)
+
+        return params
+
+    _get_params_ = hk.without_apply_rng(hk.transform(__get_params__)).apply
+
+    def get_params(weights):
+        pytree_weights = unravel_pytree(weights)
+        params = _get_params_(pytree_weights, dummy_batch)
+
+        return params
+
+    return val_and_grad_loss, hess_func, flattened_initial_params, get_params

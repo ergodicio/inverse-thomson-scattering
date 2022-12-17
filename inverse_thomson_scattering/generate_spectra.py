@@ -1,17 +1,18 @@
+import copy
+
 from inverse_thomson_scattering.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from jax import numpy as jnp
-from jax import jit
 
 
-def get_forward_pass(config, xie, sa):
-    nonMaxwThomsonE_jax = get_form_factor_fn(config["D"]["lamrangE"], backend="jax")
-    nonMaxwThomsonI_jax = get_form_factor_fn(config["D"]["lamrangI"], backend="jax")
+def get_forward_pass(config, xie, sa, backend: str = "haiku"):
+    nonMaxwThomsonE_jax = get_form_factor_fn(config["D"]["lamrangE"], backend=backend)
+    nonMaxwThomsonI_jax = get_form_factor_fn(config["D"]["lamrangI"], backend=backend)
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], xie)
 
     def forward_pass(fitted_params):
 
-        parameters = config["parameters"]
+        parameters = copy.deepcopy(config["parameters"])
         for key in parameters.keys():
             if parameters[key]["active"]:
                 parameters[key]["val"] = jnp.squeeze(fitted_params[key])
@@ -37,7 +38,7 @@ def get_forward_pass(config, xie, sa):
         lam = parameters["lam"]["val"]
 
         if config["D"]["extraoptions"]["load_ion_spec"]:
-            ThryI, lamAxisI = jit(nonMaxwThomsonI_jax)(
+            ThryI, lamAxisI = nonMaxwThomsonI_jax(
                 parameters["Te"]["val"],
                 parameters["Ti"]["val"],
                 parameters["Z"]["val"],
@@ -62,7 +63,7 @@ def get_forward_pass(config, xie, sa):
             lamAxisI = []
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
-            ThryE, lamAxisE = jit(nonMaxwThomsonE_jax)(
+            ThryE, lamAxisE = nonMaxwThomsonE_jax(
                 cur_Te,
                 parameters["Ti"]["val"],
                 parameters["Z"]["val"],

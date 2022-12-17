@@ -1,12 +1,9 @@
 import jax
-from jax import config
 
-config.update("jax_enable_x64", True)
 from functools import partial
 import numpy as np
 import scipy.interpolate as sp
 from jax import numpy as jnp
-from jax import jit
 import haiku as hk
 from inverse_thomson_scattering import ratintn
 from inverse_thomson_scattering.misc import lam_parse
@@ -43,7 +40,7 @@ def zprimeMaxw(xi):
     return Zp
 
 
-def get_form_factor_fn(lamrang, backend="jax"):
+def get_form_factor_fn(lamrang, backend: str):
     npts = 1024
 
     # basic quantities
@@ -227,4 +224,4 @@ def get_form_factor_fn(lamrang, backend="jax"):
         # formfactorE = PsLamE # commented because unused
         return formfactor, lams
 
-    return jit(nonMaxwThomson)
+    return nonMaxwThomson

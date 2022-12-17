@@ -45,7 +45,7 @@ def initialize_parameters(config: Dict) -> Dict:
     shifts = {}
     if config["optimizer"]["x_norm"]:
         for k, v in init_params.items():
-            norms[k] = 2 * (ub[k] - lb[k])
+            norms[k] = (ub[k] - lb[k])
             shifts[k] = lb[k]
     else:
         for k, v in init_params.items():
@@ -437,7 +437,7 @@ def fit(config):
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
 
-    loss_fn, vg_loss_fn, hess_fn, init_params = get_loss_function(
+    vg_loss_fn, hess_fn, init_params, get_params = get_loss_function(
         config, xie, sa, np.concatenate(all_data), units["norms"], units["shifts"]
     )
 
@@ -463,16 +463,11 @@ def fit(config):
     )
     # else:
     #     x = units["pytree"]["init_params"]
+    temp_params = get_params(res.x).items()
+    final_params = {k: np.squeeze(np.array(v)) for k, v in temp_params}
 
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
-    i = 0
-    final_x = []
-    for k, v in units["pytree"]["init_params"].items():
-        final_x.append((res.x[i] * units["norms"][k] + units["shifts"][k]).reshape((len(all_data), -1)))
-        i += 1
-
-    final_x = np.concatenate(final_x, axis=-1)
     # fit_model = get_fit_model(config, xie, sa)
     # init_x = (init_params * norms + shifts).reshape((len(all_data), -1))
     # final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
@@ -531,32 +526,10 @@ def fit(config):
 
     mlflow.set_tag("status", "done plotting")
 
-    result = config["parameters"]
-    count = 0
-    final_x.reshape((len(config["lineoutloc"]["val"]), -1))
-
-    outputs = {}
-    for key in config["parameters"].keys():
-        if config["parameters"][key]["active"]:
-            # config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
-            outputs[key] = [float(val) for val in list(final_x[:, count])]
-            count = count + 1
-
-    # needs to be fixed
-    # if result["fe"]["active"]:
-    #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
-    # elif result["m"]["active"]:
-    #    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
-
-    # mlflow.log_params(config["parameters"])
-    # result = config["parameters"]
-
     with tempfile.TemporaryDirectory() as td:
         with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
-            yaml.dump(outputs, fi)
+            yaml.dump(final_params, fi)
 
         mlflow.log_artifacts(td)
 
-    return outputs
-    # result = config["parameters"]
-    # return result
+    return final_params
