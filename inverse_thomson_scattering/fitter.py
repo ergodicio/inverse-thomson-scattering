@@ -450,8 +450,6 @@ def fit(config):
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
-    # Perform fit
-    # if np.shape(units["array"]["init_params"])[0] != 0:
     res = spopt.minimize(
         vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
         init_params,
@@ -461,8 +459,6 @@ def fit(config):
         bounds=bounds,
         options={"disp": True},
     )
-    # else:
-    #     x = units["pytree"]["init_params"]
     temp_params, ThryE, e_data = get_params(res.x)
     final_params = {k: np.squeeze(np.array(v)) for k, v in temp_params.items()}
 

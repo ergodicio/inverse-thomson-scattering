@@ -3,12 +3,12 @@ parameters:
         val: 1.
         active: True
         lb: 0.01
-        ub: 3.75
+        ub: 2
     amp2:
         val: 1.
         active: True
         lb: 0.01
-        ub: 3.75
+        ub: 2
     amp3:
         val: 1.
         active: False
@@ -42,13 +42,13 @@ parameters:
         val: .2
         active: True
         lb: .001
-        ub: 2.5
+        ub: 1.25
         gradient: 0.
     m:
         val: 3.
         active: True
         lb: 2.
-        ub: 5.
+        ub: 3.5
     fe:
         val: []
         active: False
