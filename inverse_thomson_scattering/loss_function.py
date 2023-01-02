@@ -201,6 +201,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
         e_data = batch[:, 0, :] / e_norm
 
         normed_batch = jnp.concatenate([e_data[:, None, :], i_data[:, None, :]], axis=1)
+        trimmed_and_normed_batch = None
 
         loss = 0.0
         spectrumator = TSSpectraGenerator(config_for_loss)
@@ -211,6 +212,8 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             loss = loss + jnp.sum(jnp.square(i_data - ThryI))
 
         if config["D"]["extraoptions"]["fit_EPWb"]:
+            # vmin = config["D"]["extraoptions"]["fit_EPWb"]["min"]
+            # vmax = config["D"]["extraoptions"]["fit_EPWb"]["max"]
             thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
 
@@ -273,9 +276,9 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
 
         normed_batch = jnp.concatenate([e_data[:, None, :], i_data[:, None, :]], axis=1)
         spectrumator = TSSpectraGenerator(config_for_params)
-        params = spectrumator.initialize_params(normed_batch)
+        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator(normed_batch)
 
-        return params
+        return params, ThryE, e_data
 
     _get_params_ = hk.without_apply_rng(hk.transform(__get_params__)).apply
 

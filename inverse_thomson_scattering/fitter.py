@@ -45,7 +45,7 @@ def initialize_parameters(config: Dict) -> Dict:
     shifts = {}
     if config["optimizer"]["x_norm"]:
         for k, v in init_params.items():
-            norms[k] = (ub[k] - lb[k])
+            norms[k] = ub[k] - lb[k]
             shifts[k] = lb[k]
     else:
         for k, v in init_params.items():
@@ -463,8 +463,8 @@ def fit(config):
     )
     # else:
     #     x = units["pytree"]["init_params"]
-    temp_params = get_params(res.x).items()
-    final_params = {k: np.squeeze(np.array(v)) for k, v in temp_params}
+    temp_params, ThryE, e_data = get_params(res.x)
+    final_params = {k: np.squeeze(np.array(v)) for k, v in temp_params.items()}
 
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
@@ -524,9 +524,17 @@ def fit(config):
     mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})
     mlflow.log_metrics(metrics_dict)
 
-    mlflow.set_tag("status", "done plotting")
-
     with tempfile.TemporaryDirectory() as td:
+        # plot model vs actual
+        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
+        ax.plot(np.squeeze(e_data), label="Data")
+        ax.plot(np.squeeze(ThryE), label="Fit")
+        ax.legend(fontsize=14)
+        ax.grid()
+        fig.savefig(os.path.join(td, "fit.png"), bbox_inches="tight")
+
+        mlflow.set_tag("status", "done plotting")
+
         with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
             yaml.dump(final_params, fi)
 
