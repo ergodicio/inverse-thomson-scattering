@@ -25,7 +25,7 @@ def test_data():
     config = unflatten(defaults)
 
     bgshot = {"type": [], "val": []}
-    lnout = {"type": "pixel", "val": [524]}
+    lnout = {"type": "pixel", "val": [500]}
     bglnout = {"type": "pixel", "val": 900}
     extraoptions = {"spectype": 2}
 

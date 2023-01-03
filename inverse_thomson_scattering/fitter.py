@@ -460,7 +460,11 @@ def fit(config):
         options={"disp": True},
     )
     temp_params, ThryE, e_data = get_params(res.x)
-    final_params = {k: np.squeeze(np.array(v)) for k, v in temp_params.items()}
+    final_params = {
+        k: float(np.squeeze(np.array(v))) for k, v in temp_params.items() if np.squeeze(np.array(v)).size == 1
+    }
+
+    print(final_params)
 
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
