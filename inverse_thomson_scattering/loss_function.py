@@ -107,21 +107,23 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             self.cfg = cfg
             self.num_spectra = num_spectra
             self.nn = cfg["nn"]
+            convs = [int(i) for i in cfg["nn"]["conv_filters"].split("|")]
+            linears = [int(i) for i in cfg["nn"]["linear_widths"].split("|")]
 
             self.param_extractors = []
             for i in range(num_spectra):
                 layers = []
 
-                for _ in range(self.nn["num_conv"]):
-                    layers.append(hk.Conv1D(output_channels=self.nn["conv_filters"], kernel_shape=3, stride=2))
+                for cc in convs:
+                    layers.append(hk.Conv1D(output_channels=cc, kernel_shape=3, stride=2))
                     layers.append(jax.nn.tanh)
 
                 layers.append(hk.Conv1D(1, 3))
                 layers.append(jax.nn.tanh)
 
                 layers.append(hk.Flatten())
-                for _ in range(self.nn["num_linear"]):
-                    layers.append(hk.Linear(self.nn["linear_width"]))
+                for ll in range(linears):
+                    layers.append(hk.Linear(ll))
                     layers.append(jax.nn.tanh)
 
                 self.param_extractors.append(hk.Sequential(layers))

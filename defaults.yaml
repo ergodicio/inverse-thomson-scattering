@@ -107,12 +107,11 @@ optimizer:
     x_norm: True
     grad_method: AD
 
+
 nn:
     use: True
-    num_conv: 4
-    conv_filters: 32
-    num_linear: 2
-    linear_width: 16
+    conv_filters: 64|64|64|64|64
+    linear: 16|8
 
 
 mlflow:
