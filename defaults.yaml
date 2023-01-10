@@ -111,7 +111,7 @@ optimizer:
 nn:
     use: True
     conv_filters: 64|64|64|64|64
-    linear: 16|8
+    linear_widths: 16|8
 
 
 mlflow:
