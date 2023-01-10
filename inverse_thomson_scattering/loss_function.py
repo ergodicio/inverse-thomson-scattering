@@ -122,7 +122,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
                 layers.append(jax.nn.tanh)
 
                 layers.append(hk.Flatten())
-                for ll in range(linears):
+                for ll in linears:
                     layers.append(hk.Linear(ll))
                     layers.append(jax.nn.tanh)
 
