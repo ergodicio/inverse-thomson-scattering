@@ -25,7 +25,7 @@ def test_data():
     config = unflatten(defaults)
 
     bgshot = {"type": [], "val": []}
-    lnout = {"type": "pixel", "val": [500]}
+    lnout = {"type": "pixel", "val": [i for i in range(500, 550, 16)]}
     bglnout = {"type": "pixel", "val": 900}
     extraoptions = {"spectype": 2}
 
@@ -36,8 +36,6 @@ def test_data():
     mlflow.set_experiment(config["mlflow"]["experiment"])
 
     with mlflow.start_run() as run:
-        utils.log_params(config)
-
         config["bgshot"] = bgshot
         config["lineoutloc"] = lnout
         config["bgloc"] = bglnout
@@ -46,7 +44,8 @@ def test_data():
 
         config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
 
-        mlflow.log_params({"num_slices": 1})
+        utils.log_params(config)
+
         t0 = time.time()
         # mlflow.log_params(flatten(config))
         fit_results = fitter.fit(config=config)

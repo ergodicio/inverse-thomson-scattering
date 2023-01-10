@@ -434,6 +434,7 @@ def fit(config):
         else:
             raise NotImplementedError("This spectrum does not exist")
 
+        # if data.shape
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
 
@@ -459,13 +460,6 @@ def fit(config):
         bounds=bounds,
         options={"disp": True},
     )
-    temp_params, ThryE, e_data = get_params(res.x)
-    final_params = {
-        k: float(np.squeeze(np.array(v))) for k, v in temp_params.items() if np.squeeze(np.array(v)).size == 1
-    }
-
-    print(final_params)
-
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     # fit_model = get_fit_model(config, xie, sa)
@@ -525,13 +519,24 @@ def fit(config):
     mlflow.log_metrics(metrics_dict)
 
     with tempfile.TemporaryDirectory() as td:
-        # plot model vs actual
-        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-        ax.plot(np.squeeze(e_data), label="Data")
-        ax.plot(np.squeeze(ThryE), label="Fit")
-        ax.legend(fontsize=14)
-        ax.grid()
-        fig.savefig(os.path.join(td, "fit.png"), bbox_inches="tight")
+
+        temp_params, ThryE, e_data = get_params(res.x)
+
+        # make plots
+        for i in range(e_data.shape[0]):
+            # plot model vs actual
+            fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
+            ax.plot(np.squeeze(e_data[i, 256:-256]), label="Data")
+            ax.plot(np.squeeze(ThryE[i, 256:-256]), label="Fit")
+            ax.legend(fontsize=14)
+            ax.grid()
+            fig.savefig(os.path.join(td, f"lnout={config['lineoutloc']['val'][i]}.png"), bbox_inches="tight")
+
+        final_params = {}
+        # get only learned parameters
+        for param_name, param_config in config["parameters"].items():
+            if param_config["active"]:
+                final_params[param_name] = [float(val) for val in temp_params[param_name]]
 
         mlflow.set_tag("status", "done plotting")
 

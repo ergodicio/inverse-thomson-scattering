@@ -215,7 +215,7 @@ def get_form_factor_fn(lamrang, backend: str):
         SKW_ele_omg = 2 * jnp.pi * 1.0 / klde * (ele_comp) / ((jnp.abs(epsilon)) ** 2) * vTe / omgpe
         # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
-        PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
+        PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:, None, None]
         # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * C / omgs
         PsLam = PsOmg * 2 * jnp.pi * C / lams**2

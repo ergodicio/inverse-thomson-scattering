@@ -99,7 +99,7 @@ D:
         norm: 0
     iawoff: 0
     iawfilter: [1, 4, 24, 528]
-    
+
 optimizer:
     method: L-BFGS-B
     hessian: False
@@ -107,7 +107,11 @@ optimizer:
     x_norm: True
     grad_method: AD
 
-nn: True
+nn:
+    use: True
+    conv_depth: 3
+    num_filters: 8
+
 
 mlflow:
     experiment: inverse-thomson-scattering

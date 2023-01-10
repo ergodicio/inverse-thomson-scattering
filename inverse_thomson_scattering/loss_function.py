@@ -1,6 +1,7 @@
 import copy
 from typing import Dict
 from functools import partial
+from collections import defaultdict
 
 import jax
 from jax import numpy as jnp
@@ -109,16 +110,19 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             self.param_extractors = []
             for i in range(num_spectra):
                 layers = []
-                for _ in range(8):
-                    layers.append(hk.Conv1D(output_channels=8, kernel_shape=3, stride=2))
+
+                for _ in range(4):
+                    layers.append(hk.Conv1D(output_channels=32, kernel_shape=7, stride=2))
                     layers.append(jax.nn.tanh)
 
                 layers.append(hk.Conv1D(1, 3))
                 layers.append(jax.nn.tanh)
 
                 layers.append(hk.Flatten())
+                layers.append(hk.Linear(16))
+                layers.append(jax.nn.tanh)
                 layers.append(hk.Linear(8))
-                layers.append(jax.nn.leaky_relu)
+                layers.append(jax.nn.tanh)
 
                 self.param_extractors.append(hk.Sequential(layers))
 
@@ -142,21 +146,25 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             super(TSSpectraGenerator, self).__init__()
             self.cfg = cfg
             self.num_spectra = num_spectra
+            self.batch_size = len(cfg["lineoutloc"]["val"])
             if cfg["nn"]:
                 self.ts_parameter_generator = TSParameterGenerator(cfg, num_spectra)
 
         def initialize_params(self, batch):
             if self.cfg["nn"]:
-                all_params = self.ts_parameter_generator(batch)
-                these_params = {}
-                i = 0
-                i_slice = 0
+                all_params = self.ts_parameter_generator(batch[:, :, 256:-256])
+                these_params = defaultdict(list)
+                for i_slice in range(self.batch_size):
+                    i = 0
+                    for param_name, param_config in self.cfg["parameters"].items():
+                        if param_config["active"]:
+                            these_params[param_name].append(jax.nn.sigmoid(all_params[i_slice, i]).reshape((1, 1)))
+                            i = i + 1
+                        else:
+                            these_params[param_name].append(jnp.array(param_config["val"]).reshape((1, -1)))
+
                 for param_name, param_config in self.cfg["parameters"].items():
-                    if param_config["active"]:
-                        these_params[param_name] = jax.nn.sigmoid(all_params[i_slice, i]).reshape((1, 1))
-                        i = i + 1
-                    else:
-                        these_params[param_name] = jnp.array(param_config["val"]).reshape((1, -1))
+                    these_params[param_name] = jnp.concatenate(these_params[param_name])
             else:
                 these_params = {}
                 for param_name, param_config in self.cfg["parameters"].items():
