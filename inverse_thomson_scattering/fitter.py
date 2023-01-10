@@ -452,7 +452,7 @@ def fit(config):
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
     res = spopt.minimize(
-        vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
+        vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else None,
         init_params,
         method=config["optimizer"]["method"],
         jac=True if config["optimizer"]["grad_method"] == "AD" else False,

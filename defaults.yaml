@@ -109,8 +109,10 @@ optimizer:
 
 nn:
     use: True
-    conv_depth: 3
-    num_filters: 8
+    num_conv: 4
+    conv_filters: 32
+    num_linear: 2
+    linear_width: 16
 
 
 mlflow:

@@ -1,7 +1,7 @@
 from jax import numpy as jnp
 
 
-def lamParse(lamrang, lam, npts, fineion=True):
+def lamParse(lamrang, lam, fineion=True):
     """
     This function handles the calculation of wavelength grids and their associated frequency grids. A few predefined ranges
     are provided as string input options or a numeric range can be selected. A boolean switch is included to allow a finer

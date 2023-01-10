@@ -106,23 +106,23 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             super(TSParameterGenerator, self).__init__()
             self.cfg = cfg
             self.num_spectra = num_spectra
+            self.nn = cfg["nn"]
 
             self.param_extractors = []
             for i in range(num_spectra):
                 layers = []
 
-                for _ in range(4):
-                    layers.append(hk.Conv1D(output_channels=32, kernel_shape=7, stride=2))
+                for _ in range(self.nn["num_conv"]):
+                    layers.append(hk.Conv1D(output_channels=self.nn["conv_filters"], kernel_shape=3, stride=2))
                     layers.append(jax.nn.tanh)
 
                 layers.append(hk.Conv1D(1, 3))
                 layers.append(jax.nn.tanh)
 
                 layers.append(hk.Flatten())
-                layers.append(hk.Linear(16))
-                layers.append(jax.nn.tanh)
-                layers.append(hk.Linear(8))
-                layers.append(jax.nn.tanh)
+                for _ in range(self.nn["num_linear"]):
+                    layers.append(hk.Linear(self.nn["linear_width"]))
+                    layers.append(jax.nn.tanh)
 
                 self.param_extractors.append(hk.Sequential(layers))
 
@@ -139,7 +139,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
                 [self.param_extractors[i](spectra[:, i][..., None]) for i in range(self.num_spectra)], axis=-1
             )
 
-            return self.combiner(embeddings)
+            return jax.nn.sigmoid(self.combiner(embeddings))
 
     class TSSpectraGenerator(hk.Module):
         def __init__(self, cfg: Dict, num_spectra: int = 2):
@@ -147,7 +147,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             self.cfg = cfg
             self.num_spectra = num_spectra
             self.batch_size = len(cfg["lineoutloc"]["val"])
-            if cfg["nn"]:
+            if cfg["nn"]["use"]:
                 self.ts_parameter_generator = TSParameterGenerator(cfg, num_spectra)
 
         def initialize_params(self, batch):
@@ -158,7 +158,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
                     i = 0
                     for param_name, param_config in self.cfg["parameters"].items():
                         if param_config["active"]:
-                            these_params[param_name].append(jax.nn.sigmoid(all_params[i_slice, i]).reshape((1, 1)))
+                            these_params[param_name].append(all_params[i_slice, i].reshape((1, 1)))
                             i = i + 1
                         else:
                             these_params[param_name].append(jnp.array(param_config["val"]).reshape((1, -1)))

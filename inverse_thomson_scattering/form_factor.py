@@ -41,8 +41,6 @@ def zprimeMaxw(xi):
 
 
 def get_form_factor_fn(lamrang, backend: str):
-    npts = 1024
-
     # basic quantities
     C = 2.99792458e10
     Me = 510.9896 / C**2  # electron mass keV/C^2
@@ -92,7 +90,7 @@ def get_form_factor_fn(lamrang, backend: str):
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
 
-        omgL, omgs, lamAxis, _ = lam_parse.lamParse(lamrang, lam, npts)  # , True)
+        omgL, omgs, lamAxis, _ = lam_parse.lamParse(lamrang, lam)  # , True)
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
