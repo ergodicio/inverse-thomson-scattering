@@ -233,7 +233,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
 
             loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
 
-        return loss, [ThryE, e_data, params]
+        return loss / 1e7 / dummy_batch.shape[0], [ThryE, e_data, params]
 
     loss_fn = hk.without_apply_rng(hk.transform(loss_fn))
     vg_func = jit(value_and_grad(loss_fn.apply, has_aux=True))
