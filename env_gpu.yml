@@ -28,3 +28,4 @@ dependencies:
       - dm-haiku==0.0.8
       - typing-extensions
       - optax
+      - tqdm

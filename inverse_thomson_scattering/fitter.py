@@ -10,6 +10,7 @@ import optax
 
 import mlflow
 
+from tqdm import trange
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.misc.load_ts_data import load_data
 from inverse_thomson_scattering.process.correct_throughput import correct_throughput
@@ -463,22 +464,27 @@ def fit(config):
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
 
+    epoch_loss = 0.0
     for i_epoch in range(config["optimizer"]["num_epochs"]):
+        num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
         np.random.shuffle(batch_indices)
         batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-        epoch_loss = 0.0
-        for i_batch, inds in enumerate(batch_indices):
-            batch = {"data": all_data[inds], "amps": amps_list[inds]}
-            (loss, [ThryE, e_data, params]), grads = vg_loss_fn(weights, batch)
-            updates, opt_state = opt_update(grads, opt_state, weights)
-            weights = optax.apply_updates(weights, updates)
-            print(f"epoch={i_epoch+1}, batch={i_batch+1}, loss={round(loss, 6)}")
-            epoch_loss += loss
+        with trange(num_batches, unit="batch") as tbatch:
+            tbatch.set_description(f"Epoch {i_epoch}, Prev Epoch Loss {round(epoch_loss)}")
+            epoch_loss = 0.0
+            for i_batch in tbatch:
+                # for i_batch, inds in enumerate(batch_indices):
+                inds = batch_indices[i_batch]
+                batch = {"data": all_data[inds], "amps": amps_list[inds]}
+                (loss, [ThryE, e_data, params]), grads = vg_loss_fn(weights, batch)
+                updates, opt_state = opt_update(grads, opt_state, weights)
+                weights = optax.apply_updates(weights, updates)
 
-        print()
-        print(f"epoch={i_epoch + 1}, epoch loss={round(epoch_loss / len(batch_indices), 6)}")
-        mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
-        print()
+                epoch_loss += loss
+                tbatch.set_postfix({"Prev Batch Loss": round(loss)})
+            epoch_loss /= num_batches
+            mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
+                # print()
 
         batch_indices = batch_indices.flatten()
 

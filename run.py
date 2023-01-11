@@ -25,7 +25,7 @@ def test_data():
     config = unflatten(defaults)
 
     bgshot = {"type": [], "val": []}
-    lnout = {"type": "pixel", "val": [i for i in range(384, 768, 16)]}
+    lnout = {"type": "pixel", "start": 450, "end": 650, "skip": 10}
     bglnout = {"type": "pixel", "val": 900}
     extraoptions = {"spectype": 2}
 
@@ -41,6 +41,10 @@ def test_data():
         config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
 
         utils.log_params(config)
+
+        config["lineoutloc"]["val"] = [
+            i for i in range(config["lineoutloc"]["start"], config["lineoutloc"]["end"], config["lineoutloc"]["skip"])
+        ]
 
         t0 = time.time()
         # mlflow.log_params(flatten(config))
