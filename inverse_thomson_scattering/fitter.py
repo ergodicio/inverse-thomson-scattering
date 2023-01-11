@@ -470,7 +470,7 @@ def fit(config):
         np.random.shuffle(batch_indices)
         batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
         with trange(num_batches, unit="batch") as tbatch:
-            tbatch.set_description(f"Epoch {i_epoch}, Prev Epoch Loss {round(epoch_loss)}")
+            tbatch.set_description(f"Epoch {i_epoch+1}, Prev Epoch Loss {round(epoch_loss)}")
             epoch_loss = 0.0
             for i_batch in tbatch:
                 # for i_batch, inds in enumerate(batch_indices):
@@ -484,8 +484,6 @@ def fit(config):
                 tbatch.set_postfix({"Prev Batch Loss": round(loss)})
             epoch_loss /= num_batches
             mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
-                # print()
-
         batch_indices = batch_indices.flatten()
 
     all_params = {}
@@ -511,7 +509,7 @@ def fit(config):
 
         mlflow.log_metrics({"inference time": round(time.time() - t1, 2)})
 
-        losses = losses.flatten()
+        losses = losses.flatten() / np.amax(all_data[:, 0, :], axis=-1)
         loss_inds = losses.argsort()[::-1]
 
         sorted_losses = losses[loss_inds]
