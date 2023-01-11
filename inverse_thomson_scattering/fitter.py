@@ -545,7 +545,7 @@ def fit(config):
             fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
             ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")
             ax.plot(np.squeeze(sorted_fits[-1 - i, 256:-256]), label="Fit")
-            ax.set_title(titlestr + f", loss = {round(sorted_losses[-1-i])}", fontsize=14)
+            ax.set_title(titlestr, fontsize=14)
             ax.legend(fontsize=14)
             ax.grid()
             fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
