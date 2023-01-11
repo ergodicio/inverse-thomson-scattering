@@ -106,6 +106,9 @@ optimizer:
     y_norm: False
     x_norm: True
     grad_method: AD
+    batch_size: 2
+    num_epochs: 100
+    learning_rate: 1.0e-3
 
 
 nn:

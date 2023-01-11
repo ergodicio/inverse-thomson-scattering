@@ -25,13 +25,9 @@ def test_data():
     config = unflatten(defaults)
 
     bgshot = {"type": [], "val": []}
-    lnout = {"type": "pixel", "val": [i for i in range(500, 550, 16)]}
+    lnout = {"type": "pixel", "val": [i for i in range(384, 768, 16)]}
     bglnout = {"type": "pixel", "val": 900}
     extraoptions = {"spectype": 2}
-
-    config["parameters"]["Te"]["val"] = 0.5
-    config["parameters"]["ne"]["val"] = 0.2  # 0.25
-    config["parameters"]["m"]["val"] = 3.0  # 2.2
 
     mlflow.set_experiment(config["mlflow"]["experiment"])
 

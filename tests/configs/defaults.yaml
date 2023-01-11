@@ -106,12 +106,15 @@ optimizer:
     y_norm: False
     x_norm: True
     grad_method: AD
+    batch_size: 8
+    num_epochs: 5
+    learning_rate: 1.0e-3
 
 
 nn:
     use: True
-    conv_filters: 64|64|64|64|64
-    linear_widths: 16|8
+    conv_filters: 64|64|64|64
+    linear_widths: 32|16
 
 
 mlflow:

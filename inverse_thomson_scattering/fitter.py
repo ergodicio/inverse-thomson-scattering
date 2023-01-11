@@ -1,13 +1,14 @@
-import tempfile, os
+import tempfile, os, time, yaml
 from typing import Dict
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
+import pandas
 import scipy.optimize as spopt
-import time
+import optax
+
 import mlflow
-import yaml
 
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.misc.load_ts_data import load_data
@@ -109,8 +110,6 @@ def fit(config):
     ## Persistents
     # used to prevent reloading and one time analysis (not sure if there is a way to do this in python, omitted for now)
     # persistent prevShot
-
-    t0 = time.time()
     ## Hard code toggles, locations and values
     # these should only be changed if something changes in the experimental setup or data is moved around
 
@@ -396,7 +395,7 @@ def fit(config):
         noiseE = noiseE / gain
         LineoutTSE_norm = [LineoutTSE_smooth[i] / gain for i, _ in enumerate(LineoutPixelE)]
         LineoutTSE_norm = LineoutTSE_norm - noiseE  # new 6-29-20
-        ampE = np.amax(LineoutTSE_norm[:, 100:-1], axis=1)  # attempts to ignore 3w comtamination
+        ampE = np.amax(LineoutTSE_norm[:, 100:-1], axis=1)  # attempts to ignore 3w contamination
     else:
         ampE = 1
 
@@ -418,7 +417,7 @@ def fit(config):
     units = initialize_parameters(config)
 
     all_data = []
-    config["D"]["PhysParams"]["amps"] = []
+    amps_list = []
     # run fitting code for each lineout
     for i, _ in enumerate(config["lineoutloc"]["val"]):
         # this probably needs to be done differently
@@ -436,113 +435,131 @@ def fit(config):
 
         # if data.shape
         all_data.append(data[None, :])
-        config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
+        amps_list.append(np.array(amps)[None, :])
 
-    vg_loss_fn, hess_fn, init_params, get_params = get_loss_function(
-        config, xie, sa, np.concatenate(all_data), units["norms"], units["shifts"]
+    all_data = np.concatenate(all_data)
+    amps_list = np.concatenate(amps_list)
+    test_batch = {
+        "data": all_data[: config["optimizer"]["batch_size"]],
+        "amps": amps_list[: config["optimizer"]["batch_size"]],
+    }
+
+    vg_loss_fn, array_loss_fn, init_weights, get_params = get_loss_function(
+        config, xie, sa, test_batch, units["norms"], units["shifts"]
     )
 
-    if init_params is None:
-        init_params = units["array"]["init_params"]
-        bounds = zip(units["array"]["lb"], units["array"]["ub"])
-    else:
-        bounds = None
+    opt_init, opt_update = optax.chain(
+        # Set the parameters of Adam. Note the learning_rate is not here.
+        optax.scale_by_adam(b1=0.9, b2=0.999, eps=1e-8),
+        # Put a minus sign to *minimise* the loss.
+        optax.scale(-config["optimizer"]["learning_rate"]),
+    )
+
+    batch_indices = np.arange(len(all_data))
+    weights = init_weights
+    opt_state = opt_init(weights)
 
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
-    res = spopt.minimize(
-        vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else None,
-        init_params,
-        method=config["optimizer"]["method"],
-        jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-        hess=hess_fn if config["optimizer"]["hessian"] else None,
-        bounds=bounds,
-        options={"disp": True},
-    )
-    mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
-    # fit_model = get_fit_model(config, xie, sa)
-    # init_x = (init_params * norms + shifts).reshape((len(all_data), -1))
-    # final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
+    for i_epoch in range(config["optimizer"]["num_epochs"]):
+        np.random.shuffle(batch_indices)
+        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+        epoch_loss = 0.0
+        for i_batch, inds in enumerate(batch_indices):
+            batch = {"data": all_data[inds], "amps": amps_list[inds]}
+            (loss, [ThryE, e_data, params]), grads = vg_loss_fn(weights, batch)
+            updates, opt_state = opt_update(grads, opt_state, weights)
+            weights = optax.apply_updates(weights, updates)
+            print(f"epoch={i_epoch+1}, batch={i_batch+1}, loss={round(loss, 6)}")
+            epoch_loss += loss
 
-    # print("plotting")
-    # mlflow.set_tag("status", "plotting")
-    #
-    # if len(config["lineoutloc"]["val"]) > 4:
-    #     plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 2, replace=False)
-    # else:
-    #     # plot_inds = config["lineoutloc"]["val"]
-    #     plot_inds = np.arange(len(config["lineoutloc"]["val"]))
-    #
-    # t1 = time.time()
-    # fig = plt.figure(figsize=(14, 6))
-    # with tempfile.TemporaryDirectory() as td:
-    #     for i in plot_inds:
-    #         curline = config["lineoutloc"]["val"][i]
-    #         fig.clf()
-    #         ax = fig.add_subplot(1, 2, 1)
-    #         ax2 = fig.add_subplot(1, 2, 2)
-    #         # Plot initial guess
-    #         fig, ax = plotState(
-    #             init_x[i],
-    #             config,
-    #             config["D"]["PhysParams"]["amps"][i][0],
-    #             xie,
-    #             sa,
-    #             all_data[i][0],
-    #             fitModel2=fit_model,
-    #             fig=fig,
-    #             ax=[ax, ax2],
-    #         )
-    #         fig.savefig(os.path.join(td, f"before-{curline}.png"), bbox_inches="tight")
-    #
-    #         fig.clf()
-    #         ax = fig.add_subplot(1, 2, 1)
-    #         ax2 = fig.add_subplot(1, 2, 2)
-    #         fig, ax = plotState(
-    #             final_x[i],
-    #             config,
-    #             config["D"]["PhysParams"]["amps"][i][0],
-    #             xie,
-    #             sa,
-    #             all_data[i][0],
-    #             fitModel2=fit_model,
-    #             fig=fig,
-    #             ax=[ax, ax2],
-    #         )
-    #         fig.savefig(os.path.join(td, f"after-{curline}.png"), bbox_inches="tight")
-    #     mlflow.log_artifacts(td, artifact_path="plots")
+        print()
+        print(f"epoch={i_epoch + 1}, epoch loss={round(epoch_loss / len(batch_indices), 6)}")
+        mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
+        print()
 
-    metrics_dict = {"loss": res.fun, "num_iterations": res.nit, "num_fun_eval": res.nfev, "num_jac_eval": res.njev}
-    mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})
-    mlflow.log_metrics(metrics_dict)
+        batch_indices = batch_indices.flatten()
+
+    all_params = {}
+    for key in config["parameters"].keys():
+        if config["parameters"][key]["active"]:
+            all_params[key] = np.empty(0)
+
+    mlflow.log_metrics({"fit time": round(time.time() - t1, 2)})
 
     with tempfile.TemporaryDirectory() as td:
+        t1 = time.time()
+        batch_indices.sort()
+        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+        losses = np.zeros_like(batch_indices)
+        fits = np.zeros((all_data.shape[0], all_data.shape[2]))
+        for i_batch, inds in enumerate(batch_indices):
+            batch = {"data": all_data[inds], "amps": amps_list[inds]}
+            loss, [ThryE, e_data, params] = array_loss_fn(weights, batch)
+            losses[i_batch] = np.mean(loss, axis=1)
+            fits[inds] = ThryE
+            for k in all_params.keys():
+                all_params[k] = np.concatenate([all_params[k], np.squeeze(params[k])])
 
-        temp_params, ThryE, e_data = get_params(res.x)
+        mlflow.log_metrics({"inference time": round(time.time() - t1, 2)})
 
+        losses = losses.flatten()
+        loss_inds = losses.argsort()[::-1]
+
+        sorted_losses = losses[loss_inds]
+        sorted_fits = fits[loss_inds]
+        sorted_data = all_data[loss_inds]
+
+        num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
+
+        t1 = time.time()
+        os.makedirs(os.path.join(td, "worst"))
+        os.makedirs(os.path.join(td, "best"))
         # make plots
-        for i in range(e_data.shape[0]):
+        for i in range(num_plots):
             # plot model vs actual
+            titlestr = r"|Error|$^2$" + f" = {sorted_losses[i]}, line out # {config['lineoutloc']['val'][loss_inds[i]]}"
+            filename = f"loss={round(sorted_losses[i])}-lineout={config['lineoutloc']['val'][loss_inds[i]]}.png"
             fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-            ax.plot(np.squeeze(e_data[i, 256:-256]), label="Data")
-            ax.plot(np.squeeze(ThryE[i, 256:-256]), label="Fit")
+            ax.plot(np.squeeze(sorted_data[i, 0, 256:-256]), label="Data")
+            ax.plot(np.squeeze(sorted_fits[i, 256:-256]), label="Fit")
+            ax.set_title(titlestr, fontsize=14)
             ax.legend(fontsize=14)
             ax.grid()
-            fig.savefig(os.path.join(td, f"lnout={config['lineoutloc']['val'][i]}.png"), bbox_inches="tight")
+            fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
+            plt.close(fig)
 
-        final_params = {}
-        # get only learned parameters
-        for param_name, param_config in config["parameters"].items():
-            if param_config["active"]:
-                final_params[param_name] = [float(val) for val in temp_params[param_name]]
+            titlestr = (
+                r"|Error|$^2$" + f" = {sorted_losses[-1-i]}, line out # {config['lineoutloc']['val'][loss_inds[-1-i]]}"
+            )
+            filename = f"loss={round(sorted_losses[-1-i])}-lineout={config['lineoutloc']['val'][loss_inds[-1-i]]}.png"
+            fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
+            ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")
+            ax.plot(np.squeeze(sorted_fits[-1 - i, 256:-256]), label="Fit")
+            ax.set_title(titlestr + f", loss = {round(sorted_losses[-1-i])}", fontsize=14)
+            ax.legend(fontsize=14)
+            ax.grid()
+            fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
+            plt.close(fig)
+
+        mlflow.log_metrics({"plot time": round(time.time() - t1, 2)})
+
+        all_params["lineout"] = config["lineoutloc"]["val"]
+        final_params = pandas.DataFrame(all_params)
+        final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
+        # final_params = {}
+        # # get only learned parameters
+        # for param_name, param_config in config["parameters"].items():
+        #     if param_config["active"]:
+        #         final_params[param_name] = [float(val) for val in temp_params[param_name]]
 
         mlflow.set_tag("status", "done plotting")
 
-        with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
-            yaml.dump(final_params, fi)
+        # with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
+        #     yaml.dump(final_params, fi)
 
         mlflow.log_artifacts(td)
 
-    return final_params
+    # return final_params

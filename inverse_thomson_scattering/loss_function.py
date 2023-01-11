@@ -13,7 +13,7 @@ import numpy as np
 from inverse_thomson_scattering.generate_spectra import get_forward_pass
 
 
-def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Dict, shifts: Dict):
+def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, shifts: Dict):
     """
 
     Args:
@@ -96,8 +96,8 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
     vmap_postprocess = vmap(postprocess)
 
     if config["optimizer"]["y_norm"]:
-        i_norm = np.amax(dummy_batch[:, 1, :])
-        e_norm = np.amax(dummy_batch[:, 0, :])
+        i_norm = np.amax(dummy_batch["data"][:, 1, :])
+        e_norm = np.amax(dummy_batch["data"][:, 0, :])
     else:
         i_norm = e_norm = 1.0
 
@@ -148,13 +148,15 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             super(TSSpectraGenerator, self).__init__()
             self.cfg = cfg
             self.num_spectra = num_spectra
-            self.batch_size = len(cfg["lineoutloc"]["val"])
+            self.batch_size = cfg["optimizer"]["batch_size"]
             if cfg["nn"]["use"]:
                 self.ts_parameter_generator = TSParameterGenerator(cfg, num_spectra)
 
+            self.crop_window = 256
+
         def initialize_params(self, batch):
             if self.cfg["nn"]:
-                all_params = self.ts_parameter_generator(batch[:, :, 256:-256])
+                all_params = self.ts_parameter_generator(batch[:, :, self.crop_window : -self.crop_window])
                 these_params = defaultdict(list)
                 for i_slice in range(self.batch_size):
                     i = 0
@@ -187,15 +189,10 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
 
         def __call__(self, batch):
 
-            params = self.initialize_params(batch)
+            params = self.initialize_params(batch["data"])
             modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)
             ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess(
-                modlE,
-                modlI,
-                lamAxisE,
-                lamAxisI,
-                jnp.concatenate(self.cfg["D"]["PhysParams"]["amps"]),
-                live_TSinputs,
+                modlE, modlI, lamAxisE, lamAxisI, batch["amps"], live_TSinputs
             )
 
             ThryE = ThryE / e_norm
@@ -205,21 +202,20 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
 
     config_for_loss = copy.deepcopy(config)
 
-    def loss_fn(batch):
+    def array_loss_fn(batch):
 
-        i_data = batch[:, 1, :] / i_norm
-        e_data = batch[:, 0, :] / e_norm
+        i_data = batch["data"][:, 1, :] / i_norm
+        e_data = batch["data"][:, 0, :] / e_norm
 
         normed_batch = jnp.concatenate([e_data[:, None, :], i_data[:, None, :]], axis=1)
-        trimmed_and_normed_batch = None
 
         loss = 0.0
         spectrumator = TSSpectraGenerator(config_for_loss)
-        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator(normed_batch)
+        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator({"data": normed_batch, "amps": batch["amps"]})
 
         if config["D"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-            loss = loss + jnp.sum(jnp.square(i_data - ThryI))
+            loss = loss + jnp.square(i_data - ThryI)
 
         if config["D"]["extraoptions"]["fit_EPWb"]:
             # vmin = config["D"]["extraoptions"]["fit_EPWb"]["min"]
@@ -227,75 +223,106 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: np.ndarray, norms: Di
             thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
 
-            loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+            loss = loss + jnp.square(data_slc - thry_slc)
 
         if config["D"]["extraoptions"]["fit_EPWr"]:
             thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
 
-            loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+            loss = loss + jnp.square(data_slc - thry_slc)
 
-        return loss / 1e7 / dummy_batch.shape[0], [ThryE, e_data, params]
+        return loss, [ThryE, e_data, params]
+
+    def loss_fn(batch):
+
+        i_data = batch["data"][:, 1, :] / i_norm
+        e_data = batch["data"][:, 0, :] / e_norm
+
+        normed_batch = jnp.concatenate([e_data[:, None, :], i_data[:, None, :]], axis=1)
+
+        loss = 0.0
+        spectrumator = TSSpectraGenerator(config_for_loss)
+        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator({"data": normed_batch, "amps": batch["amps"]})
+
+        if config["D"]["extraoptions"]["fit_IAW"]:
+            #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+            loss = loss + jnp.square(i_data - ThryI)
+
+        if config["D"]["extraoptions"]["fit_EPWb"]:
+            # vmin = config["D"]["extraoptions"]["fit_EPWb"]["min"]
+            # vmax = config["D"]["extraoptions"]["fit_EPWb"]["max"]
+            thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
+
+            loss = loss + jnp.square(data_slc - thry_slc)
+
+        if config["D"]["extraoptions"]["fit_EPWr"]:
+            thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
+            data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
+
+            loss = loss + jnp.square(data_slc - thry_slc)
+
+        return jnp.mean(loss), [ThryE, e_data, params]
 
     loss_fn = hk.without_apply_rng(hk.transform(loss_fn))
+    array_loss_fn = jit(hk.without_apply_rng(hk.transform(array_loss_fn)).apply)
     vg_func = jit(value_and_grad(loss_fn.apply, has_aux=True))
-    hess_func = jit(jax.hessian(loss_fn.apply))
 
     rng_key = jax.random.PRNGKey(42)
     init_params = loss_fn.init(rng_key, dummy_batch)
 
-    if config["nn"]:
-        flattened_initial_params, unravel_pytree = jax_ravel_pytree(init_params)
-        ravel_pytree = jax_ravel_pytree
-    else:
+    # if config["nn"]:
+    #     flattened_initial_params, unravel_pytree = jax_ravel_pytree(init_params)
+    #     ravel_pytree = jax_ravel_pytree
+    # else:
+    #
+    #     def unravel_pytree(weights):
+    #         pytree_weights = {"ts_spectra_generator": {}}
+    #         i = 0
+    #         for key in config["parameters"].keys():
+    #             if config["parameters"][key]["active"]:
+    #                 pytree_weights["ts_spectra_generator"][key] = jnp.array(
+    #                     weights[i].reshape((dummy_batch.shape[0], -1))
+    #                 )
+    #                 i += 1
+    #
+    #         return pytree_weights
+    #
+    #     def ravel_pytree(pytree_grads):
+    #         grads = []
+    #         for key in config["parameters"].keys():
+    #             if config["parameters"][key]["active"]:
+    #                 grads.append(pytree_grads["ts_spectra_generator"][key])
+    #         return np.concatenate(grads), None
+    #
+    #     flattened_initial_params = None
 
-        def unravel_pytree(weights):
-            pytree_weights = {"ts_spectra_generator": {}}
-            i = 0
-            for key in config["parameters"].keys():
-                if config["parameters"][key]["active"]:
-                    pytree_weights["ts_spectra_generator"][key] = jnp.array(
-                        weights[i].reshape((dummy_batch.shape[0], -1))
-                    )
-                    i += 1
-
-            return pytree_weights
-
-        def ravel_pytree(pytree_grads):
-            grads = []
-            for key in config["parameters"].keys():
-                if config["parameters"][key]["active"]:
-                    grads.append(pytree_grads["ts_spectra_generator"][key])
-            return np.concatenate(grads), None
-
-        flattened_initial_params = None
-
-    def val_and_grad_loss(weights: np.ndarray):
-
-        pytree_weights = unravel_pytree(weights)
-        (value, aux), grad = vg_func(pytree_weights, dummy_batch)
-        temp_grad, _ = ravel_pytree(grad)
-        flattened_grads = np.array(temp_grad).flatten()
-        return value, flattened_grads
+    # def val_and_grad_loss(weights: np.ndarray):
+    #
+    #     pytree_weights = unravel_pytree(weights)
+    #     (value, aux), grad = vg_func(pytree_weights, dummy_batch)
+    #     temp_grad, _ = ravel_pytree(grad)
+    #     flattened_grads = np.array(temp_grad).flatten()
+    #     return value, flattened_grads
 
     config_for_params = copy.deepcopy(config)
 
     def __get_params__(batch):
-        i_data = batch[:, 1, :] / i_norm
-        e_data = batch[:, 0, :] / e_norm
+        i_data = batch["data"][:, 1, :] / i_norm
+        e_data = batch["data"][:, 0, :] / e_norm
 
         normed_batch = jnp.concatenate([e_data[:, None, :], i_data[:, None, :]], axis=1)
         spectrumator = TSSpectraGenerator(config_for_params)
-        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator(normed_batch)
+        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator({"data": normed_batch, "amps": batch["amps"]})
 
         return params, ThryE, e_data
 
     _get_params_ = hk.without_apply_rng(hk.transform(__get_params__)).apply
 
-    def get_params(weights):
-        pytree_weights = unravel_pytree(weights)
-        params = _get_params_(pytree_weights, dummy_batch)
+    # def get_params(weights):
+    #     pytree_weights = unravel_pytree(weights)
+    #     params = _get_params_(pytree_weights, dummy_batch)
+    #
+    #     return params
 
-        return params
-
-    return val_and_grad_loss, hess_func, flattened_initial_params, get_params
+    return vg_func, array_loss_fn, init_params, _get_params_
