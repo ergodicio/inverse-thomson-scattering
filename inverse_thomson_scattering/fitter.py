@@ -465,6 +465,7 @@ def fit(config):
     mlflow.set_tag("status", "minimizing")
 
     epoch_loss = 0.0
+    best_loss = 1e16
     for i_epoch in range(config["optimizer"]["num_epochs"]):
         num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
         np.random.shuffle(batch_indices)
@@ -477,11 +478,13 @@ def fit(config):
                 inds = batch_indices[i_batch]
                 batch = {"data": all_data[inds], "amps": amps_list[inds]}
                 (loss, [ThryE, e_data, params]), grads = vg_loss_fn(weights, batch)
-                updates, opt_state = opt_update(grads, opt_state, weights)
-                weights = optax.apply_updates(weights, updates)
-
+                if loss < best_loss:
+                    best_loss = loss
+                    best_weights = weights
                 epoch_loss += loss
                 tbatch.set_postfix({"Prev Batch Loss": round(loss)})
+                updates, opt_state = opt_update(grads, opt_state, weights)
+                weights = optax.apply_updates(weights, updates)
             epoch_loss /= num_batches
             mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
         batch_indices = batch_indices.flatten()
@@ -501,7 +504,7 @@ def fit(config):
         fits = np.zeros((all_data.shape[0], all_data.shape[2]))
         for i_batch, inds in enumerate(batch_indices):
             batch = {"data": all_data[inds], "amps": amps_list[inds]}
-            loss, [ThryE, e_data, params] = array_loss_fn(weights, batch)
+            loss, [ThryE, _, params] = array_loss_fn(best_weights, batch)
             losses[i_batch] = np.mean(loss, axis=1)
             fits[inds] = ThryE
             for k in all_params.keys():
