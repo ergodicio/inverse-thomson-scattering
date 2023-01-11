@@ -38,8 +38,8 @@ def zprimeMaxw(xi):
     return Zp
 
 
-def get_form_factor_fn(lamrang):
-    npts = 20460
+def get_form_factor_fn(lamrang, npts):
+    #npts = 20460
 
     # basic quantities
     C = 2.99792458e10
@@ -86,6 +86,7 @@ def get_form_factor_fn(lamrang):
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
 
         omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts)  # , True)
+        #print("omgs shape ", jnp.shape(omgs))
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
@@ -96,6 +97,7 @@ def get_form_factor_fn(lamrang):
         kL = jnp.sqrt(omgL**2 - omgpe**2) / C
         #kL = kL[..., jnp.newaxis]
         k = jnp.sqrt(ks**2 + kL**2 - 2 * ks * kL * jnp.cos(sarad))
+        #print("k shape ", jnp.shape(k))
 
         kdotv = k * Va
         omgdop = omg - kdotv
@@ -209,7 +211,8 @@ def get_form_factor_fn(lamrang):
         SKW_ele_omg = 2 * jnp.pi * 1.0 / klde * (ele_comp) / ((jnp.abs(epsilon)) ** 2) * vTe / omgpe
         # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
-        PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
+        PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:,None,None]
+        #PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
         # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * C / omgs
         PsLam = PsOmg * 2 * jnp.pi * C / lams**2

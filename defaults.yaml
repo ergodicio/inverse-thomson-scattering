@@ -83,9 +83,11 @@ parameters:
 
 D:
     active: False
+    bgscaleE: 1
+    bgscaleI: 0.1
+    bgshotmult: 1
     BinWidth: 10
-    NumBinInRng: 0
-    TotalNumBin: 1023
+    CCDsize: [1024, 1024]
     expandedions: False
     extraoptions:
         spectype: 2
@@ -94,11 +96,16 @@ D:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
+    flatbg: 0
+    gain: 1
+    iawoff: 0
+    iawfilter: [1, 4, 24, 528]
+    NumBinInRng: 0
     PhysParams:
         background: [0, 0]
         norm: 0
-    iawoff: 0
-    iawfilter: [1, 4, 24, 528]
+    shotDay: 0
+    TotalNumBin: 1023
     
 optimizer:
     method: L-BFGS-B

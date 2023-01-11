@@ -3,8 +3,8 @@ import numpy as np
 from inverse_thomson_scattering.plotters import LinePlots
 
 
-def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
-    [modlE, modlI, lamAxisE, lamAxisI, tsdict] = fitModel2(x)
+def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, ax):
+    [modlE, modlI, lamAxisE, lamAxisI, tsdict] = fitModel2(x, sas["weights"])
 
     lam = config["parameters"]["lam"]["val"]
     amp1 = config["parameters"]["amp1"]["val"]
@@ -25,6 +25,8 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
         if config["D"]["PhysParams"]["norm"] == 0:
             lamAxisI = np.average(lamAxisI.reshape(1024, -1), axis=1)
             ThryI = amp3 * amps[1] * ThryI / max(ThryI)
+            
+        ThryI = ThryI + np.array(noiseI)
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
         originE = (max(lamAxisE) + min(lamAxisE)) / 2  # Conceptual_origin so the convolution donsn't shift the signal
@@ -44,8 +46,12 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
             ThryE = amps[0] * ThryE / max(ThryE)
             ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam])
             ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam])
+            
+        ThryE = ThryE + np.array(noiseE)
+        print(np.shape(noiseE))
+        print(np.shape(ThryE))
 
-    if config["D"]["extraoptions"]["spectype"] == 1:
+    if config["D"]["extraoptions"]["spectype"] == 0:
         print("colorplot still needs to be written")
         # Write Colorplot
         # Thryinit=ArtemisModel(config["parameters"],xie,scaterangs,x0,weightMatrix,...

@@ -39,6 +39,8 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
             (1.0 / (stddev[0] * jnp.sqrt(2.0 * jnp.pi)))
             * jnp.exp(-((lamAxisE - originE) ** 2.0) / (2.0 * (stddev[0]) ** 2.0))
         )  # Gaussian
+        #print("modleE shape ", jnp.shape(modlE))
+        #print("instfunc shape ",jnp.shape(inst_funcE))
         ThryE = jnp.convolve(modlE, inst_funcE, "same")
         ThryE = (jnp.amax(modlE) / jnp.amax(ThryE)) * ThryE
 
@@ -84,13 +86,16 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
 
     def loss_fn(x: jnp.ndarray):
         reshaped_x = jnp.array(x.reshape((data.shape[0], -1)))
-        modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(reshaped_x)
+        #print("x shape ",jnp.shape(reshaped_x))
+        #print("weights shape ", jnp.shape(sas["weights"]))
+        modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_fit_model(reshaped_x, sas["weights"])
+        #print("modleE shape ", jnp.shape(modlE))
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_get_spectra(
             modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
         )
-
-        ThryE = ThryE + config["D"]["PhysParams"]["noiseE"]
-        ThryI = ThryI + config["D"]["PhysParams"]["noiseI"]
+        #print("ThryE shape ", jnp.shape(ThryE))
+        ThryE = ThryE + jnp.array(config["D"]["PhysParams"]["noiseE"])
+        ThryI = ThryI + jnp.array(config["D"]["PhysParams"]["noiseI"])
         
         ThryE = ThryE / e_norm
         ThryI = ThryI / i_norm
@@ -126,6 +131,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: np.ndarra
             
             loss = loss + jnp.sum(sqdev)
 
+        #print(jnp.shape(loss))
         return loss
 
     vg_func = jit(value_and_grad(loss_fn))

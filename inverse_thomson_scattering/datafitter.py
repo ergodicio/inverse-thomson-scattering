@@ -20,6 +20,7 @@ from inverse_thomson_scattering.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.plotstate import plotState
 from inverse_thomson_scattering.fitmodl import get_fit_model
 from inverse_thomson_scattering.loss_function import get_loss_function
+from inverse_thomson_scattering.plotters import TScmap
 
 
 def unnumpy_dict(this_dict: Dict):
@@ -78,23 +79,19 @@ def fit(config):
     """
 
     t0 = time.time()
-    ## Hard code toggles, locations and values
-    # these should only be changed if something changes in the experimental setup or data is moved around
-
-    tstype = config["D"]["extraoptions"]["spectype"]  # 1 for ARTS, 2 for TRTS, 3 for SRTS
-
-    # lines 75 through 85 can likely be moved to the input decks
-    CCDsize = [1024, 1024]  # dimensions of the CCD chip as read
-    shift_zero = 0
 
     # need a better way to do this
     shotDay = 0  # turn on to switch file retrieval to shot day location
 
-    gain = 1
-    bgscalingE = config["bgscale"]  # multiplicitive factor on the EPW BG lineout
-    bgscalingI = 0.1  # multiplicitive factor on the IAW BG lineout
-    bgshotmult = 1
-    flatbg = 0
+    ## Hard code toggles, locations and values
+    # these should only be changed if something changes in the experimental setup or data is moved around
+
+    tstype = config["D"]["extraoptions"]["spectype"]  # 1 for ARTS, 2 for TRTS, 3 for SRTS
+    gain = config["D"]["gain"]
+    bgscalingE = config["D"]["bgscaleE"]  # multiplicitive factor on the EPW BG lineout
+    bgscalingI = config["D"]["bgscaleI"]  # multiplicitive factor on the IAW BG lineout
+    bgshotmult = config["D"]["bgshotmult"]
+    flatbg = config["D"]["flatbg"]
 
     # Scattering angle in degrees for TIM6 TS
     if tstype > 1:
@@ -120,22 +117,8 @@ def fit(config):
         weights=imp['weightMatrix']
         sa = dict(sa=np.arange(19, 139, 0.5), weights=weights)
 
-    # Define jet colormap with 0=white (this might be moved and just loaded here)
-    upper = mpl.cm.jet(np.arange(256))
-    lower = np.ones((int(256 / 16), 4))
-    # - modify the first three columns (RGB):
-    #   range linearly between white (1,1,1) and the first color of the upper colormap
-    for i in range(3):
-        lower[:, i] = np.linspace(1, upper[0, i], lower.shape[0])
-
-    # combine parts of colormap
-    cmap = np.vstack((lower, upper))
-
-    # convert to matplotlib colormap
-    cmap = mpl.colors.ListedColormap(cmap, name="myColorMap", N=cmap.shape[0])
-
     # Retrieve calibrated axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(config["shotnum"], tstype, CCDsize)
+    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(config["shotnum"], tstype, config["D"]["CCDsize"])
 
     [elecData, ionData, xlab, shift_zero] = loadData(
         config["shotnum"], shotDay, tstype, magE, config["D"]["extraoptions"]
@@ -180,24 +163,18 @@ def fit(config):
         ionData_bsub = ionData
 
     # Assign lineout locations
-    if config["lineoutloc"]["type"] == "ps":
+    # Convert lineout locations to pixel
+    if config["lineoutloc"]["type"] == "ps" or config["lineoutloc"]["type"] == "um":
         LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["lineoutloc"]["val"]]
-        LineoutPixelI = LineoutPixelE
-
-    elif config["lineoutloc"]["type"] == "um":  # [char(hex2dec('03bc')) 'm']:
-        LineoutPixelE = [np.argmin(abs(axisxE - loc)) for loc in config["lineoutloc"]["val"]]
-        LineoutPixelI = LineoutPixelE
-
     elif config["lineoutloc"]["type"] == "pixel":
         LineoutPixelE = config["lineoutloc"]["val"]
-        LineoutPixelI = LineoutPixelE
+    LineoutPixelI = LineoutPixelE
+
 
     if config["bgloc"]["type"] == "ps":
         BackgroundPixel = np.argmin(abs(axisxE - config["bgloc"]["val"]))
-
     elif config["bgloc"]["type"] == "pixel":
         BackgroundPixel = config["bgloc"]["val"]
-
     elif config["bgloc"]["type"] == "auto":
         BackgroundPixel = LineoutPixelE + 100
 
@@ -223,12 +200,15 @@ def fit(config):
             np.convolve(LineoutTSI[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
         ]  # was divided by 10 for some reason (removed 8-9-22)
 
+    
     if config["bgshot"]["type"] == "Fit":
         if config["D"]["extraoptions"]["load_ele_spec"]:
             if tstype == 1:
                 [BGele, _, _, _] = loadData(
                     config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"]
                 )
+                BGele = correctThroughput(BGele, tstype, axisyE, config["shotnum"])
+                BGele = conv2(BGele, np.ones([5, 5]) / 25, mode="same") #1/27 for H2 and 1/24 for kr
                 xx = np.arange(1024)
 
                 def quadbg(x):
@@ -246,6 +226,8 @@ def fit(config):
                 ) * BGele
                 BGele = newBG
                 elecData_bsub = elecData - newBG
+                print("ran polyfit")
+                print(corrfactor.x)
             else:
                 # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
                 bgfitx = np.hstack([np.arange(100, 200), np.arange(800, 1023)])
@@ -277,7 +259,7 @@ def fit(config):
                     #LineoutTSE_smooth[i] = LineoutTSE_smooth[i] - rat11(np.arange(1024), *rat1bg)
                     #the behaviour of this fit is different now when a BG shot is included (no effect without a BG shot
                     LineoutBGE.append(rat11(np.arange(1024), *rat1bg)[None,:])
-                print(np.shape(LineoutBGE))
+                #print(np.shape(LineoutBGE))
 
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
@@ -298,27 +280,30 @@ def fit(config):
     if config["D"]["extraoptions"]["load_ele_spec"]:
         noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
-        #This model is in conflict with the fitted background since they both affect the data but are performed on different data
-        def exp2(x, a, b, c, d):
-            return a * np.exp(-b * x) + c * np.exp(-d * x)
+        
+        if tstype != 1:
+            #This model is in conflict with the fitted background since they both affect the data but are performed on different data
+            def exp2(x, a, b, c, d):
+                return a * np.exp(-b * x) + c * np.exp(-d * x)
 
-        bgfitx = np.hstack(
-            [np.arange(250, 480), np.arange(540, 900)]
-        )  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
-        plt.plot(bgfitx,noiseE[bgfitx])
-        #[expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
-        [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[200, 0.001, 200, 0.001])
-        noiseE = bgscalingE * exp2(np.arange(1024), *expbg)
-        plt.plot(bgfitx,noiseE[bgfitx])
-        plt.plot(bgfitx,exp2(bgfitx,200,0.001,200,0.001))
-        plt.show()
+            bgfitx = np.hstack(
+                [np.arange(250, 480), np.arange(540, 900)]
+            )  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
+            plt.plot(bgfitx,noiseE[bgfitx])
+            #[expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
+            [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[200, 0.001, 200, 0.001])
+            noiseE = bgscalingE * exp2(np.arange(1024), *expbg)
+            plt.plot(bgfitx,noiseE[bgfitx])
+            plt.plot(bgfitx,exp2(bgfitx,200,0.001,200,0.001))
+            plt.show()
 
         # temporary constant addition to the background
         noiseE = noiseE + flatbg
         
         if 'BGele' in locals():
             LineoutBGE2 = [
-            np.mean(BGele[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1) for a in LineoutPixelI]
+            #np.mean(BGele[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1) for a in LineoutPixelI]
+                np.mean(BGele[:, a - config["dpixel"] : a + config["dpixel"]], axis=1) for a in LineoutPixelE]
             noiseE = noiseE + LineoutBGE2
         else:
             noiseE = noiseE * np.ones((len(LineoutPixelE),1))
@@ -327,6 +312,7 @@ def fit(config):
             noiseE = noiseE + LineoutBGE
 
     ## Plot data
+    cmap = TScmap()
     fig, ax = plt.subplots(1, 2, figsize=(16, 4))
     if config["D"]["extraoptions"]["load_ion_spec"]:
         imI = ax[1].imshow(

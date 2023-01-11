@@ -15,12 +15,12 @@ parameters:
         lb: 0.
         ub: 10.
     lam:
-        val: 524.0
+        val: 526.0
         active: True
         lb: 523.
         ub: 528.
     Te:
-        val: .5
+        val: .9
         active: True
         lb: 0.01
         ub: 3.
@@ -39,7 +39,7 @@ parameters:
         val: 40
         active: False
     ne:
-        val: .2
+        val: .5
         active: True
         lb: .001
         ub: 10.

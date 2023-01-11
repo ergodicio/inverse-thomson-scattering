@@ -9,14 +9,14 @@ from jax import jit
 #config.update('jax_disable_jit', True)
 
 def get_fit_model(config, xie, sa):
-    nonMaxwThomsonE_jax, _ = get_form_factor_fn(config["D"]["lamrangE"])
-    nonMaxwThomsonI_jax, _ = get_form_factor_fn(config["D"]["lamrangI"])
+    nonMaxwThomsonE_jax, _ = get_form_factor_fn(config["D"]["lamrangE"],config["D"]["npts"])
+    nonMaxwThomsonI_jax, _ = get_form_factor_fn(config["D"]["lamrangI"],config["D"]["npts"])
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], xie)
 
-    def fit_model(x):
+    def fit_model(x, sa_weights):
         # param_dict = copy.deepcopy(config)
         #print(x)
-
+        #print("sa_weights", jnp.shape(sa_weights))
         parameters = config["parameters"]
         i = 0
         for key in parameters.keys():
@@ -59,7 +59,7 @@ def get_fit_model(config, xie, sa):
             ThryI = jnp.mean(ThryI, axis=0)
             modlI = jnp.sum(ThryI * sa["weights"], axis=1)
         else:
-            modlI = []
+            modlI = 0
             lamAxisI = []
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
@@ -93,7 +93,7 @@ def get_fit_model(config, xie, sa):
 
             ThryE = jnp.real(ThryE)
             ThryE = jnp.mean(ThryE, axis=0)
-            modlE = jnp.sum(ThryE * sa["weights"], axis=1)
+            modlE = jnp.sum(ThryE * sa_weights, axis=1)
 
             # [modl,lamAx]=S2Signal(Thry,lamAxis,D);
 
@@ -127,7 +127,7 @@ def get_fit_model(config, xie, sa):
                     #     ]
                     # )
         else:
-            modlE = []
+            modlE = 0
             lamAxisE = []
 
         return modlE, modlI, lamAxisE, lamAxisI, parameters

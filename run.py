@@ -11,7 +11,8 @@ from jax import config
 
 config.update("jax_enable_x64", True)
 
-from inverse_thomson_scattering import datafitter
+
+from inverse_thomson_scattering import datafitter_new
 
 
 def log_params(cfg):
@@ -69,7 +70,7 @@ if __name__ == "__main__":
             bgshot = {"type": "Fit", "val": 94477}
             #lnout = {"type": "ps", "val": slices}
             #lnout = {"type": "um", "val": slices}
-            lnout = {"type": "pixel", "val": [500]}
+            lnout = {"type": "pixel", "val": [500, 600]}
             bglnout = {"type": "pixel", "val": 900}
             
             config["parameters"]["Te"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.2,.4,.5,.55,.6,.6,.65,.65,.65,.65,.65,.5,.4,.4,.3,.3,.25,.2,.2]))
@@ -90,12 +91,13 @@ if __name__ == "__main__":
                 config["bgloc"] = bglnout
                 config["num_cores"] = int(mp.cpu_count())
 
-                config = {**config, **dict(shotnum=94475, bgscale=1, dpixel=2)}
+                config = {**config, **dict(shotnum=94475, dpixel=2)}
+                #config = {**config, **dict(shotnum=101675, dpixel=2)}
 
                 mlflow.log_params({"num_slices": len(slices)})
                 t0 = time.time()
                 # mlflow.log_params(flatten(config))
-                fit_results = datafitter.fit(config=config)
+                fit_results = datafitter_new.fit(config=config)
                 metrics_dict = {"datafitter_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
                 mlflow.log_metrics(metrics=metrics_dict)
                 mlflow.set_tag("status", "completed")
