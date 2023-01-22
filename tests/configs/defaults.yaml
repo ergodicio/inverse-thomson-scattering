@@ -107,13 +107,13 @@ optimizer:
     x_norm: True
     grad_method: AD
     batch_size: 2
-    num_epochs: 5
-    learning_rate: 1.0e-3
+    num_epochs: 100
+    learning_rate: 5.0e-3
 
 
 nn:
     use: True
-    conv_filters: 64|64|64|64
+    conv_filters: 64|32|32 # 64|64|32|32|32
     linear_widths: 32|16
 
 

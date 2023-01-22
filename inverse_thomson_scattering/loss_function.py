@@ -115,7 +115,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
                 layers = []
 
                 for cc in convs:
-                    layers.append(hk.Conv1D(output_channels=cc, kernel_shape=3, stride=2))
+                    layers.append(hk.Conv1D(output_channels=cc, kernel_shape=3, stride=1))
                     layers.append(jax.nn.tanh)
 
                 layers.append(hk.Conv1D(1, 3))

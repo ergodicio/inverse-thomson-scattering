@@ -569,4 +569,6 @@ def fit(config):
 
         mlflow.log_artifacts(td)
 
+    return final_params
+
     # return final_params
