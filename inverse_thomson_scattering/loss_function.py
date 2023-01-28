@@ -155,7 +155,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
             self.crop_window = cfg["other"]["crop_window"]
 
         def initialize_params(self, batch):
-            if self.cfg["nn"]:
+            if self.cfg["nn"]["use"]:
                 all_params = self.ts_parameter_generator(batch[:, :, self.crop_window : -self.crop_window])
                 these_params = defaultdict(list)
                 for i_slice in range(self.batch_size):
@@ -170,16 +170,18 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
                 for param_name, param_config in self.cfg["parameters"].items():
                     these_params[param_name] = jnp.concatenate(these_params[param_name])
             else:
-                these_params = {}
+                these_params = defaultdict(list)
+                # for i_slice in range(self.batch_size):
+                # i = 0
                 for param_name, param_config in self.cfg["parameters"].items():
                     if param_config["active"]:
                         these_params[param_name] = hk.get_parameter(
                             param_name,
-                            shape=[1, 1],
+                            shape=[self.batch_size, 1],
                             init=hk.initializers.RandomUniform(minval=0, maxval=1),
                         )
                     else:
-                        these_params[param_name] = jnp.array(param_config["val"]).reshape((1, -1))
+                        these_params[param_name] = jnp.array(param_config["val"]).reshape((self.batch_size, -1))
 
             for param_name, param_config in self.cfg["parameters"].items():
                 if param_config["active"]:
