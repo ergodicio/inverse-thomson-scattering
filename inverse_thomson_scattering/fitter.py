@@ -108,7 +108,7 @@ def fit(config):
     """
 
     # prepare data
-    all_data, amps_list, units, xie, sa = prepare_data(config)
+    all_data, amps_list, units, velocity, sa = prepare_data(config)
     test_batch = {
         "data": all_data[: config["optimizer"]["batch_size"]],
         "amps": amps_list[: config["optimizer"]["batch_size"]],
@@ -116,7 +116,7 @@ def fit(config):
 
     # prepare optimizer / solver
     vg_loss_fn, array_loss_fn, init_weights, get_params = get_loss_function(
-        config, xie, sa, test_batch, units["norms"], units["shifts"]
+        config, velocity, sa, test_batch, units["norms"], units["shifts"]
     )
 
     if config["optimizer"]["method"] == "adam":
@@ -547,9 +547,9 @@ def prepare_data(config):
     parameters = config["parameters"]
 
     # Setup x0
-    xie = np.linspace(-7, 7, parameters["fe"]["length"])
+    velocity = np.linspace(-7, 7, parameters["fe"]["length"])
 
-    NumDistFunc = get_num_dist_func(parameters["fe"]["type"], xie)
+    NumDistFunc = get_num_dist_func(parameters["fe"]["type"], velocity)
     parameters["fe"]["val"] = np.log(NumDistFunc(parameters["m"]["val"]))
     parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
     parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
@@ -579,4 +579,4 @@ def prepare_data(config):
 
     all_data = np.concatenate(all_data)
     amps_list = np.concatenate(amps_list)
-    return all_data, amps_list, units, xie, sa
+    return all_data, amps_list, units, velocity, sa
