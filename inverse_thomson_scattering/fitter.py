@@ -8,10 +8,7 @@ import pandas
 import scipy.optimize as spopt
 import optax
 from jaxopt import OptaxSolver
-
-
 import mlflow
-
 from tqdm import trange
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.misc.load_ts_data import load_data
@@ -110,6 +107,143 @@ def fit(config):
 
     """
 
+    # prepare data
+    all_data, amps_list, units, xie, sa = prepare_data(config)
+    test_batch = {
+        "data": all_data[: config["optimizer"]["batch_size"]],
+        "amps": amps_list[: config["optimizer"]["batch_size"]],
+    }
+
+    # prepare optimizer / solver
+    vg_loss_fn, array_loss_fn, init_weights, get_params = get_loss_function(
+        config, xie, sa, test_batch, units["norms"], units["shifts"]
+    )
+
+    if config["optimizer"]["method"] == "adam":
+        opt = optax.adam(config["optimizer"]["learning_rate"])
+        solver = OptaxSolver(
+            opt=opt, fun=vg_loss_fn, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+        )
+    else:
+        raise NotImplementedError
+
+    batch_indices = np.arange(len(all_data))
+    weights = init_weights
+    opt_state = solver.init_state(weights, batch=test_batch)
+
+    # start train loop
+    t1 = time.time()
+    print("minimizing")
+    mlflow.set_tag("status", "minimizing")
+
+    epoch_loss = 1e19
+    best_loss = 1e16
+    for i_epoch in range(config["optimizer"]["num_epochs"]):
+        num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
+        np.random.shuffle(batch_indices)
+        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+        with trange(num_batches, unit="batch") as tbatch:
+            tbatch.set_description(f"Epoch {i_epoch+1}, Prev Epoch Loss {round(epoch_loss)}")
+            epoch_loss = 0.0
+            for i_batch in tbatch:
+                inds = batch_indices[i_batch]
+                batch = {"data": all_data[inds], "amps": amps_list[inds]}
+                weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
+
+                epoch_loss += opt_state.value
+                tbatch.set_postfix({"Prev Batch Loss": round(opt_state.value)})
+
+            epoch_loss /= num_batches
+            if epoch_loss < best_loss:
+                best_loss = epoch_loss
+                best_weights = weights
+
+            mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
+        batch_indices = batch_indices.flatten()
+
+    all_params = {}
+    for key in config["parameters"].keys():
+        if config["parameters"][key]["active"]:
+            all_params[key] = np.empty(0)
+
+    mlflow.log_metrics({"fit time": round(time.time() - t1, 2)})
+    final_params = postprocess(config, batch_indices, all_data, all_params, amps_list, best_weights, array_loss_fn)
+    return final_params
+
+
+def postprocess(config, batch_indices, all_data, all_params, amps_list, best_weights, array_loss_fn):
+    with tempfile.TemporaryDirectory() as td:
+        t1 = time.time()
+        batch_indices.sort()
+        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+        losses = np.zeros_like(batch_indices)
+        fits = np.zeros((all_data.shape[0], all_data.shape[2]))
+        for i_batch, inds in enumerate(batch_indices):
+            batch = {"data": all_data[inds], "amps": amps_list[inds]}
+            loss, [ThryE, _, params] = array_loss_fn(best_weights, batch)
+            losses[i_batch] = np.mean(loss, axis=1)
+            fits[inds] = ThryE
+            for k in all_params.keys():
+                all_params[k] = np.concatenate([all_params[k], np.squeeze(params[k])])
+
+        mlflow.log_metrics({"inference time": round(time.time() - t1, 2)})
+
+        losses = losses.flatten() / np.amax(all_data[:, 0, :], axis=-1)
+        loss_inds = losses.argsort()[::-1]
+
+        sorted_losses = losses[loss_inds]
+        sorted_fits = fits[loss_inds]
+        sorted_data = all_data[loss_inds]
+
+        num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
+
+        t1 = time.time()
+        os.makedirs(os.path.join(td, "worst"))
+        os.makedirs(os.path.join(td, "best"))
+
+        model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds)
+
+        mlflow.log_metrics({"plot time": round(time.time() - t1, 2)})
+
+        all_params["lineout"] = config["lineoutloc"]["val"]
+        final_params = pandas.DataFrame(all_params)
+        final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
+        mlflow.set_tag("status", "done plotting")
+        mlflow.log_artifacts(td)
+
+    return final_params
+
+
+def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds):
+    # make plots
+    for i in range(num_plots):
+        # plot model vs actual
+        titlestr = r"|Error|$^2$" + f" = {sorted_losses[i]}, line out # {config['lineoutloc']['val'][loss_inds[i]]}"
+        filename = f"loss={round(sorted_losses[i])}-lineout={config['lineoutloc']['val'][loss_inds[i]]}.png"
+        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
+        ax.plot(np.squeeze(sorted_data[i, 0, 256:-256]), label="Data")
+        ax.plot(np.squeeze(sorted_fits[i, 256:-256]), label="Fit")
+        ax.set_title(titlestr, fontsize=14)
+        ax.legend(fontsize=14)
+        ax.grid()
+        fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
+        plt.close(fig)
+
+        titlestr = (
+            r"|Error|$^2$" + f" = {sorted_losses[-1 - i]}, line out # {config['lineoutloc']['val'][loss_inds[-1 - i]]}"
+        )
+        filename = f"loss={round(sorted_losses[-1 - i])}-lineout={config['lineoutloc']['val'][loss_inds[-1 - i]]}.png"
+        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
+        ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")
+        ax.plot(np.squeeze(sorted_fits[-1 - i, 256:-256]), label="Fit")
+        ax.set_title(titlestr, fontsize=14)
+        ax.legend(fontsize=14)
+        ax.grid()
+        fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
+        plt.close(fig)
+
+
+def prepare_data(config):
     ## Persistents
     # used to prevent reloading and one time analysis (not sure if there is a way to do this in python, omitted for now)
     # persistent prevShot
@@ -321,6 +455,7 @@ def fit(config):
     if config["other"]["extraoptions"]["load_ele_spec"]:
         noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
+
         # print(noiseE)
         def exp2(x, a, b, c, d):
             return a * np.exp(-b * x) + c * np.exp(-d * x)
@@ -444,141 +579,4 @@ def fit(config):
 
     all_data = np.concatenate(all_data)
     amps_list = np.concatenate(amps_list)
-    test_batch = {
-        "data": all_data[: config["optimizer"]["batch_size"]],
-        "amps": amps_list[: config["optimizer"]["batch_size"]],
-    }
-
-    vg_loss_fn, array_loss_fn, init_weights, get_params = get_loss_function(
-        config, xie, sa, test_batch, units["norms"], units["shifts"]
-    )
-
-    # opt_init, opt_update = optax.chain(
-    #     # Set the parameters of Adam. Note the learning_rate is not here.
-    #     optax.scale_by_adam(b1=0.9, b2=0.999, eps=1e-8),
-    #     # Put a minus sign to *minimise* the loss.
-    #     optax.scale(-config["optimizer"]["learning_rate"]),
-    # )
-    # opt_state = opt_init(weights)
-
-    if config["optimizer"]["method"] == "adam":
-        opt = optax.adam(config["optimizer"]["learning_rate"])
-        solver = OptaxSolver(
-            opt=opt, fun=vg_loss_fn, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
-        )
-    else:
-        raise NotImplementedError
-
-    batch_indices = np.arange(len(all_data))
-    weights = init_weights
-    opt_state = solver.init_state(weights, batch=test_batch)
-
-    t1 = time.time()
-    print("minimizing")
-    mlflow.set_tag("status", "minimizing")
-
-    epoch_loss = 1e19
-    best_loss = 1e16
-    for i_epoch in range(config["optimizer"]["num_epochs"]):
-        num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
-        np.random.shuffle(batch_indices)
-        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-        with trange(num_batches, unit="batch") as tbatch:
-            tbatch.set_description(f"Epoch {i_epoch+1}, Prev Epoch Loss {round(epoch_loss)}")
-            epoch_loss = 0.0
-            for i_batch in tbatch:
-                inds = batch_indices[i_batch]
-                batch = {"data": all_data[inds], "amps": amps_list[inds]}
-                weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
-
-                epoch_loss += opt_state.value
-                tbatch.set_postfix({"Prev Batch Loss": round(opt_state.value)})
-
-            epoch_loss /= num_batches
-            if epoch_loss < best_loss:
-                best_loss = epoch_loss
-                best_weights = weights
-
-            mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
-        batch_indices = batch_indices.flatten()
-
-    all_params = {}
-    for key in config["parameters"].keys():
-        if config["parameters"][key]["active"]:
-            all_params[key] = np.empty(0)
-
-    mlflow.log_metrics({"fit time": round(time.time() - t1, 2)})
-    final_params = postprocess(config, batch_indices, all_data, all_params, amps_list, best_weights, array_loss_fn)
-    return final_params
-
-
-def postprocess(config, batch_indices, all_data, all_params, amps_list, best_weights, array_loss_fn):
-    with tempfile.TemporaryDirectory() as td:
-        t1 = time.time()
-        batch_indices.sort()
-        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-        losses = np.zeros_like(batch_indices)
-        fits = np.zeros((all_data.shape[0], all_data.shape[2]))
-        for i_batch, inds in enumerate(batch_indices):
-            batch = {"data": all_data[inds], "amps": amps_list[inds]}
-            loss, [ThryE, _, params] = array_loss_fn(best_weights, batch)
-            losses[i_batch] = np.mean(loss, axis=1)
-            fits[inds] = ThryE
-            for k in all_params.keys():
-                all_params[k] = np.concatenate([all_params[k], np.squeeze(params[k])])
-
-        mlflow.log_metrics({"inference time": round(time.time() - t1, 2)})
-
-        losses = losses.flatten() / np.amax(all_data[:, 0, :], axis=-1)
-        loss_inds = losses.argsort()[::-1]
-
-        sorted_losses = losses[loss_inds]
-        sorted_fits = fits[loss_inds]
-        sorted_data = all_data[loss_inds]
-
-        num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
-
-        t1 = time.time()
-        os.makedirs(os.path.join(td, "worst"))
-        os.makedirs(os.path.join(td, "best"))
-
-        model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds)
-
-        mlflow.log_metrics({"plot time": round(time.time() - t1, 2)})
-
-        all_params["lineout"] = config["lineoutloc"]["val"]
-        final_params = pandas.DataFrame(all_params)
-        final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
-        mlflow.set_tag("status", "done plotting")
-        mlflow.log_artifacts(td)
-
-    return final_params
-
-
-def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds):
-    # make plots
-    for i in range(num_plots):
-        # plot model vs actual
-        titlestr = r"|Error|$^2$" + f" = {sorted_losses[i]}, line out # {config['lineoutloc']['val'][loss_inds[i]]}"
-        filename = f"loss={round(sorted_losses[i])}-lineout={config['lineoutloc']['val'][loss_inds[i]]}.png"
-        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-        ax.plot(np.squeeze(sorted_data[i, 0, 256:-256]), label="Data")
-        ax.plot(np.squeeze(sorted_fits[i, 256:-256]), label="Fit")
-        ax.set_title(titlestr, fontsize=14)
-        ax.legend(fontsize=14)
-        ax.grid()
-        fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
-        plt.close(fig)
-
-        titlestr = (
-            r"|Error|$^2$" + f" = {sorted_losses[-1 - i]}, line out # {config['lineoutloc']['val'][loss_inds[-1 - i]]}"
-        )
-        filename = f"loss={round(sorted_losses[-1 - i])}-lineout={config['lineoutloc']['val'][loss_inds[-1 - i]]}.png"
-        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-        ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")
-        ax.plot(np.squeeze(sorted_fits[-1 - i, 256:-256]), label="Fit")
-        ax.set_title(titlestr, fontsize=14)
-        ax.legend(fontsize=14)
-        ax.grid()
-        fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
-        plt.close(fig)
+    return all_data, amps_list, units, xie, sa
