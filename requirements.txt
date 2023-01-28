@@ -13,3 +13,4 @@ flatdict
 dm-haiku
 optax
 tqdm
+jaxopt
