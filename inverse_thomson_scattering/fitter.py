@@ -508,7 +508,11 @@ def fit(config):
             all_params[key] = np.empty(0)
 
     mlflow.log_metrics({"fit time": round(time.time() - t1, 2)})
+    final_params = postprocess(config, batch_indices, all_data, all_params, amps_list, best_weights, array_loss_fn)
+    return final_params
 
+
+def postprocess(config, batch_indices, all_data, all_params, amps_list, best_weights, array_loss_fn):
     with tempfile.TemporaryDirectory() as td:
         t1 = time.time()
         batch_indices.sort()
@@ -537,51 +541,44 @@ def fit(config):
         t1 = time.time()
         os.makedirs(os.path.join(td, "worst"))
         os.makedirs(os.path.join(td, "best"))
-        # make plots
-        for i in range(num_plots):
-            # plot model vs actual
-            titlestr = r"|Error|$^2$" + f" = {sorted_losses[i]}, line out # {config['lineoutloc']['val'][loss_inds[i]]}"
-            filename = f"loss={round(sorted_losses[i])}-lineout={config['lineoutloc']['val'][loss_inds[i]]}.png"
-            fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-            ax.plot(np.squeeze(sorted_data[i, 0, 256:-256]), label="Data")
-            ax.plot(np.squeeze(sorted_fits[i, 256:-256]), label="Fit")
-            ax.set_title(titlestr, fontsize=14)
-            ax.legend(fontsize=14)
-            ax.grid()
-            fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
-            plt.close(fig)
 
-            titlestr = (
-                r"|Error|$^2$" + f" = {sorted_losses[-1-i]}, line out # {config['lineoutloc']['val'][loss_inds[-1-i]]}"
-            )
-            filename = f"loss={round(sorted_losses[-1-i])}-lineout={config['lineoutloc']['val'][loss_inds[-1-i]]}.png"
-            fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-            ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")
-            ax.plot(np.squeeze(sorted_fits[-1 - i, 256:-256]), label="Fit")
-            ax.set_title(titlestr, fontsize=14)
-            ax.legend(fontsize=14)
-            ax.grid()
-            fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
-            plt.close(fig)
+        model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds)
 
         mlflow.log_metrics({"plot time": round(time.time() - t1, 2)})
 
         all_params["lineout"] = config["lineoutloc"]["val"]
         final_params = pandas.DataFrame(all_params)
         final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
-        # final_params = {}
-        # # get only learned parameters
-        # for param_name, param_config in config["parameters"].items():
-        #     if param_config["active"]:
-        #         final_params[param_name] = [float(val) for val in temp_params[param_name]]
-
         mlflow.set_tag("status", "done plotting")
-
-        # with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
-        #     yaml.dump(final_params, fi)
-
         mlflow.log_artifacts(td)
 
     return final_params
 
-    # return final_params
+
+def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds):
+    # make plots
+    for i in range(num_plots):
+        # plot model vs actual
+        titlestr = r"|Error|$^2$" + f" = {sorted_losses[i]}, line out # {config['lineoutloc']['val'][loss_inds[i]]}"
+        filename = f"loss={round(sorted_losses[i])}-lineout={config['lineoutloc']['val'][loss_inds[i]]}.png"
+        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
+        ax.plot(np.squeeze(sorted_data[i, 0, 256:-256]), label="Data")
+        ax.plot(np.squeeze(sorted_fits[i, 256:-256]), label="Fit")
+        ax.set_title(titlestr, fontsize=14)
+        ax.legend(fontsize=14)
+        ax.grid()
+        fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
+        plt.close(fig)
+
+        titlestr = (
+            r"|Error|$^2$" + f" = {sorted_losses[-1 - i]}, line out # {config['lineoutloc']['val'][loss_inds[-1 - i]]}"
+        )
+        filename = f"loss={round(sorted_losses[-1 - i])}-lineout={config['lineoutloc']['val'][loss_inds[-1 - i]]}.png"
+        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
+        ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")
+        ax.plot(np.squeeze(sorted_fits[-1 - i, 256:-256]), label="Fit")
+        ax.set_title(titlestr, fontsize=14)
+        ax.legend(fontsize=14)
+        ax.grid()
+        fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
+        plt.close(fig)

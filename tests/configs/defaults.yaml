@@ -105,7 +105,6 @@ optimizer:
     # use adam for nn / stochastic gradient descent
     # use L-BFGS-B for full batch / parameter learning
     # although adam will work here too
-
     method: adam #L-BFGS-B
     hessian: False
     y_norm: False

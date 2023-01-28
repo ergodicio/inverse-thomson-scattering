@@ -7,7 +7,6 @@ import jax
 from jax import numpy as jnp
 
 from jax import jit, value_and_grad
-from jax.flatten_util import ravel_pytree as jax_ravel_pytree
 import haiku as hk
 import numpy as np
 from inverse_thomson_scattering.generate_spectra import get_forward_pass
@@ -171,8 +170,6 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
                     these_params[param_name] = jnp.concatenate(these_params[param_name])
             else:
                 these_params = defaultdict(list)
-                # for i_slice in range(self.batch_size):
-                # i = 0
                 for param_name, param_config in self.cfg["parameters"].items():
                     if param_config["active"]:
                         these_params[param_name] = hk.get_parameter(
