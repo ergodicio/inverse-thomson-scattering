@@ -15,6 +15,7 @@ dependencies:
       - --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
       - jaxlib==0.3.24+cuda11.cudnn82
       - jax==0.3.24
+      - jaxopt
       - numpy
       - scipy
       - matplotlib

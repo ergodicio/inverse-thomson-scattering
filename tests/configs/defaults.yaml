@@ -81,7 +81,8 @@ parameters:
         val: []
         active: False
 
-D:
+other:
+    crop_window: 256
     active: False
     BinWidth: 10
     NumBinInRng: 0
@@ -101,7 +102,7 @@ D:
     iawfilter: [1, 4, 24, 528]
     
 optimizer:
-    method: L-BFGS-B
+    method: adam #L-BFGS-B
     hessian: False
     y_norm: False
     x_norm: True
@@ -109,7 +110,6 @@ optimizer:
     batch_size: 2
     num_epochs: 100
     learning_rate: 5.0e-3
-
 
 nn:
     use: True

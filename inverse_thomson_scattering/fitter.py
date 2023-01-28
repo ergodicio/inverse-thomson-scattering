@@ -7,6 +7,8 @@ import numpy as np
 import pandas
 import scipy.optimize as spopt
 import optax
+from jaxopt import OptaxSolver
+
 
 import mlflow
 
@@ -114,7 +116,7 @@ def fit(config):
     ## Hard code toggles, locations and values
     # these should only be changed if something changes in the experimental setup or data is moved around
 
-    tstype = config["D"]["extraoptions"]["spectype"]  # 1 for ARTS, 2 for TRTS, 3 for SRTS
+    tstype = config["other"]["extraoptions"]["spectype"]  # 1 for ARTS, 2 for TRTS, 3 for SRTS
 
     # lines 75 through 85 can likely be moved to the input decks
     CCDsize = [1024, 1024]  # dimensions of the CCD chip as read
@@ -177,19 +179,19 @@ def fit(config):
     #    shift_zero = prevShot.shift_zero;
 
     [elecData, ionData, xlab, shift_zero] = load_data(
-        config["shotnum"], shotDay, tstype, magE, config["D"]["extraoptions"]
+        config["shotnum"], shotDay, tstype, magE, config["other"]["extraoptions"]
     )
 
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
-    if not config["D"]["extraoptions"]["load_ion_spec"]:
-        config["D"]["extraoptions"]["fit_IAW"] = 0
+    if not config["other"]["extraoptions"]["load_ion_spec"]:
+        config["other"]["extraoptions"]["fit_IAW"] = 0
         print("IAW data not loaded, omitting IAW fit")
-    if not config["D"]["extraoptions"]["load_ele_spec"]:
-        config["D"]["extraoptions"]["fit_EPWb"] = 0
-        config["D"]["extraoptions"]["fit_EPWr"] = 0
+    if not config["other"]["extraoptions"]["load_ele_spec"]:
+        config["other"]["extraoptions"]["fit_EPWb"] = 0
+        config["other"]["extraoptions"]["fit_EPWr"] = 0
         print("EPW data not loaded, omitting EPW fit")
 
-    if config["D"]["extraoptions"]["load_ele_spec"]:
+    if config["other"]["extraoptions"]["load_ele_spec"]:
         elecData = correct_throughput(elecData, tstype, axisyE)
     # prevShot.config["shotnum"] = config["shotnum"];
     # prevShot.elecData = elecData;
@@ -199,10 +201,12 @@ def fit(config):
 
     # Background Shot subtraction
     if config["bgshot"]["type"] == "Shot":
-        [BGele, BGion, _, _] = load_data(config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"])
-        if config["D"]["extraoptions"]["load_ion_spec"]:
+        [BGele, BGion, _, _] = load_data(
+            config["bgshot"]["val"], shotDay, tstype, magE, config["other"]["extraoptions"]
+        )
+        if config["other"]["extraoptions"]["load_ion_spec"]:
             ionData_bsub = ionData - conv2(BGion, np.ones([5, 3]) / 15, mode="same")
-        if config["D"]["extraoptions"]["load_ele_spec"]:
+        if config["other"]["extraoptions"]["load_ele_spec"]:
             BGele = correct_throughput(BGele, tstype, axisyE)
             if tstype == 1:
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5]) / 25, mode="same")
@@ -238,7 +242,7 @@ def fit(config):
     span = 2 * config["dpixel"] + 1
     # (span must be odd)
 
-    if config["D"]["extraoptions"]["load_ele_spec"]:
+    if config["other"]["extraoptions"]["load_ele_spec"]:
         LineoutTSE = [
             np.mean(elecData_bsub[:, a - config["dpixel"] : a + config["dpixel"]], axis=1) for a in LineoutPixelE
         ]
@@ -246,7 +250,7 @@ def fit(config):
             np.convolve(LineoutTSE[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
         ]
 
-    if config["D"]["extraoptions"]["load_ion_spec"]:
+    if config["other"]["extraoptions"]["load_ion_spec"]:
         LineoutTSI = [
             np.mean(ionData_bsub[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1)
             for a in LineoutPixelI
@@ -256,10 +260,10 @@ def fit(config):
         ]  # was divided by 10 for some reason (removed 8-9-22)
 
     if config["bgshot"]["type"] == "Fit":
-        if config["D"]["extraoptions"]["load_ele_spec"]:
+        if config["other"]["extraoptions"]["load_ele_spec"]:
             if tstype == 1:
                 [BGele, _, _, _] = load_data(
-                    config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"]
+                    config["bgshot"]["val"], shotDay, tstype, magE, config["other"]["extraoptions"]
                 )
                 xx = np.arange(1024)
 
@@ -307,14 +311,14 @@ def fit(config):
 
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
-    if config["D"]["extraoptions"]["load_ion_spec"]:
+    if config["other"]["extraoptions"]["load_ion_spec"]:
         noiseI = np.mean(ionData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseI = np.convolve(noiseI, np.ones(span) / span, "same")
         bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
         noiseI = np.mean(noiseI[bgfitx])
         noiseI = np.ones(1024) * bgscalingI * noiseI
 
-    if config["D"]["extraoptions"]["load_ele_spec"]:
+    if config["other"]["extraoptions"]["load_ele_spec"]:
         noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
         # print(noiseE)
@@ -337,7 +341,7 @@ def fit(config):
 
     ## Plot data
     # fig, ax = plt.subplots(1, 2, figsize=(16, 4))
-    # if config["D"]["extraoptions"]["load_ion_spec"]:
+    # if config["other"]["extraoptions"]["load_ion_spec"]:
     #     imI = ax[1].imshow(
     #         conv2(ionData_bsub, np.ones([5, 3]) / 15, mode="same"),
     #         cmap,
@@ -360,7 +364,7 @@ def fit(config):
     #         [axisxI[BackgroundPixel] - shift_zero, axisxI[BackgroundPixel] - shift_zero], [axisyI[0], axisyI[-1]], "k"
     #     )
     #
-    # if config["D"]["extraoptions"]["load_ele_spec"]:
+    # if config["other"]["extraoptions"]["load_ele_spec"]:
     #     imE = ax[0].imshow(
     #         conv2(elecData_bsub, np.ones([5, 3]) / 15, mode="same"),
     #         cmap,
@@ -384,7 +388,7 @@ def fit(config):
     #     )
 
     # Normalize Data before fitting
-    if config["D"]["extraoptions"]["load_ion_spec"]:
+    if config["other"]["extraoptions"]["load_ion_spec"]:
         noiseI = noiseI / gain
         LineoutTSI_norm = [LineoutTSI_smooth[i] / gain for i, _ in enumerate(LineoutPixelI)]
         LineoutTSI_norm = LineoutTSI_norm - noiseI  # new 6-29-20
@@ -392,7 +396,7 @@ def fit(config):
     else:
         ampI = 1
 
-    if config["D"]["extraoptions"]["load_ele_spec"]:
+    if config["other"]["extraoptions"]["load_ele_spec"]:
         noiseE = noiseE / gain
         LineoutTSE_norm = [LineoutTSE_smooth[i] / gain for i, _ in enumerate(LineoutPixelE)]
         LineoutTSE_norm = LineoutTSE_norm - noiseE  # new 6-29-20
@@ -400,10 +404,10 @@ def fit(config):
     else:
         ampE = 1
 
-    config["D"]["PhysParams"]["widIRF"] = stddev
-    config["D"]["lamrangE"] = [axisyE[0], axisyE[-2]]
-    config["D"]["lamrangI"] = [axisyI[0], axisyI[-2]]
-    config["D"]["npts"] = (len(LineoutTSE_norm) - 1) * 20
+    config["other"]["PhysParams"]["widIRF"] = stddev
+    config["other"]["lamrangE"] = [axisyE[0], axisyE[-2]]
+    config["other"]["lamrangI"] = [axisyI[0], axisyI[-2]]
+    config["other"]["npts"] = (len(LineoutTSE_norm) - 1) * 20
 
     parameters = config["parameters"]
 
@@ -422,13 +426,13 @@ def fit(config):
     # run fitting code for each lineout
     for i, _ in enumerate(config["lineoutloc"]["val"]):
         # this probably needs to be done differently
-        if config["D"]["extraoptions"]["load_ion_spec"] and config["D"]["extraoptions"]["load_ele_spec"]:
+        if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
             data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
             amps = [ampE[i], ampI[i]]
-        elif config["D"]["extraoptions"]["load_ion_spec"]:
+        elif config["other"]["extraoptions"]["load_ion_spec"]:
             data = np.vstack((LineoutTSI_norm[i], LineoutTSI_norm[i]))
             amps = [ampE, ampI[i]]
-        elif config["D"]["extraoptions"]["load_ele_spec"]:
+        elif config["other"]["extraoptions"]["load_ele_spec"]:
             data = np.vstack((LineoutTSE_norm[i], LineoutTSE_norm[i]))
             amps = [ampE[i], ampI]
         else:
@@ -449,22 +453,31 @@ def fit(config):
         config, xie, sa, test_batch, units["norms"], units["shifts"]
     )
 
-    opt_init, opt_update = optax.chain(
-        # Set the parameters of Adam. Note the learning_rate is not here.
-        optax.scale_by_adam(b1=0.9, b2=0.999, eps=1e-8),
-        # Put a minus sign to *minimise* the loss.
-        optax.scale(-config["optimizer"]["learning_rate"]),
-    )
+    # opt_init, opt_update = optax.chain(
+    #     # Set the parameters of Adam. Note the learning_rate is not here.
+    #     optax.scale_by_adam(b1=0.9, b2=0.999, eps=1e-8),
+    #     # Put a minus sign to *minimise* the loss.
+    #     optax.scale(-config["optimizer"]["learning_rate"]),
+    # )
+    # opt_state = opt_init(weights)
+
+    if config["optimizer"]["method"] == "adam":
+        opt = optax.adam(config["optimizer"]["learning_rate"])
+        solver = OptaxSolver(
+            opt=opt, fun=vg_loss_fn, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+        )
+    else:
+        raise NotImplementedError
 
     batch_indices = np.arange(len(all_data))
     weights = init_weights
-    opt_state = opt_init(weights)
+    opt_state = solver.init_state(weights, batch=test_batch)
 
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
 
-    epoch_loss = 0.0
+    epoch_loss = 1e19
     best_loss = 1e16
     for i_epoch in range(config["optimizer"]["num_epochs"]):
         num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
@@ -474,18 +487,18 @@ def fit(config):
             tbatch.set_description(f"Epoch {i_epoch+1}, Prev Epoch Loss {round(epoch_loss)}")
             epoch_loss = 0.0
             for i_batch in tbatch:
-                # for i_batch, inds in enumerate(batch_indices):
                 inds = batch_indices[i_batch]
                 batch = {"data": all_data[inds], "amps": amps_list[inds]}
-                (loss, [ThryE, e_data, params]), grads = vg_loss_fn(weights, batch)
-                if loss < best_loss:
-                    best_loss = loss
-                    best_weights = weights
-                epoch_loss += loss
-                tbatch.set_postfix({"Prev Batch Loss": round(loss)})
-                updates, opt_state = opt_update(grads, opt_state, weights)
-                weights = optax.apply_updates(weights, updates)
+                weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
+
+                epoch_loss += opt_state.value
+                tbatch.set_postfix({"Prev Batch Loss": round(opt_state.value)})
+
             epoch_loss /= num_batches
+            if epoch_loss < best_loss:
+                best_loss = epoch_loss
+                best_weights = weights
+
             mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
         batch_indices = batch_indices.flatten()
 

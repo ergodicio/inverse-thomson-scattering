@@ -58,9 +58,9 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
     amp2 = config["parameters"]["amp2"]["val"]
     amp3 = config["parameters"]["amp3"]["val"]
 
-    stddev = config["D"]["PhysParams"]["widIRF"]
+    stddev = config["other"]["PhysParams"]["widIRF"]
 
-    if config["D"]["extraoptions"]["load_ion_spec"]:
+    if config["other"]["extraoptions"]["load_ion_spec"]:
         originI = (max(lamAxisI) + min(lamAxisI)) / 2  # Conceptual_origin so the convolution donsn't shift the signal
         inst_funcI = np.squeeze(
             (1 / (stddev[1] * np.sqrt(2 * np.pi))) * np.exp(-((lamAxisI - originI) ** 2) / (2 * (stddev[1]) ** 2))
@@ -69,11 +69,11 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
         ThryI = (max(modlI) / max(ThryI)) * ThryI
         ThryI = np.average(ThryI.reshape(1024, -1), axis=1)
 
-        if config["D"]["PhysParams"]["norm"] == 0:
+        if config["other"]["PhysParams"]["norm"] == 0:
             lamAxisI = np.average(lamAxisI.reshape(1024, -1), axis=1)
             ThryI = amp3 * amps[1] * ThryI / max(ThryI)
 
-    if config["D"]["extraoptions"]["load_ele_spec"]:
+    if config["other"]["extraoptions"]["load_ele_spec"]:
         originE = (max(lamAxisE) + min(lamAxisE)) / 2  # Conceptual_origin so the convolution donsn't shift the signal
         inst_funcE = np.squeeze(
             (1 / (stddev[0] * np.sqrt(2 * np.pi))) * np.exp(-((lamAxisE - originE) ** 2) / (2 * (stddev[0]) ** 2))
@@ -81,18 +81,18 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
         ThryE = np.convolve(modlE, inst_funcE, "same")
         ThryE = (max(modlE) / max(ThryE)) * ThryE
 
-        if config["D"]["PhysParams"]["norm"] > 0:
+        if config["other"]["PhysParams"]["norm"] > 0:
             ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam] / max(ThryE[lamAxisE < lam]))
             ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam] / max(ThryE[lamAxisE > lam]))
 
         ThryE = np.average(ThryE.reshape(1024, -1), axis=1)
-        if config["D"]["PhysParams"]["norm"] == 0:
+        if config["other"]["PhysParams"]["norm"] == 0:
             lamAxisE = np.average(lamAxisE.reshape(1024, -1), axis=1)
             ThryE = amps[0] * ThryE / max(ThryE)
             ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam])
             ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam])
 
-    if config["D"]["extraoptions"]["spectype"] == 1:
+    if config["other"]["extraoptions"]["spectype"] == 1:
         print("colorplot still needs to be written")
         # Write Colorplot
         # Thryinit=ArtemisModel(config["parameters"],xie,scaterangs,x0,weightMatrix,...
@@ -118,7 +118,7 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
     #    caxis([-8000 8000]);
     # end
     else:
-        if config["D"]["extraoptions"]["load_ion_spec"]:
+        if config["other"]["extraoptions"]["load_ion_spec"]:
             LinePlots(
                 lamAxisI,
                 np.vstack((data[1, :], ThryI)),
@@ -129,7 +129,7 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
             )
             ax[0].set_xlim([525, 528])
 
-        if config["D"]["extraoptions"]["load_ele_spec"]:
+        if config["other"]["extraoptions"]["load_ele_spec"]:
             LinePlots(
                 lamAxisE,
                 np.vstack((data[0, :], ThryE)),
@@ -141,16 +141,16 @@ def plotState(x, config, amps, xie, sas, data, fitModel2, fig, ax):
             ax[1].set_xlim([450, 630])
 
     chisq = 0
-    if config["D"]["extraoptions"]["fit_IAW"]:
+    if config["other"]["extraoptions"]["fit_IAW"]:
         #    chisq=chisq+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
         chisq = chisq + sum((data[1, :] - ThryI) ** 2)
 
-    if config["D"]["extraoptions"]["fit_EPWb"]:
+    if config["other"]["extraoptions"]["fit_EPWb"]:
         chisq = chisq + sum(
             (data[0, (lamAxisE > 410) & (lamAxisE < 510)] - ThryE[(lamAxisE > 410) & (lamAxisE < 510)]) ** 2
         )
 
-    if config["D"]["extraoptions"]["fit_EPWr"]:
+    if config["other"]["extraoptions"]["fit_EPWr"]:
         chisq = chisq + sum(
             (data[0, (lamAxisE > 540) & (lamAxisE < 680)] - ThryE[(lamAxisE > 540) & (lamAxisE < 680)]) ** 2
         )

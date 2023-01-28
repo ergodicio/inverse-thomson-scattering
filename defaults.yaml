@@ -81,7 +81,8 @@ parameters:
         val: []
         active: False
 
-D:
+other:
+    crop_window: 256
     active: False
     BinWidth: 10
     NumBinInRng: 0

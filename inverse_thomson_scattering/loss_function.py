@@ -29,7 +29,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
     """
     forward_pass = get_forward_pass(config, xie, sas, backend="haiku")
     lam = config["parameters"]["lam"]["val"]
-    stddev = config["D"]["PhysParams"]["widIRF"]
+    stddev = config["other"]["PhysParams"]["widIRF"]
 
     vmap = partial(hk.vmap, split_rng=False)
 
@@ -43,7 +43,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
         ThryI = (jnp.amax(modlI) / jnp.amax(ThryI)) * ThryI
         ThryI = jnp.average(ThryI.reshape(1024, -1), axis=1)
 
-        if config["D"]["PhysParams"]["norm"] == 0:
+        if config["other"]["PhysParams"]["norm"] == 0:
             lamAxisI = jnp.average(lamAxisI.reshape(1024, -1), axis=1)
             ThryI = TSins["amp3"]["val"] * amps[1] * ThryI / jnp.amax(ThryI)
             lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
@@ -60,7 +60,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
         ThryE = jnp.convolve(modlE, inst_funcE, "same")
         ThryE = (jnp.amax(modlE) / jnp.amax(ThryE)) * ThryE
 
-        if config["D"]["PhysParams"]["norm"] > 0:
+        if config["other"]["PhysParams"]["norm"] > 0:
             ThryE = jnp.where(
                 lamAxisE < lam,
                 TSins["amp1"] * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
@@ -68,7 +68,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
             )
 
         ThryE = jnp.average(ThryE.reshape(1024, -1), axis=1)
-        if config["D"]["PhysParams"]["norm"] == 0:
+        if config["other"]["PhysParams"]["norm"] == 0:
             lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
             ThryE = amps[0] * ThryE / jnp.amax(ThryE)
             ThryE = jnp.where(lamAxisE < lam, TSins["amp1"]["val"] * ThryE, TSins["amp2"]["val"] * ThryE)
@@ -78,14 +78,14 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
     @jit
     def postprocess(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
 
-        if config["D"]["extraoptions"]["load_ion_spec"]:
+        if config["other"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
         else:
             lamAxisI = jnp.nan
             ThryI = jnp.nan
             # raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
-        if config["D"]["extraoptions"]["load_ele_spec"]:
+        if config["other"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = transform_electron_spec(lamAxisE, modlE, amps, TSins)
         else:
             raise NotImplementedError("Need to create an electron spectrum so we can compare it against data!")
@@ -152,7 +152,7 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
             if cfg["nn"]["use"]:
                 self.ts_parameter_generator = TSParameterGenerator(cfg, num_spectra)
 
-            self.crop_window = 256
+            self.crop_window = cfg["other"]["crop_window"]
 
         def initialize_params(self, batch):
             if self.cfg["nn"]:
@@ -213,19 +213,19 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
         spectrumator = TSSpectraGenerator(config_for_loss)
         ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator({"data": normed_batch, "amps": batch["amps"]})
 
-        if config["D"]["extraoptions"]["fit_IAW"]:
+        if config["other"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
             loss = loss + jnp.square(i_data - ThryI)
 
-        if config["D"]["extraoptions"]["fit_EPWb"]:
-            # vmin = config["D"]["extraoptions"]["fit_EPWb"]["min"]
-            # vmax = config["D"]["extraoptions"]["fit_EPWb"]["max"]
+        if config["other"]["extraoptions"]["fit_EPWb"]:
+            # vmin = config["other"]["extraoptions"]["fit_EPWb"]["min"]
+            # vmax = config["other"]["extraoptions"]["fit_EPWb"]["max"]
             thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
 
             loss = loss + jnp.square(data_slc - thry_slc)
 
-        if config["D"]["extraoptions"]["fit_EPWr"]:
+        if config["other"]["extraoptions"]["fit_EPWr"]:
             thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
 
@@ -244,19 +244,19 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
         spectrumator = TSSpectraGenerator(config_for_loss)
         ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator({"data": normed_batch, "amps": batch["amps"]})
 
-        if config["D"]["extraoptions"]["fit_IAW"]:
+        if config["other"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
             loss = loss + jnp.square(i_data - ThryI)
 
-        if config["D"]["extraoptions"]["fit_EPWb"]:
-            # vmin = config["D"]["extraoptions"]["fit_EPWb"]["min"]
-            # vmax = config["D"]["extraoptions"]["fit_EPWb"]["max"]
+        if config["other"]["extraoptions"]["fit_EPWb"]:
+            # vmin = config["other"]["extraoptions"]["fit_EPWb"]["min"]
+            # vmax = config["other"]["extraoptions"]["fit_EPWb"]["max"]
             thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
 
             loss = loss + jnp.square(data_slc - thry_slc)
 
-        if config["D"]["extraoptions"]["fit_EPWr"]:
+        if config["other"]["extraoptions"]["fit_EPWr"]:
             thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
             data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
 
@@ -266,45 +266,11 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
 
     loss_fn = hk.without_apply_rng(hk.transform(loss_fn))
     array_loss_fn = jit(hk.without_apply_rng(hk.transform(array_loss_fn)).apply)
-    vg_func = jit(value_and_grad(loss_fn.apply, has_aux=True))
 
     rng_key = jax.random.PRNGKey(42)
     init_params = loss_fn.init(rng_key, dummy_batch)
 
-    # if config["nn"]:
-    #     flattened_initial_params, unravel_pytree = jax_ravel_pytree(init_params)
-    #     ravel_pytree = jax_ravel_pytree
-    # else:
-    #
-    #     def unravel_pytree(weights):
-    #         pytree_weights = {"ts_spectra_generator": {}}
-    #         i = 0
-    #         for key in config["parameters"].keys():
-    #             if config["parameters"][key]["active"]:
-    #                 pytree_weights["ts_spectra_generator"][key] = jnp.array(
-    #                     weights[i].reshape((dummy_batch.shape[0], -1))
-    #                 )
-    #                 i += 1
-    #
-    #         return pytree_weights
-    #
-    #     def ravel_pytree(pytree_grads):
-    #         grads = []
-    #         for key in config["parameters"].keys():
-    #             if config["parameters"][key]["active"]:
-    #                 grads.append(pytree_grads["ts_spectra_generator"][key])
-    #         return np.concatenate(grads), None
-    #
-    #     flattened_initial_params = None
-
-    # def val_and_grad_loss(weights: np.ndarray):
-    #
-    #     pytree_weights = unravel_pytree(weights)
-    #     (value, aux), grad = vg_func(pytree_weights, dummy_batch)
-    #     temp_grad, _ = ravel_pytree(grad)
-    #     flattened_grads = np.array(temp_grad).flatten()
-    #     return value, flattened_grads
-
+    vg_func = jit(value_and_grad(loss_fn.apply, has_aux=True))
     config_for_params = copy.deepcopy(config)
 
     def __get_params__(batch):
@@ -318,11 +284,5 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
         return params, ThryE, e_data
 
     _get_params_ = hk.without_apply_rng(hk.transform(__get_params__)).apply
-
-    # def get_params(weights):
-    #     pytree_weights = unravel_pytree(weights)
-    #     params = _get_params_(pytree_weights, dummy_batch)
-    #
-    #     return params
 
     return vg_func, array_loss_fn, init_params, _get_params_
