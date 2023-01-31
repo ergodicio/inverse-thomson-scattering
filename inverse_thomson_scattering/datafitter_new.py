@@ -8,12 +8,12 @@ from typing import Dict
 
 from scipy.signal import convolve2d as conv2
 from os.path import join,exists
-from inverse_thomson_scattering.additional_functions import get_scattering_angles, plotinput
-from inverse_thomson_scattering.evaluate_background import get_shot_bg, get_lineout_bg
+from inverse_thomson_scattering.additional_functions import get_scattering_angles, plotinput, init_params
+from inverse_thomson_scattering.evaluate_background import get_shot_bg
 from inverse_thomson_scattering.loadTSdata import loadData
 from inverse_thomson_scattering.correctThroughput import correctThroughput
 from inverse_thomson_scattering.getCalibrations import getCalibrations
-from inverse_thomson_scattering.plotters import ColorPlots
+from inverse_thomson_scattering.lineouts import get_lineouts
 from inverse_thomson_scattering.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.loss_function import get_loss_function
 from inverse_thomson_scattering.fitmodl import get_fit_model
@@ -59,10 +59,12 @@ def fit(config):
     Returns:
 
     """
-    os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
-    os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"]="platform"
     #initialize timer
     t0 = time.time()
+    
+    #load data
+    [elecData, ionData, xlab, config["D"]["extraoptions"]["spectype"]] = loadData(
+        config["shotnum"], config["D"]["shotDay"], config["D"]["extraoptions"])
     
     #get scattering angles and weights
     sa = get_scattering_angles(config["D"]["extraoptions"]["spectype"])
@@ -70,11 +72,6 @@ def fit(config):
     #Calibrate axes
     [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(
         config["shotnum"], config["D"]["extraoptions"]["spectype"], config["D"]["CCDsize"])
-    
-    #load data
-    [elecData, ionData, xlab, shift_zero] = loadData(
-        config["shotnum"], config["D"]["shotDay"], config["D"]["extraoptions"]["spectype"],
-        magE, config["D"]["extraoptions"])
     
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
     if not config["D"]["extraoptions"]["load_ion_spec"]:
@@ -94,181 +91,75 @@ def fit(config):
     #Correct for spectral throughput
     if config["D"]["extraoptions"]["load_ele_spec"]:
         elecData = correctThroughput(elecData, config["D"]["extraoptions"]["spectype"], axisyE, config["shotnum"])
-        
-    # Convert lineout locations to pixel
-    if config["lineoutloc"]["type"] == "ps" or config["lineoutloc"]["type"] == "um":
-        LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["lineoutloc"]["val"]]
-    elif config["lineoutloc"]["type"] == "pixel":
-        LineoutPixelE = config["lineoutloc"]["val"]
-    LineoutPixelI = LineoutPixelE
-
-
-    if config["bgloc"]["type"] == "ps":
-        BackgroundPixel = np.argmin(abs(axisxE - config["bgloc"]["val"]))
-    elif config["bgloc"]["type"] == "pixel":
-        BackgroundPixel = config["bgloc"]["val"]
-    elif config["bgloc"]["type"] == "auto":
-        BackgroundPixel = LineoutPixelE + 100
-
-    span = 2 * config["dpixel"] + 1  # (span must be odd)
     
-    #extract lineouts
-    if config["D"]["extraoptions"]["load_ele_spec"]:
-        LineoutTSE = [
-            np.mean(elecData[:, a - config["dpixel"] : a + config["dpixel"]], axis=1)
-            for a in LineoutPixelE
-        ]
-        LineoutTSE_smooth = [
-            np.convolve(LineoutTSE[i], np.ones(span) / span, "same") 
-            for i, _ in enumerate(LineoutPixelE)
-        ]
-        if config["D"]["extraoptions"]["spectype"] == 1:
-            #print(np.shape(sa["weights"]))
-            sa["weights"]=np.array([
-                np.mean(sa["weights"][a - config["dpixel"] : a + config["dpixel"],:], axis=0)
-                for a in LineoutPixelE
-                ])
-            #print(np.shape(sa["weights"]))
-            sa["weights"]=sa["weights"][:,np.newaxis,:]
-            #print(np.shape(sa["weights"]))
-        else:
-            #print(np.shape(sa["weights"]))
-            sa["weights"]=sa["weights"]*np.ones([len(LineoutPixelE),len(sa["sa"])])
-            #print(np.shape(sa["weights"]))
-
-    if config["D"]["extraoptions"]["load_ion_spec"]:
-        LineoutTSI = [
-            np.mean(ionData[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1)
-            for a in LineoutPixelI
-        ]
-        LineoutTSI_smooth = [
-            np.convolve(LineoutTSI[i], np.ones(span) / span, "same") 
-            for i, _ in enumerate(LineoutPixelE)
-        ]  # was divided by 10 for some reason (removed 8-9-22)
-        
-        
-    #Find background signal combining information from a background shot and background lineout
-    [BGele, BGion] = get_shot_bg(config, magE, axisyE, elecData)
-    [noiseE, noiseI] = get_lineout_bg(config, elecData, ionData, BGele, BGion, LineoutTSE_smooth,
-                                      BackgroundPixel, IAWtime, LineoutPixelE, LineoutPixelI)
     
-    #Plot Data
-    if config["D"]["extraoptions"]["load_ion_spec"]:
-        ColorPlots(
-            axisxI - shift_zero,
-            axisyI,
-            conv2(ionData-BGion, np.ones([5, 3]) / 15, mode="same"),
-            Line=[[axisxI[LineoutPixelI] - shift_zero, axisxI[LineoutPixelI] - shift_zero],
-                  [axisyI[0], axisyI[-1]], 
-                  [axisxI[BackgroundPixel] - shift_zero, axisxI[BackgroundPixel] - shift_zero],
-                  [axisyI[0], axisyI[-1]]],
-            vmin=0,
-            XLabel=xlab,
-            YLabel="Wavelength (nm)",
-            title="Shot : " + str(config["shotnum"]) + " : " + "TS : Corrected and background subtracted")
+    #load and correct background
+    [BGele, BGion] = get_shot_bg(config, axisyE, elecData)
+    
+    #extract ARTS section
+    if (config["lineoutloc"]["type"] == "range") & (config["D"]["extraoptions"]["spectype"] == "angular"):
         
-    if config["D"]["extraoptions"]["load_ele_spec"]:
-        ColorPlots(
-            axisxE - shift_zero,
-            axisyE,
-            conv2(elecData-BGele, np.ones([5, 3]) / 15, mode="same"),
-            Line=[[axisxE[LineoutPixelE] - shift_zero, axisxE[LineoutPixelE] - shift_zero],
-                  [axisyE[0], axisyE[-1]], 
-                  [axisxE[BackgroundPixel] - shift_zero, axisxE[BackgroundPixel] - shift_zero],
-                  [axisyE[0], axisyE[-1]]],
-            vmin=0,
-            XLabel=xlab,
-            YLabel="Wavelength (nm)",
-            title="Shot : " + str(config["shotnum"]) + " : " + "TS : Corrected and background subtracted")
+        config["D"]["extraoptions"]["spectype"] = "angular_full"
+        config["D"]["PhysParams"]["amps"] = np.array([np.amax(elecData), 1])
+        sa["angAxis"] = axisxE
         
-    #Find data amplitudes
-    gain = config["D"]["gain"]
-    if config["D"]["extraoptions"]["load_ion_spec"]:
-        noiseI = noiseI / gain
-        LineoutTSI_norm = [LineoutTSI_smooth[i] / gain for i, _ in enumerate(LineoutPixelI)]
-        LineoutTSI_norm = np.array(LineoutTSI_norm)
-        ampI = np.amax(LineoutTSI_norm-noiseI, axis=1)
-    else:
-        ampI = 1
-
-    if config["D"]["extraoptions"]["load_ele_spec"]:
-        noiseE = noiseE / gain
-        LineoutTSE_norm = [LineoutTSE_smooth[i] / gain for i, _ in enumerate(LineoutPixelE)]
-        LineoutTSE_norm = np.array(LineoutTSE_norm)
-        ampE = np.amax(LineoutTSE_norm[:, 100:-1]-noiseE[:, 100:-1], axis=1)  # attempts to ignore 3w comtamination
-    else:
-        ampE = 1
+        if config["D"]["extraoptions"]["plot_raw_data"]:
+            ColorPlots(axisxE, axisyE,
+                conv2(elecData-BGele, np.ones([5, 5]) / 25, mode="same"),
+                vmin=0,
+                XLabel=xlab,
+                YLabel="Wavelength (nm)",
+                title="Shot : " + str(config["shotnum"]) + " : " + "TS : Corrected and background subtracted")
+            
+        #down sample image to resolution units by summation
+        ang_res_unit = 10 #in pixels
+        lam_res_unit = 5 #in pixels
+        
+        #data_res_unit = np.zeros((int(elecData.shape[0]/lam_res_unit),
+        #                        int(elecData.shape[1]/ang_res_unit)))
+        #for i in np.arange(0, data_res_unit.shape[0]):
+        #    for ii in np.arange(0, data_res_unit.shape[1]):
+        #        j = lam_res_unit*i
+        #        jj = ang_res_unit*ii
+        #        data_res_unit[i,ii] = sum(sum(
+        #            elecData[j:j+lam_res_unit,jj:jj+ang_res_unit]))
+        
+        
+        #lam_step = int(ThryE.shape[1]/data.shape[0])
+        #ang_step = int(ThryE.shape[0]/data.shape[1])
+        
+        data_res_unit = np.array([np.average(elecData[i:i+lam_res_unit,:], axis=0) for i in range(0, elecData.shape[0], lam_res_unit)])
+        print("data shape after 1 resize", np.shape(data_res_unit))
+        data_res_unit = np.array([np.average(data_res_unit[:,i:i+ang_res_unit], axis=1) for i in range(0, data_res_unit.shape[1], ang_res_unit)])
+        print("data shape after 2 resize", np.shape(data_res_unit))
+        
+        all_data = data_res_unit
+        config["D"]["PhysParams"]["noiseI"] = 0
+        config["D"]["PhysParams"]["noiseE"] = BGele
+        
+    else: 
+        all_data = get_lineouts(elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, 0, IAWtime, xlab, sa, config)
 
     config["D"]["PhysParams"]["widIRF"] = stddev
-    config["D"]["lamrangE"] = [axisyE[0], axisyE[-2]]
-    config["D"]["lamrangI"] = [axisyI[0], axisyI[-2]]
-    #config["D"]["npts"] = (len(LineoutTSE_norm) - 1) * 20
-    config["D"]["npts"] = np.shape(LineoutTSE_norm)[1] * 10
-    config["D"]["PhysParams"]["noiseI"] = noiseI
-    config["D"]["PhysParams"]["noiseE"] = noiseE
+    config["D"]["lamrangE"] = [axisyE[0], axisyE[-1]]
+    config["D"]["lamrangI"] = [axisyI[0], axisyI[-1]]
+    config["D"]["npts"] = config["D"]["CCDsize"][0] * config["D"]["points_per_pixel"]
 
     parameters = config["parameters"]
 
     # Setup x0
     xie = np.linspace(-7, 7, parameters["fe"]["length"])
 
+    # Initialize fe
     NumDistFunc = get_num_dist_func(parameters["fe"]["type"], xie)
     parameters["fe"]["val"] = np.log(NumDistFunc(parameters["m"]["val"]))
     parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
     parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
 
-    x0 = []
-    lb = []
-    ub = []
-    for i, _ in enumerate(config["lineoutloc"]["val"]):
-        for key in parameters.keys():
-            if parameters[key]["active"]:
-                if np.size(parameters[key]["val"])>1:
-                    x0.append(parameters[key]["val"][i])
-                elif isinstance(parameters[key]["val"], list):
-                    x0.append(parameters[key]["val"][0])
-                else:
-                    x0.append(parameters[key]["val"])
-                lb.append(parameters[key]["lb"])
-                ub.append(parameters[key]["ub"])
-
-    x0=np.array(x0)
-    lb=np.array(lb)
-    ub=np.array(ub)
+    [x0, bnds, norms, shifts] = init_params(config, parameters)
     
-    all_data = []
-    config["D"]["PhysParams"]["amps"] = []
-    # run fitting code for each lineout
-    for i, _ in enumerate(config["lineoutloc"]["val"]):
-        # this probably needs to be done differently
-        if config["D"]["extraoptions"]["load_ion_spec"] and config["D"]["extraoptions"]["load_ele_spec"]:
-            data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
-            amps = [ampE[i], ampI[i]]
-        elif config["D"]["extraoptions"]["load_ion_spec"]:
-            data = np.vstack((LineoutTSI_norm[i], LineoutTSI_norm[i]))
-            amps = [ampE, ampI[i]]
-        elif config["D"]["extraoptions"]["load_ele_spec"]:
-            data = np.vstack((LineoutTSE_norm[i], LineoutTSE_norm[i]))
-            amps = [ampE[i], ampI]
-        else:
-            raise NotImplementedError("This spectrum does not exist")
-
-        all_data.append(data[None, :])
-        config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
-
-    if config["optimizer"]["x_norm"]:
-        norms = 2 * (ub - lb)
-        shifts = lb
-    else:
-        norms = np.ones_like(x0)
-        shifts = np.zeros_like(x0)
-
-    x0 = (x0 - shifts) / norms
-    lb = (lb - shifts) / norms
-    ub = (ub - shifts) / norms
-    bnds= list(zip(lb,ub))
-
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
+    
+    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, all_data, norms, shifts)
 
     t1 = time.time()
     print("minimizing")
@@ -295,7 +186,7 @@ def fit(config):
                 method=config["optimizer"]["method"],
                 jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                 hess=hess_fn if config["optimizer"]["hessian"] else None,
-                bounds=zip(lb, ub),
+                bounds=bnds,
                 options={"disp": True},
             )
     else:

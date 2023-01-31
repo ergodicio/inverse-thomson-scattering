@@ -93,7 +93,10 @@ def get_fit_model(config, xie, sa):
 
             ThryE = jnp.real(ThryE)
             ThryE = jnp.mean(ThryE, axis=0)
-            modlE = jnp.sum(ThryE * sa_weights, axis=1)
+            if config["D"]["extraoptions"]["spectype"] == "angular_full":
+                modlE = jnp.matmul(sa_weights, ThryE.transpose())
+            else: 
+                modlE = jnp.sum(ThryE * sa_weights, axis=1)
 
             # [modl,lamAx]=S2Signal(Thry,lamAxis,D);
 

@@ -48,8 +48,6 @@ def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, a
             ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam])
             
         ThryE = ThryE + np.array(noiseE)
-        print(np.shape(noiseE))
-        print(np.shape(ThryE))
 
     if config["D"]["extraoptions"]["spectype"] == 0:
         print("colorplot still needs to be written")
@@ -97,7 +95,7 @@ def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, a
                 CurveNames=["Data", "Fit"],
                 XLabel="Wavelength (nm)",
             )
-            ax[1].set_xlim([450, 630])
+            ax[1].set_xlim([400, 630])
 
     chisq = 0
     if config["D"]["extraoptions"]["fit_IAW"]:

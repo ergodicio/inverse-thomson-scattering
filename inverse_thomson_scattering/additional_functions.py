@@ -9,9 +9,10 @@ from os.path import join
 
 from inverse_thomson_scattering.numDistFunc import get_num_dist_func
 from inverse_thomson_scattering.plotstate import plotState
+from inverse_thomson_scattering.fitmodl import get_fit_model
 
 def get_scattering_angles(spectype):
-    if spectype > 1:
+    if spectype != "angular":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
             sa=np.linspace(53.637560, 66.1191, 10),
@@ -36,8 +37,49 @@ def get_scattering_angles(spectype):
         weights=imp['weightMatrix']
         sa = dict(sa=np.arange(19, 139.5, 0.5), weights=weights)
     return sa
+
+def init_params(config, parameters):
+    x0 = []
+    lb = []
+    ub = []
+    if config["lineoutloc"]["type"] == "range":
+        for key in parameters.keys():
+            if parameters[key]["active"]:
+                x0.append(parameters[key]["val"])
+                lb.append(parameters[key]["lb"])
+                ub.append(parameters[key]["ub"])
+    else:
+        for i, _ in enumerate(config["lineoutloc"]["val"]):
+            for key in parameters.keys():
+                if parameters[key]["active"]:
+                    if np.size(parameters[key]["val"])>1:
+                        x0.append(parameters[key]["val"][i])
+                    elif isinstance(parameters[key]["val"], list):
+                        x0.append(parameters[key]["val"][0])
+                    else:
+                        x0.append(parameters[key]["val"])
+                    lb.append(parameters[key]["lb"])
+                    ub.append(parameters[key]["ub"])
+
+    x0=np.array(x0)
+    lb=np.array(lb)
+    ub=np.array(ub)
+    
+    if config["optimizer"]["x_norm"]:
+        norms = 2 * (ub - lb)
+        shifts = lb
+    else:
+        norms = np.ones_like(x0)
+        shifts = np.zeros_like(x0)
+
+    x0 = (x0 - shifts) / norms
+    lb = (lb - shifts) / norms
+    ub = (ub - shifts) / norms
+    bnds= list(zip(lb,ub))
+    
+    return x0, bnds, norms, shifts
         
-def plotinput(config, sa, fit_model):
+def plotinput(config, sa):
     parameters = config["parameters"]
 
     # Setup x0

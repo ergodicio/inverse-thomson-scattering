@@ -9,11 +9,10 @@ from inverse_thomson_scattering.loadTSdata import loadData
 from inverse_thomson_scattering.correctThroughput import correctThroughput
 
 
-def get_shot_bg(config, magE, axisyE, elecData):
+def get_shot_bg(config, axisyE, elecData):
     if config["bgshot"]["type"] == "Shot":
         [BGele, BGion, _, _] = loadData(
-        config["bgshot"]["val"], config["D"]["shotDay"], config["D"]["extraoptions"]["spectype"],
-        magE, config["D"]["extraoptions"])
+        config["bgshot"]["val"], config["D"]["shotDay"], config["D"]["extraoptions"])
         if config["D"]["extraoptions"]["load_ion_spec"]:
             BGion = conv2(BGion, np.ones([5, 3]) / 15, mode="same")
         else:
@@ -28,8 +27,7 @@ def get_shot_bg(config, magE, axisyE, elecData):
             BGele = 0
     elif config["D"]["extraoptions"]["spectype"] == 1 and config["bgshot"]["type"] == "Fit":
         [BGele, _, _, _] = loadData(
-        config["bgshot"]["val"], config["D"]["shotDay"], config["D"]["extraoptions"]["spectype"],
-        magE, config["D"]["extraoptions"])
+        config["bgshot"]["val"], config["D"]["shotDay"], config["D"]["extraoptions"])
         
         BGele = correctThroughput(BGele, config["D"]["extraoptions"]["spectype"], axisyE, config["shotnum"])
         
@@ -93,12 +91,13 @@ def get_lineout_bg(config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, B
             LineoutBGE=[]
             for i, _ in enumerate(config["lineoutloc"]["val"]):
                 [rat1bg, _] = spopt.curve_fit(rat11, bgfitx, LineoutTSE_smooth[i][bgfitx],[-16,200000,170])
-                #plt.plot(rat11(np.arange(1024), *rat1bg))
-                #plt.plot(LineoutTSE_smooth[i])
-                #plt.show()
+                if config["bgloc"]["show"]:
+                    plt.plot(rat11(np.arange(1024), *rat1bg))
+                    plt.plot(LineoutTSE_smooth[i])
+                    plt.show()
                 #LineoutTSE_smooth[i] = LineoutTSE_smooth[i] - rat11(np.arange(1024), *rat1bg)
                 #the behaviour of this fit is different now when a BG shot is included (no effect without a BG shot
-                LineoutBGE.append(rat11(np.arange(1024), *rat1bg)[None,:])
+                LineoutBGE.append(rat11(np.arange(1024), *rat1bg))
             print(np.shape(LineoutBGE))
                 
     
@@ -132,19 +131,30 @@ def get_lineout_bg(config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, B
             def exp2(x, a, b, c, d):
                 return a * np.exp(-b * x) + c * np.exp(-d * x)
 
-            bgfitx = np.hstack(
-                [np.arange(250, 480), np.arange(540, 900)]
-            )  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
+            bgfitx = np.hstack([np.arange(250, 480), np.arange(540, 900)])  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
+            bgfitx2 = np.hstack([np.arange(250, 300), np.arange(700, 900)])
             plt.plot(bgfitx,noiseE[bgfitx])
             #[expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
             [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[200, 0.001, 200, 0.001])
             noiseE = config["D"]["bgscaleE"] * exp2(np.arange(1024), *expbg)
-            plt.plot(bgfitx,noiseE[bgfitx])
-            plt.plot(bgfitx,exp2(bgfitx,200,0.001,200,0.001))
-            plt.show()
+            
+            #rescale background exponential using the edge of each data lineout
+            noiseE_rescaled=[]
+            for i, _ in enumerate(config["lineoutloc"]["val"]):
+                scale = spopt.minimize_scalar(lambda a: np.sum(abs(LineoutTSE_smooth[i][bgfitx2]-a*noiseE[bgfitx2])))
+                
+                noiseE_rescaled.append(scale.x*noiseE)
+            
+            if config["bgloc"]["show"]:
+                plt.plot(bgfitx,noiseE[bgfitx])
+                plt.plot(bgfitx,scale.x*noiseE[bgfitx])
+                plt.plot(bgfitx,exp2(bgfitx,200,0.001,200,0.001))
+                lin=np.mean((elecData-BGele)[:, 480 - config["dpixel"] : 480 + config["dpixel"]], 1)
+                plt.plot(bgfitx,lin[bgfitx])
+                plt.show()
 
         #constant addition to the background
-        noiseE = noiseE + config["D"]["flatbg"]
+        noiseE = np.array(noiseE_rescaled) + config["D"]["flatbg"]
     else:
         noiseE = 0
     if config["D"]["extraoptions"]["load_ele_spec"]:    
@@ -156,8 +166,12 @@ def get_lineout_bg(config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, B
             noiseE = noiseE * np.ones((len(LineoutPixelE),1))
 
         if 'LineoutBGE' in locals():
+            #print(np.shape(noiseE))
             noiseE = noiseE + np.array(LineoutBGE)
+            #print(np.shape(noiseE))
     else:
         noiseE = 0
+        
+    #print(np.shape(noiseE))
             
     return noiseE, noiseI
