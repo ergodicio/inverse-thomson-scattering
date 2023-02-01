@@ -3,12 +3,21 @@ from jax import jit
 
 
 @jit
-def ratintn(f, g, z):
+def ratintn(f: jnp.ndarray, g: jnp.ndarray, z: jnp.ndarray) -> jnp.ndarray:
+    """
+    Integrate f / g dz taking each to be piecwise linear.This is more accurate when f / g has a near - pole in an
+    interval f, g and z are 1D complex arrays.
 
-    # Integrate f / g dz taking each to be piecwise linear.This is more accurate when f / g has a near - pole in an
-    # interval f, g and z are 1D complex arrays.
-    #
-    # Based on newlip routine by Ed Williams.
+    Based on newlip routine by Ed Williams.
+
+    Args:
+        f:
+        g:
+        z:
+
+    Returns:
+
+    """
 
     if len(jnp.shape(f)) == 1:
         f = jnp.transpose(f[..., jnp.newaxis])
@@ -18,13 +27,20 @@ def ratintn(f, g, z):
     return out
 
 
-def ratcen(f, g):
+def ratcen(f: jnp.ndarray, g: jnp.ndarray) -> jnp.ndarray:
+    """
+    Return "rationally centered" f / g such that int_s(1) ^ s(0) ds f(s) / g(s) = sum(ratcen(f, g) * s(dif)) when
+    f and g are linear functions of s.
+    This allows accurate integration through near poles of f / g
 
-    # Return "rationally centered" f / g such that int_s(1) ^ s(0) ds f(s) / g(s) = sum(ratcen(f, g) * s(dif)) when
-    # f and g are linear functions of s.
-    # This allows accurate integration through near poles of f / g
-    #
-    # Based on newlip routine by Ed Williams.
+    Based on newlip routine by Ed Williams.
+    Args:
+        f:
+        g:
+
+    Returns:
+
+    """
 
     fdif = f[:, 1:-1] - f[:, 0:-2]
     gdif = g[1:-1] - g[0:-2]

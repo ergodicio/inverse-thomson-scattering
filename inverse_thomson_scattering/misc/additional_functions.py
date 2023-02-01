@@ -6,10 +6,11 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 
 from os.path import join
+from typing import Dict
 
-from inverse_thomson_scattering.numDistFunc import get_num_dist_func
-from inverse_thomson_scattering.plotstate import plotState
-from inverse_thomson_scattering.fitmodl import get_fit_model
+from inverse_thomson_scattering.misc.numDistFunc import get_num_dist_func
+from inverse_thomson_scattering.misc.plotters import plotState
+from inverse_thomson_scattering.generate_spectra import get_fit_model
 
 def get_scattering_angles(spectype):
     if spectype != "angular":
@@ -38,46 +39,61 @@ def get_scattering_angles(spectype):
         sa = dict(sa=np.arange(19, 139.5, 0.5), weights=weights)
     return sa
 
-def init_params(config, parameters):
-    x0 = []
-    lb = []
-    ub = []
+def initialize_parameters(config: Dict) -> Dict:
+    init_params = {}
+    lb = {}
+    ub = {}
+    parameters = config["parameters"]
     if config["lineoutloc"]["type"] == "range":
+        linoutlocs = [1]
+    else:
+        linoutlocs = config["lineoutloc"]["val"]
+    for i, _ in enumerate(linoutlocs):
         for key in parameters.keys():
             if parameters[key]["active"]:
-                x0.append(parameters[key]["val"])
-                lb.append(parameters[key]["lb"])
-                ub.append(parameters[key]["ub"])
-    else:
-        for i, _ in enumerate(config["lineoutloc"]["val"]):
-            for key in parameters.keys():
-                if parameters[key]["active"]:
-                    if np.size(parameters[key]["val"])>1:
-                        x0.append(parameters[key]["val"][i])
-                    elif isinstance(parameters[key]["val"], list):
-                        x0.append(parameters[key]["val"][0])
-                    else:
-                        x0.append(parameters[key]["val"])
-                    lb.append(parameters[key]["lb"])
-                    ub.append(parameters[key]["ub"])
+                init_params[key] = []
+                lb[key] = []
+                ub[key] = []
+                if np.size(parameters[key]["val"]) > 1:
+                    init_params[key].append(parameters[key]["val"][i])
+                elif isinstance(parameters[key]["val"], list):
+                    init_params[key].append(parameters[key]["val"][0])
+                else:
+                    init_params[key].append(parameters[key]["val"])
+                lb[key].append(parameters[key]["lb"])
+                ub[key].append(parameters[key]["ub"])
 
-    x0=np.array(x0)
-    lb=np.array(lb)
-    ub=np.array(ub)
-    
+    init_params = {k: np.array(v) for k, v in init_params.items()}
+    lb = {k: np.array(v) for k, v in lb.items()}
+    ub = {k: np.array(v) for k, v in ub.items()}
+
+    norms = {}
+    shifts = {}
     if config["optimizer"]["x_norm"]:
-        norms = 2 * (ub - lb)
-        shifts = lb
+        for k, v in init_params.items():
+            norms[k] = 2 * (ub[k] - lb[k])
+            shifts[k] = lb[k]
     else:
-        norms = np.ones_like(x0)
-        shifts = np.zeros_like(x0)
+        for k, v in init_params.items():
+            norms[k] = np.ones_like(init_params)
+            shifts[k] = np.zeros_like(init_params)
 
-    x0 = (x0 - shifts) / norms
-    lb = (lb - shifts) / norms
-    ub = (ub - shifts) / norms
-    bnds= list(zip(lb,ub))
-    
-    return x0, bnds, norms, shifts
+    init_params = {k: (v - shifts[k]) / norms[k] for k, v in init_params.items()}
+    lower_bound = {k: (v - shifts[k]) / norms[k] for k, v in lb.items()}
+    upper_bound = {k: (v - shifts[k]) / norms[k] for k, v in ub.items()}
+
+    init_params_arr = np.array([v for k, v in init_params.items()])
+    lb_arr = np.array([v for k, v in lower_bound.items()])
+    ub_arr = np.array([v for k, v in upper_bound.items()])
+
+    bnds = list(zip(lb, ub))
+
+    return {
+        "pytree": {"init_params": init_params, "lb": lb, "rb": ub},
+        "array": {"init_params": init_params_arr, "lb": lb_arr, "ub": ub_arr},
+        "norms": norms,
+        "shifts": shifts,
+    }
         
 def plotinput(config, sa):
     parameters = config["parameters"]

@@ -1,14 +1,18 @@
-from jax import config
+import jax
+from jax import config, jit
 
 config.update("jax_enable_x64", True)
 #config.update('jax_disable_jit',True)
 
+from functools import partial
 from jax import numpy as jnp
-from jax import jit, value_and_grad, vmap
-from inverse_thomson_scattering import ratintn
-from inverse_thomson_scattering import lamParse
-import numpy as np
+
 import scipy.interpolate as sp
+import haiku as hk
+
+from inverse_thomson_scattering import ratintn
+from inverse_thomson_scattering.misc import lam_parse
+
 
 def zprimeMaxw(xi):
     """
@@ -16,30 +20,30 @@ def zprimeMaxw(xi):
     defined in Chapter 5. For values of xi between - 10 and 10 a table is used. Outside of this range the assumtotic
     approximation(see Eqn. 5.2.10) is used.
     xi is expected to be ascending
+
     Args:
         xi:
+
     Returns:
+
     """
 
-    rdWT = np.vstack(np.loadtxt("files/rdWT.txt"))
-    idWT = np.vstack(np.loadtxt("files/idWT.txt"))
+    rdWT = jnp.vstack(jnp.loadtxt("files/rdWT.txt"))
+    idWT = jnp.vstack(jnp.loadtxt("files/idWT.txt"))
 
     ai = xi < -10
     bi = xi > 10
-    ci = ~(ai + bi)
 
     rinterp = sp.interp1d(rdWT[:, 0], rdWT[:, 1], "linear")
-    rZp = np.concatenate((xi[ai] ** -2, rinterp(xi), xi[bi] ** -2))
+    rZp = jnp.concatenate((xi[ai] ** -2, rinterp(xi), xi[bi] ** -2))
     iinterp = sp.interp1d(idWT[:, 0], idWT[:, 1], "linear")
-    iZp = np.concatenate((0 * xi[ai], iinterp(xi), 0 * xi[bi]))
+    iZp = jnp.concatenate((0 * xi[ai], iinterp(xi), 0 * xi[bi]))
 
-    Zp = np.vstack((rZp, iZp))
-    # print(np.shape(Zp))
+    Zp = jnp.vstack((rZp, iZp))
+    # print(jnp.shape(Zp))
     return Zp
 
-
-def get_form_factor_fn(lamrang, npts):
-    #npts = 20460
+def get_form_factor_fn(lamrang, npts=20460, backend="jax"):
 
     # basic quantities
     C = 2.99792458e10
@@ -53,12 +57,17 @@ def get_form_factor_fn(lamrang, npts):
     xi2 = jnp.array(jnp.arange(-minmax, minmax, h))
     Zpi = jnp.array(zprimeMaxw(xi2))
 
+    if backend == "jax":
+        vmap = jax.vmap
+    else:
+        vmap = partial(hk.vmap, split_rng=False)
+
     def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lam):
         """
         NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions and scattering angles. The spectral density function is calculated with and without the ion contribution which can be set to an independent grid from the electron contribution. Distribution functions can be one or two dimensional and the appropriate susceptibility is calculated with the rational integration.
-         
-         
-         
+
+
+
         :param Te: electron temperature in keV [1 by number of plasma conditions]
         :param Ti: ion temperature in keV [1 by number of ion species]
         :param Z: ionization state [1 by number of ion species]
@@ -85,8 +94,7 @@ def get_form_factor_fn(lamrang, npts):
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
 
-        omgL, omgs, lamAxis, _ = lamParse.lamParse(lamrang, lam, npts)  # , True)
-        #print("omgs shape ", jnp.shape(omgs))
+        omgL, omgs, lamAxis, _ = lam_parse.lamParse(lamrang, lam, npts)  # , True)
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
@@ -95,9 +103,7 @@ def get_form_factor_fn(lamrang, npts):
 
         ks = jnp.sqrt(omgs**2 - omgpe**2) / C
         kL = jnp.sqrt(omgL**2 - omgpe**2) / C
-        #kL = kL[..., jnp.newaxis]
         k = jnp.sqrt(ks**2 + kL**2 - 2 * ks * kL * jnp.cos(sarad))
-        #print("k shape ", jnp.shape(k))
 
         kdotv = k * Va
         omgdop = omg - kdotv
@@ -116,7 +122,6 @@ def get_form_factor_fn(lamrang, npts):
         Zbar = jnp.sum(Z * fract)
         ni = fract * ne[..., jnp.newaxis, jnp.newaxis, jnp.newaxis] / Zbar
         omgpi = constants * Z * jnp.sqrt(ni * Me / Mi)
-        
 
         vTi = jnp.sqrt(Ti / Mi)  # ion thermal velocity
         # kldi = jnp.transpose(vTi / omgpi, [1, 0, 2, 3]) * k
@@ -221,8 +226,4 @@ def get_form_factor_fn(lamrang, npts):
         # formfactorE = PsLamE # commented because unused
         return formfactor, lams
 
-    def cost_fn(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe):
-        formf, _ = nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe)
-        return jnp.sum(formf)
-
-    return jit(nonMaxwThomson), jit(value_and_grad(cost_fn))
+    return jit(nonMaxwThomson)

@@ -1,39 +1,36 @@
-import time, mlflow, os, tempfile, jax, yaml
+import time, mlflow, os, tempfile, yaml
 
 import numpy as np
 import scipy.optimize as spopt
 import matplotlib.pyplot as plt
 
-from typing import Dict
-
 from scipy.signal import convolve2d as conv2
-from os.path import join,exists
-from inverse_thomson_scattering.additional_functions import get_scattering_angles, plotinput, init_params
+from inverse_thomson_scattering.misc.additional_functions import get_scattering_angles, plotinput, initialize_parameters
 from inverse_thomson_scattering.evaluate_background import get_shot_bg
-from inverse_thomson_scattering.loadTSdata import loadData
-from inverse_thomson_scattering.correctThroughput import correctThroughput
-from inverse_thomson_scattering.getCalibrations import getCalibrations
+from inverse_thomson_scattering.misc.load_ts_data import loadData
+from inverse_thomson_scattering.process.correct_throughput import correctThroughput
+from inverse_thomson_scattering.misc.calibration import get_calibrations
 from inverse_thomson_scattering.lineouts import get_lineouts
-from inverse_thomson_scattering.numDistFunc import get_num_dist_func
+from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.loss_function import get_loss_function
-from inverse_thomson_scattering.fitmodl import get_fit_model
-from inverse_thomson_scattering.plotstate import plotState
+from inverse_thomson_scattering.generate_spectra import get_fit_model
+from inverse_thomson_scattering.misc.plotters import plotState
 
-def unnumpy_dict(this_dict: Dict):
-    new_dict = {}
-    for k, v in this_dict.items():
-        if isinstance(v, Dict):
-            new_v = unnumpy_dict(v)
-        elif isinstance(v, np.ndarray):
-            new_v = [float(val) for val in v]
-        elif isinstance(v, jax.numpy.ndarray):
-            new_v = [float(val) for val in v]
-        else:
-            new_v = v
-
-        new_dict[k] = new_v
-
-    return new_dict
+#def unnumpy_dict(this_dict: Dict):
+#    new_dict = {}
+#    for k, v in this_dict.items():
+#        if isinstance(v, Dict):
+#            new_v = unnumpy_dict(v)
+#        elif isinstance(v, np.ndarray):
+#            new_v = [float(val) for val in v]
+#        elif isinstance(v, jax.numpy.ndarray):
+#            new_v = [float(val) for val in v]
+#        else:
+#            new_v = v
+#
+#        new_dict[k] = new_v
+#
+#    return new_dict
 
 def fit(config):
     """
@@ -70,7 +67,7 @@ def fit(config):
     sa = get_scattering_angles(config["D"]["extraoptions"]["spectype"])
     
     #Calibrate axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(
+    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(
         config["shotnum"], config["D"]["extraoptions"]["spectype"], config["D"]["CCDsize"])
     
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
@@ -81,7 +78,7 @@ def fit(config):
         config["D"]["extraoptions"]["fit_EPWb"] = 0
         config["D"]["extraoptions"]["fit_EPWr"] = 0
         print("EPW data not loaded, omitting EPW fit")
-        
+
     #If no data is loaded or being fit plot the input and quit
     if config["lineoutloc"]["val"]==[] or (config["D"]["extraoptions"]["fit_IAW"]+config["D"]["extraoptions"]["fit_EPWb"]+config["D"]["extraoptions"]["fit_EPWr"]) == 0 or (elecData==[] and ionData==[]):
         print("No data loaded, plotting input")
@@ -115,23 +112,10 @@ def fit(config):
         ang_res_unit = 10 #in pixels
         lam_res_unit = 5 #in pixels
         
-        #data_res_unit = np.zeros((int(elecData.shape[0]/lam_res_unit),
-        #                        int(elecData.shape[1]/ang_res_unit)))
-        #for i in np.arange(0, data_res_unit.shape[0]):
-        #    for ii in np.arange(0, data_res_unit.shape[1]):
-        #        j = lam_res_unit*i
-        #        jj = ang_res_unit*ii
-        #        data_res_unit[i,ii] = sum(sum(
-        #            elecData[j:j+lam_res_unit,jj:jj+ang_res_unit]))
-        
-        
-        #lam_step = int(ThryE.shape[1]/data.shape[0])
-        #ang_step = int(ThryE.shape[0]/data.shape[1])
-        
         data_res_unit = np.array([np.average(elecData[i:i+lam_res_unit,:], axis=0) for i in range(0, elecData.shape[0], lam_res_unit)])
-        print("data shape after 1 resize", np.shape(data_res_unit))
+        #print("data shape after 1 resize", np.shape(data_res_unit))
         data_res_unit = np.array([np.average(data_res_unit[:,i:i+ang_res_unit], axis=1) for i in range(0, data_res_unit.shape[1], ang_res_unit)])
-        print("data shape after 2 resize", np.shape(data_res_unit))
+        #print("data shape after 2 resize", np.shape(data_res_unit))
         
         all_data = data_res_unit
         config["D"]["PhysParams"]["noiseI"] = 0
@@ -156,10 +140,16 @@ def fit(config):
     parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
     parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
 
-    [x0, bnds, norms, shifts] = init_params(config, parameters)
+    #[x0, bnds, norms, shifts] = init_params(config, parameters)
+    fitting_params = initialize_parameters(config)
     
     
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, all_data, norms, shifts)
+    #loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, all_data, norms, shifts)
+    loss_fn, vg_loss_fn, hess_fn = get_loss_function(
+        config, xie, sa, all_data, fitting_params["norms"], fitting_params["shifts"], backend="haiku"
+    )
+    x0 = fitting_params["array"]["init_params"]
+    bnds = zip(fitting_params["array"]["lb"], fitting_params["array"]["ub"])
 
     t1 = time.time()
     print("minimizing")
@@ -190,13 +180,13 @@ def fit(config):
                 options={"disp": True},
             )
     else:
-        x = x0
+        x = fitting_params["pytree"]["init_params"]
 
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     fit_model = get_fit_model(config, xie, sa)
-    init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
-    final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
+    init_x = (x0 * fitting_params["norms"] + fitting_params["shifts"]).reshape((len(all_data), -1))
+    final_x = (res.x * fitting_params["norms"] + fitting_params["shifts"]).reshape((len(all_data), -1))
 
     print("plotting")
     mlflow.set_tag("status", "plotting")
@@ -281,4 +271,5 @@ def fit(config):
             yaml.dump(outputs, fi)
 
         mlflow.log_artifacts(td)
-    result = config["parameters"]
+
+    return outputs

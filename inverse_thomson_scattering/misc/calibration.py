@@ -4,7 +4,7 @@ import numpy as np
 import scipy.io as sio
 from os.path import join,exists
 
-def getCalibrations(shotNum,tstype,CCDsize):
+def get_calibrations(shotNum,tstype,CCDsize):
 
     stddev = dict()
     # Dispersions and calibrations

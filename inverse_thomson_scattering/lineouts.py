@@ -1,5 +1,5 @@
 import numpy as np
-from inverse_thomson_scattering.plotters import ColorPlots
+from inverse_thomson_scattering.misc.plotters import ColorPlots
 from inverse_thomson_scattering.evaluate_background import get_lineout_bg
 
 def get_lineouts(elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, shift_zero, IAWtime, xlab, sa, config):
@@ -30,7 +30,7 @@ def get_lineouts(elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI
             np.convolve(LineoutTSE[i], np.ones(span) / span, "same") 
             for i, _ in enumerate(LineoutPixelE)
         ]
-        if config["D"]["extraoptions"]["spectype"] == 1:
+        if config["D"]["extraoptions"]["spectype"] == "angular":
             #print(np.shape(sa["weights"]))
             sa["weights"]=np.array([
                 np.mean(sa["weights"][a - config["dpixel"] : a + config["dpixel"],:], axis=0)

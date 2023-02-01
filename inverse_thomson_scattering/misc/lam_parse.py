@@ -4,14 +4,13 @@ def lamParse(lamrang, lam, npts=20480, fineion=True):
     """
     This function handles the calculation of wavelength grids and their associated frequency grids.
     Uses a minimum and maximum wavlength (string inputs have beeen depreciated). 
-    A boolean switch is included to allow a finer griding in the ion spectrum allowing for simultaneous resolution of the ion and electron frequencies (currently inoperable working on a solution 11/7/22).
+    A boolean switch is included to allow a finer griding in the ion spectrum allowing for simultaneous resolution of
+    the ion and electron frequencies (currently inoperable working on a solution 11/7/22).
     """
 
     c = 2.99792458e10
     min_lam = lamrang[0]
     max_lam = lamrang[1]
-    #npts = 20480
-    #npts = 10240
 
     # if fineion and (min_lam < lam and max_lam > lam):
     #     lamAxis = jnp.linspace(min_lam, max_lam, npts)

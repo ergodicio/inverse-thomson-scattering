@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 from scipy.signal import convolve2d as conv2
 
-from inverse_thomson_scattering.loadTSdata import loadData
-from inverse_thomson_scattering.correctThroughput import correctThroughput
+from inverse_thomson_scattering.misc.load_ts_data import loadData
+from inverse_thomson_scattering.process.correct_throughput import correctThroughput
 
 
 def get_shot_bg(config, axisyE, elecData):
@@ -19,7 +19,7 @@ def get_shot_bg(config, axisyE, elecData):
             BGion = 0
         if config["D"]["extraoptions"]["load_ele_spec"]:
             BGele = correctThroughput(BGele, config["D"]["extraoptions"]["spectype"], axisyE, config["shotnum"])
-            if config["D"]["extraoptions"]["spectype"] == 1:
+            if config["D"]["extraoptions"]["spectype"] == "angular":
                 BGele = conv2(BGele, np.ones([5, 5]) / 25, mode="same") #1/27 for H2 and 1/24 for kr
             else:
                 BGele = conv2(BGele, np.ones([5, 3]) / 15, mode="same")
@@ -98,7 +98,7 @@ def get_lineout_bg(config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, B
                 #LineoutTSE_smooth[i] = LineoutTSE_smooth[i] - rat11(np.arange(1024), *rat1bg)
                 #the behaviour of this fit is different now when a BG shot is included (no effect without a BG shot
                 LineoutBGE.append(rat11(np.arange(1024), *rat1bg))
-            print(np.shape(LineoutBGE))
+            #print(np.shape(LineoutBGE))
                 
     
     if config["D"]["extraoptions"]["load_ion_spec"]:
@@ -127,13 +127,13 @@ def get_lineout_bg(config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, B
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
         
         #replace background lineout with double exponential for extra smoothing
-        if config["D"]["extraoptions"]["spectype"] != 1:
+        if config["D"]["extraoptions"]["spectype"] != "angular":
             def exp2(x, a, b, c, d):
                 return a * np.exp(-b * x) + c * np.exp(-d * x)
 
             bgfitx = np.hstack([np.arange(250, 480), np.arange(540, 900)])  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
             bgfitx2 = np.hstack([np.arange(250, 300), np.arange(700, 900)])
-            plt.plot(bgfitx,noiseE[bgfitx])
+            plt.plot(bgfitx, noiseE[bgfitx])
             #[expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
             [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[200, 0.001, 200, 0.001])
             noiseE = config["D"]["bgscaleE"] * exp2(np.arange(1024), *expbg)

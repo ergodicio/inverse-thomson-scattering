@@ -3,32 +3,41 @@ from os import listdir
 
 from pyhdf.SD import SD, SDC
 import numpy as np
-from inverse_thomson_scattering.warpcorr import warpCorrection
+from inverse_thomson_scattering.process.warpcorr import perform_warp_correction
 
 
 def loadData(sNum, sDay, loadspecs):
     """
-    This function loads the appropriate data based off the provided shot number (sNum) and the type of data specified
-    using specType. The flag sDay changes the default path to the temporary archive on the redwood server and will
+    This function loads the appropriate data based off the provided shot number (sNum) automaticaly determining the
+    type of data in the file. The flag sDay changes the default path to the temporary archive on the redwood server and will
     only work if connected to the LLE redwood server.
+
     If the data is time resolved an attempt will be made to locate t=0 based off the fiducials. The relationship
     between the fiducials and t=0 changes from one shot day to the next.
+
+    Known Issues:
+        If there are mutliple data types from the same shot number such as ATS and imaging data, this algorithm will
+        fail.
+        The fiducial finding and timing has been depreciated and will need to be reinstated.
+
     Args:
         sNum:
         sDay:
         specType:
         magE:
         loadspecs:
+
     Returns:
+
     """
     if sDay:
         folder = r"\\redwood\archive\tmp\thomson"
     else:
         folder = "data"
-        
+
     file_list = listdir(folder)
     files = [name for name in file_list if str(sNum) in name]
-    
+
     for fl in files:
         if "epw" in fl or "EPW" in fl:
             hdfnameE = join(folder, fl)
@@ -50,7 +59,7 @@ def loadData(sNum, sDay, loadspecs):
             hdfnameE = join(folder, fl)
             specType = "angular"
             xlab = "Scattering angle (degrees)"
-            
+
     if loadspecs["load_ion_spec"]:
         try:
             iDatfile = SD(hdfnameI, SDC.READ)
@@ -64,7 +73,7 @@ def loadData(sNum, sDay, loadspecs):
             loadspecs["load_ion_spec"] = False
     else:
         iDat = []
-            
+
     if loadspecs["load_ele_spec"]:
         try:
             eDatfile = SD(hdfnameE, SDC.READ)
@@ -78,5 +87,5 @@ def loadData(sNum, sDay, loadspecs):
             loadspecs["load_ele_spec"] = False
     else:
         eDat = []
-            
+
     return eDat, iDat, xlab, specType
