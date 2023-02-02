@@ -8,6 +8,7 @@ from functools import partial
 from jax import numpy as jnp
 
 import scipy.interpolate as sp
+import numpy as np
 import haiku as hk
 
 from inverse_thomson_scattering import ratintn
@@ -28,18 +29,18 @@ def zprimeMaxw(xi):
 
     """
 
-    rdWT = jnp.vstack(jnp.loadtxt("files/rdWT.txt"))
-    idWT = jnp.vstack(jnp.loadtxt("files/idWT.txt"))
+    rdWT = np.vstack(np.loadtxt("files/rdWT.txt"))
+    idWT = np.vstack(np.loadtxt("files/idWT.txt"))
 
     ai = xi < -10
     bi = xi > 10
 
     rinterp = sp.interp1d(rdWT[:, 0], rdWT[:, 1], "linear")
-    rZp = jnp.concatenate((xi[ai] ** -2, rinterp(xi), xi[bi] ** -2))
+    rZp = np.concatenate((xi[ai] ** -2, rinterp(xi), xi[bi] ** -2))
     iinterp = sp.interp1d(idWT[:, 0], idWT[:, 1], "linear")
-    iZp = jnp.concatenate((0 * xi[ai], iinterp(xi), 0 * xi[bi]))
+    iZp = np.concatenate((0 * xi[ai], iinterp(xi), 0 * xi[bi]))
 
-    Zp = jnp.vstack((rZp, iZp))
+    Zp = np.vstack((rZp, iZp))
     # print(jnp.shape(Zp))
     return Zp
 

@@ -25,7 +25,7 @@ def get_shot_bg(config, axisyE, elecData):
                 BGele = conv2(BGele, np.ones([5, 3]) / 15, mode="same")
         else:
             BGele = 0
-    elif config["D"]["extraoptions"]["spectype"] == 1 and config["bgshot"]["type"] == "Fit":
+    elif config["D"]["extraoptions"]["spectype"] == "angular" and config["bgshot"]["type"] == "Fit":
         [BGele, _, _, _] = loadData(
         config["bgshot"]["val"], config["D"]["shotDay"], config["D"]["extraoptions"])
         
@@ -65,7 +65,7 @@ def get_lineout_bg(config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, B
     span = 2 * config["dpixel"] + 1  # (span must be odd)
     
     #Fit a model to the data edges to interperet the background
-    if config["bgshot"]["type"] == "Fit" and config["D"]["extraoptions"]["spectype"] != 1:
+    if config["bgshot"]["type"] == "Fit" and config["D"]["extraoptions"]["spectype"] != "angular":
         if config["D"]["extraoptions"]["load_ele_spec"]:
             # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
             bgfitx = np.hstack([np.arange(100, 200), np.arange(800, 1023)])

@@ -79,7 +79,7 @@ D:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
-        plot_raw_data: False
+        plot_raw_data: True
 
 mlflow:
     experiment: inverse-thomson-scattering

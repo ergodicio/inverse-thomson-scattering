@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from os.path import join
 from typing import Dict
 
-from inverse_thomson_scattering.misc.numDistFunc import get_num_dist_func
+from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.misc.plotters import plotState
 from inverse_thomson_scattering.generate_spectra import get_fit_model
 
@@ -51,9 +51,10 @@ def initialize_parameters(config: Dict) -> Dict:
     for i, _ in enumerate(linoutlocs):
         for key in parameters.keys():
             if parameters[key]["active"]:
-                init_params[key] = []
-                lb[key] = []
-                ub[key] = []
+                if key not in init_params.keys():
+                    init_params[key] = []
+                    lb[key] = []
+                    ub[key] = []
                 if np.size(parameters[key]["val"]) > 1:
                     init_params[key].append(parameters[key]["val"][i])
                 elif isinstance(parameters[key]["val"], list):
@@ -85,8 +86,6 @@ def initialize_parameters(config: Dict) -> Dict:
     init_params_arr = np.array([v for k, v in init_params.items()])
     lb_arr = np.array([v for k, v in lower_bound.items()])
     ub_arr = np.array([v for k, v in upper_bound.items()])
-
-    bnds = list(zip(lb, ub))
 
     return {
         "pytree": {"init_params": init_params, "lb": lb, "rb": ub},

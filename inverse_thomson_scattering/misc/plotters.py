@@ -179,8 +179,11 @@ def ColorPlots(
 
     if CurveNames:
         ax.legend(CurveNames)
+        
+    plt.show()
 
 def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, ax):
+    
     [modlE, modlI, lamAxisE, lamAxisI, tsdict] = fitModel2(x, sas["weights"])
 
     lam = config["parameters"]["lam"]["val"]
@@ -188,15 +191,15 @@ def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, a
     amp2 = config["parameters"]["amp2"]["val"]
     amp3 = config["parameters"]["amp3"]["val"]
 
-    stddev = config["D"]["PhysParams"]["widIRF"]
-
     if config["D"]["extraoptions"]["load_ion_spec"]:
-        originI = (max(lamAxisI) + min(lamAxisI)) / 2  # Conceptual_origin so the convolution donsn't shift the signal
+        stddevI = config["D"]["PhysParams"]["widIRF"]["spect_stddev_ion"]
+        originI = (np.amax(lamAxisI) + np.amin(lamAxisI)) / 2.0
         inst_funcI = np.squeeze(
-            (1 / (stddev[1] * np.sqrt(2 * np.pi))) * np.exp(-((lamAxisI - originI) ** 2) / (2 * (stddev[1]) ** 2))
+            (1.0 / (stddevI * np.sqrt(2.0 * np.pi)))
+            * np.exp(-((lamAxisI - originI) ** 2.0) / (2.0 * (stddevI) ** 2.0))
         )  # Gaussian
         ThryI = np.convolve(modlI, inst_funcI, "same")
-        ThryI = (max(modlI) / max(ThryI)) * ThryI
+        ThryI = (np.amax(modlI) / np.amax(ThryI)) * ThryI
         ThryI = np.average(ThryI.reshape(1024, -1), axis=1)
 
         if config["D"]["PhysParams"]["norm"] == 0:
@@ -206,12 +209,15 @@ def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, a
         ThryI = ThryI + np.array(noiseI)
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
-        originE = (max(lamAxisE) + min(lamAxisE)) / 2  # Conceptual_origin so the convolution donsn't shift the signal
+        stddevE = config["D"]["PhysParams"]["widIRF"]["spect_stddev_ele"]
+        # Conceptual_origin so the convolution doesn't shift the signal
+        originE = (np.amax(lamAxisE) + np.amin(lamAxisE)) / 2.0
         inst_funcE = np.squeeze(
-            (1 / (stddev[0] * np.sqrt(2 * np.pi))) * np.exp(-((lamAxisE - originE) ** 2) / (2 * (stddev[0]) ** 2))
+            (1.0 / (stddevE * np.sqrt(2.0 * np.pi)))
+            * np.exp(-((lamAxisE - originE) ** 2.0) / (2.0 * (stddevE) ** 2.0))
         )  # Gaussian
         ThryE = np.convolve(modlE, inst_funcE, "same")
-        ThryE = (max(modlE) / max(ThryE)) * ThryE
+        ThryE = (np.amax(modlE) / np.amax(ThryE)) * ThryE
 
         if config["D"]["PhysParams"]["norm"] > 0:
             ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam] / max(ThryE[lamAxisE < lam]))
@@ -289,4 +295,26 @@ def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, a
             (data[0, (lamAxisE > 540) & (lamAxisE < 680)] - ThryE[(lamAxisE > 540) & (lamAxisE < 680)]) ** 2
         )
 
+    loss = 0
+    if config["D"]["extraoptions"]["fit_IAW"]:
+        loss = loss + np.sum(np.square(data[1, :] - ThryI) /i_data)
+
+    if config["D"]["extraoptions"]["fit_EPWb"]:
+        sqdev = np.square(data[0, :] - ThryE) / ThryE
+        sqdev = np.where((lamAxisE > config["D"]["fit_rng"]["blue_min"])
+                          & (lamAxisE < config["D"]["fit_rng"]["blue_max"]),
+                          sqdev, 0.0)
+
+        loss = loss + np.sum(sqdev)
+
+    if config["D"]["extraoptions"]["fit_EPWr"]:
+        sqdev = np.square(data[0, :] - ThryE) / ThryE
+        sqdev = np.where((lamAxisE > config["D"]["fit_rng"]["red_min"])
+                          & (lamAxisE < config["D"]["fit_rng"]["red_max"]),
+                          sqdev, 0.0)
+
+        loss = loss + np.sum(sqdev)
+        
+    print(loss)
+                
     return fig, ax

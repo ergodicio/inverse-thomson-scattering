@@ -149,7 +149,7 @@ def fit(config):
         config, xie, sa, all_data, fitting_params["norms"], fitting_params["shifts"], backend="haiku"
     )
     x0 = fitting_params["array"]["init_params"]
-    bnds = zip(fitting_params["array"]["lb"], fitting_params["array"]["ub"])
+    bnds = list(zip(fitting_params["array"]["lb"], fitting_params["array"]["ub"]))
 
     t1 = time.time()
     print("minimizing")
@@ -184,9 +184,34 @@ def fit(config):
 
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
+    i = 0
+    final_x = []
+    init_x = []
+    for k, v in fitting_params["pytree"]["init_params"].items():
+        init_x.append((x0[i] * fitting_params["norms"][k] + fitting_params["shifts"][k]).reshape((len(all_data), -1)))
+        final_x.append((res.x[i] * fitting_params["norms"][k] + fitting_params["shifts"][k]).reshape((len(all_data), -1)))
+        i += 1
+    
+    final_x = np.concatenate(final_x, axis=-1)
+    init_x = np.concatenate(init_x, axis=-1)
+    
+    count = 0
+    #final_x.reshape((len(config["lineoutloc"]["val"]), -1))
+
+    outputs = {}
+    inits = {}
+    for key in config["parameters"].keys():
+        if config["parameters"][key]["active"]:
+            # config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
+            outputs[key] = np.array([float(val) for val in list(final_x[:, count])])
+            inits[key] = np.array([float(val) for val in list(init_x[:, count])])
+            count = count + 1
+    
+    
     fit_model = get_fit_model(config, xie, sa)
-    init_x = (x0 * fitting_params["norms"] + fitting_params["shifts"]).reshape((len(all_data), -1))
-    final_x = (res.x * fitting_params["norms"] + fitting_params["shifts"]).reshape((len(all_data), -1))
+    
+    #init_x = (fitting_params["pytree"]["init_params"] * fitting_params["norms"] + fitting_params["shifts"]).reshape((len(all_data), -1))
+    #final_x = (res.x * fitting_params["norms"] + fitting_params["shifts"]).reshape((len(all_data), -1))
 
     print("plotting")
     mlflow.set_tag("status", "plotting")
@@ -206,12 +231,12 @@ def fit(config):
             ax2 = fig.add_subplot(1, 2, 2)
             # Plot initial guess
             fig, ax = plotState(
-                init_x[i],
+                inits,
                 config,
                 config["D"]["PhysParams"]["amps"][i][0],
                 xie,
                 cur_sa,
-                all_data[i][0],
+                all_data[i],
                 config["D"]["PhysParams"]["noiseE"][i] if config["D"]["extraoptions"]["load_ele_spec"] else config["D"]["PhysParams"]["noiseE"],
                 config["D"]["PhysParams"]["noiseI"][i] if config["D"]["extraoptions"]["load_ion_spec"] else config["D"]["PhysParams"]["noiseI"],
                 fitModel2=fit_model,
@@ -224,12 +249,12 @@ def fit(config):
             ax = fig.add_subplot(1, 2, 1)
             ax2 = fig.add_subplot(1, 2, 2)
             fig, ax = plotState(
-                final_x[i],
+                outputs,
                 config,
                 config["D"]["PhysParams"]["amps"][i][0],
                 xie,
                 cur_sa,
-                all_data[i][0],
+                all_data[i],
                 config["D"]["PhysParams"]["noiseE"][i] if config["D"]["extraoptions"]["load_ele_spec"] else config["D"]["PhysParams"]["noiseE"],
                 config["D"]["PhysParams"]["noiseI"][i] if config["D"]["extraoptions"]["load_ion_spec"] else config["D"]["PhysParams"]["noiseI"],
                 fitModel2=fit_model,
@@ -248,7 +273,7 @@ def fit(config):
 
     result = config["parameters"]
     count = 0
-    final_x.reshape((len(config["lineoutloc"]["val"]), -1))
+    #final_x.reshape((len(config["lineoutloc"]["val"]), -1))
 
     outputs = {}
     for key in config["parameters"].keys():

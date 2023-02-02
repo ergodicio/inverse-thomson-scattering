@@ -67,6 +67,9 @@ def loadData(sNum, sDay, loadspecs):
             iDat = sds_obj.get()  # get sds data
             iDat = iDat.astype("float64")
             iDat = iDat[0, :, :] - iDat[1, :, :]
+            
+            if specType == "imaging":
+                iDat = np.rot90(np.squeeze(iDat),3)
         except BaseException:
             print("Unable to find IAW")
             iDat = []
@@ -80,7 +83,14 @@ def loadData(sNum, sDay, loadspecs):
             sds_obj = eDatfile.select("Streak_array")  # select sds
             eDat = sds_obj.get()  # get sds data
             eDat = eDat.astype("float64")
-            eDat = np.fliplr(eDat[0, :, :] - eDat[1, :, :])
+            eDat = eDat[0, :, :] - eDat[1, :, :]
+            
+            if specType == "angular":
+                eDat = np.fliplr(eDat)
+            elif specType == "temporal":
+                eDat = perform_warp_correction(eDat) 
+            elif specType == "imaging":
+                eDat = np.rot90(np.squeeze(eDat),3)
         except BaseException:
             print("Unable to find EPW")
             eDat = []

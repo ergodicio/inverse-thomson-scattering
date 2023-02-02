@@ -182,6 +182,9 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: Dict, shi
                 modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
             )
 
+            ThryE = ThryE + jnp.array(config["D"]["PhysParams"]["noiseE"])
+            ThryI = ThryI + jnp.array(config["D"]["PhysParams"]["noiseI"])
+            
             ThryE = ThryE / e_norm
             ThryI = ThryI / i_norm
 
@@ -250,7 +253,7 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: Dict, shi
             def __call__(self, batch):
                 params = self.initialize_params()
                 # params = self.neural_network_parameterizer(batch)
-                modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)
+                modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params, sas["weights"])
                 ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess_thry(
                     modlE,
                     modlI,
@@ -260,6 +263,9 @@ def get_loss_function(config: Dict, xie, sas, data: np.ndarray, norms: Dict, shi
                     live_TSinputs,
                 )
 
+                ThryE = ThryE + jnp.array(config["D"]["PhysParams"]["noiseE"])
+                ThryI = ThryI + jnp.array(config["D"]["PhysParams"]["noiseI"])
+                
                 ThryE = ThryE / e_norm
                 ThryI = ThryI / i_norm
 

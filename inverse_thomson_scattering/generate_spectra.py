@@ -14,7 +14,7 @@ def get_fit_model(config, xie, sa):
     nonMaxwThomsonI_jax = get_form_factor_fn(config["D"]["lamrangI"], config["D"]["npts"], backend="jax")
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], xie)
 
-    def fit_model(fitted_params):
+    def fit_model(fitted_params, sa_weights):
 
         parameters = config["parameters"]
         for key in parameters.keys():
