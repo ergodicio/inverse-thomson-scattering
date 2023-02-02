@@ -101,6 +101,16 @@ other:
     iawoff: 0
     iawfilter: [1, 4, 24, 528]
 
+data:
+    lineouts:
+        type: pixel
+        start: 450
+        end: 650
+        skip: 1
+    background:
+        type: pixel
+        slice: 900
+
 optimizer:
     method: L-BFGS-B
     hessian: False

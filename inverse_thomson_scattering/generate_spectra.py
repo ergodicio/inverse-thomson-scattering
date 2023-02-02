@@ -5,17 +5,17 @@ from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from jax import numpy as jnp
 
 
-def get_forward_pass(config, xie, sa, backend: str = "haiku"):
+def get_forward_pass(config, sa, backend: str = "haiku"):
     nonMaxwThomsonE_jax = get_form_factor_fn(config["other"]["lamrangE"], backend=backend)
     nonMaxwThomsonI_jax = get_form_factor_fn(config["other"]["lamrangI"], backend=backend)
-    num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], xie)
+    num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
 
     def forward_pass(fitted_params):
 
         parameters = copy.deepcopy(config["parameters"])
         for key in parameters.keys():
-            if parameters[key]["active"]:
-                parameters[key]["val"] = jnp.squeeze(fitted_params[key])
+            # if parameters[key]["active"]:
+            parameters[key]["val"] = jnp.squeeze(fitted_params[key])
 
         # if parameters["fe"]["active"]:
         #     parameters["fe"]["val"] = fitted_params[-parameters["fe"]["length"] : :]
@@ -48,7 +48,7 @@ def get_forward_pass(config, xie, sa, backend: str = "haiku"):
                 parameters["Va"]["val"],
                 parameters["ud"]["val"],
                 sa["sa"],
-                (fecur, xie),
+                (fecur, config["velocity"]),
                 526.5,  # TODO hardcoded
             )
 
@@ -73,7 +73,7 @@ def get_forward_pass(config, xie, sa, backend: str = "haiku"):
                 parameters["Va"]["val"],
                 parameters["ud"]["val"],
                 sa["sa"],
-                (fecur, xie),
+                (fecur, config["velocity"]),
                 lam,
             )
 

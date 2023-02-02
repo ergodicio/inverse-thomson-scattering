@@ -28,12 +28,6 @@ def test_data():
     defaults.update(flatten(inputs))
     config = unflatten(defaults)
 
-    bgshot = {"type": [], "val": []}
-
-    lnout = {"type": "pixel", "val": [500, 501]}
-    bglnout = {"type": "pixel", "val": 900}
-    extraoptions = {"spectype": 2}
-
     config["parameters"]["Te"]["val"] = 0.5
     config["parameters"]["ne"]["val"] = 0.2  # 0.25
     config["parameters"]["m"]["val"] = 3.0  # 2.2
@@ -42,18 +36,9 @@ def test_data():
 
     with mlflow.start_run() as run:
         utils.log_params(config)
-
-        config["bgshot"] = bgshot
-        config["lineoutloc"] = lnout
-        config["bgloc"] = bglnout
-        config["extraoptions"] = extraoptions
         config["num_cores"] = int(mp.cpu_count())
 
-        config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
-
-        mlflow.log_params({"num_slices": 1})
         t0 = time.time()
-        # mlflow.log_params(flatten(config))
         fit_results = fitter.fit(config=config)
         metrics_dict = {"fit_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
         mlflow.log_metrics(metrics=metrics_dict)

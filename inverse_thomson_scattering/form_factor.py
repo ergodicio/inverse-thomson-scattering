@@ -144,7 +144,7 @@ def get_form_factor_fn(lamrang, backend: str):
         # fe is separated into components distribution function, v / vth axis, angles between f1 and kL
         # if len(fe) == 2:
         DF, x = fe
-        fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(DF)))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
+        fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
 
         # elif len(fe) == 3:
         #     [DF, x, thetaphi] = fe
@@ -169,12 +169,12 @@ def get_form_factor_fn(lamrang, backend: str):
         #
         #     fe_vphi[jnp.isnan(fe_vphi)] = 0
 
-        df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
+        df = jnp.diff(fe_vphi.squeeze(), 1, 1) / jnp.diff(xie.squeeze(), 1, 1)
         df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
 
         chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
-        ratmod = jnp.exp(jnp.interp(xi1, x, jnp.log(DF)))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
+        ratmod = jnp.exp(jnp.interp(xi1, x, jnp.log(jnp.squeeze(DF))))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
         ratdf = jnp.gradient(ratmod, xi1[1] - xi1[0])
 
         def this_ratintn(this_dx):

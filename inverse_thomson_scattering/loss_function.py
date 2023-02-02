@@ -6,27 +6,26 @@ from collections import defaultdict
 import jax
 from jax import numpy as jnp
 
+
 from jax import jit, value_and_grad
+from jax.flatten_util import ravel_pytree
 import haiku as hk
 import numpy as np
 from inverse_thomson_scattering.generate_spectra import get_forward_pass
 
 
-def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, shifts: Dict):
+def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     """
 
     Args:
         config:
-        xie:
         sas:
         dummy_batch:
-        norms:
-        shifts:
 
     Returns:
 
     """
-    forward_pass = get_forward_pass(config, xie, sas, backend="haiku")
+    forward_pass = get_forward_pass(config, sas, backend="haiku")
     lam = config["parameters"]["lam"]["val"]
     stddev = config["other"]["PhysParams"]["widIRF"]
 
@@ -76,7 +75,6 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
 
     @jit
     def postprocess(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
-
         if config["other"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
         else:
@@ -135,7 +133,6 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
             self.combiner = hk.Linear(num_outputs)
 
         def __call__(self, spectra: jnp.ndarray):
-
             embeddings = jnp.concatenate(
                 [self.param_extractors[i](spectra[:, i][..., None]) for i in range(self.num_spectra)], axis=-1
             )
@@ -178,16 +175,18 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
                             init=hk.initializers.RandomUniform(minval=0, maxval=1),
                         )
                     else:
-                        these_params[param_name] = jnp.array(param_config["val"]).reshape((self.batch_size, -1))
+                        these_params[param_name] = jnp.concatenate(param_config["val"]).reshape((self.batch_size, -1))
 
             for param_name, param_config in self.cfg["parameters"].items():
                 if param_config["active"]:
-                    these_params[param_name] = these_params[param_name] * norms[param_name] + shifts[param_name]
+                    these_params[param_name] = (
+                        these_params[param_name] * self.cfg["units"]["norms"][param_name]
+                        + self.cfg["units"]["shifts"][param_name]
+                    )
 
             return these_params
 
         def __call__(self, batch):
-
             params = self.initialize_params(batch["data"])
             modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)
             ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess(
@@ -202,7 +201,6 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
     config_for_loss = copy.deepcopy(config)
 
     def array_loss_fn(batch):
-
         i_data = batch["data"][:, 1, :] / i_norm
         e_data = batch["data"][:, 0, :] / e_norm
 
@@ -233,7 +231,6 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
         return loss, [ThryE, e_data, params]
 
     def loss_fn(batch):
-
         i_data = batch["data"][:, 1, :] / i_norm
         e_data = batch["data"][:, 0, :] / e_norm
 
@@ -263,13 +260,44 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
 
         return jnp.mean(loss), [ThryE, e_data, params]
 
+    # def _sp_loss_fn_(batch):
+    #
+    #     i_data = batch["data"][:, 1, :] / i_norm
+    #     e_data = batch["data"][:, 0, :] / e_norm
+    #
+    #     normed_batch = jnp.concatenate([e_data[:, None, :], i_data[:, None, :]], axis=1)
+    #
+    #     loss = 0.0
+    #     spectrumator = TSSpectraGenerator(config_for_loss)
+    #     ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator({"data": normed_batch, "amps": batch["amps"]})
+    #
+    #     if config["other"]["extraoptions"]["fit_IAW"]:
+    #         #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+    #         loss = loss + jnp.square(i_data - ThryI)
+    #
+    #     if config["other"]["extraoptions"]["fit_EPWb"]:
+    #         # vmin = config["other"]["extraoptions"]["fit_EPWb"]["min"]
+    #         # vmax = config["other"]["extraoptions"]["fit_EPWb"]["max"]
+    #         thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
+    #         data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
+    #
+    #         loss = loss + jnp.square(data_slc - thry_slc)
+    #
+    #     if config["other"]["extraoptions"]["fit_EPWr"]:
+    #         thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
+    #         data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
+    #
+    #         loss = loss + jnp.square(data_slc - thry_slc)
+    #
+    #     return jnp.mean(loss)
+
     loss_fn = hk.without_apply_rng(hk.transform(loss_fn))
     array_loss_fn = jit(hk.without_apply_rng(hk.transform(array_loss_fn)).apply)
 
     rng_key = jax.random.PRNGKey(42)
-    init_params = loss_fn.init(rng_key, dummy_batch)
+    init_weights = loss_fn.init(rng_key, dummy_batch)
 
-    vg_func = jit(value_and_grad(loss_fn.apply, has_aux=True))
+    _vg_func_ = jit(value_and_grad(loss_fn.apply, has_aux=True))
     config_for_params = copy.deepcopy(config)
 
     def __get_params__(batch):
@@ -284,4 +312,45 @@ def get_loss_function(config: Dict, xie, sas, dummy_batch: Dict, norms: Dict, sh
 
     _get_params_ = hk.without_apply_rng(hk.transform(__get_params__)).apply
 
-    return vg_func, array_loss_fn, init_params, _get_params_
+    if config["optimizer"]["method"] == "adam":
+        vg_func = _vg_func_
+        get_params = _get_params_
+        loss_dict = dict(vg_func=vg_func, array_loss_fn=array_loss_fn, init_weights=init_weights, get_params=get_params)
+    elif config["optimizer"]["method"] == "l-bfgs-b":
+        flattened_weights, unravel_pytree = ravel_pytree(init_weights)
+
+        def vg_func(weights: np.ndarray):
+            """
+            Full batch training so dummy batch actually contains the whole batch
+
+            Args:
+                weights:
+
+            Returns:
+
+            """
+
+            pytree_weights = unravel_pytree(weights)
+            (value, aux), grad = vg_func(pytree_weights, dummy_batch)
+            temp_grad, _ = ravel_pytree(grad)
+            flattened_grads = np.array(temp_grad).flatten()
+            return value, flattened_grads
+
+        def get_params(weights, batch=None):
+            pytree_weights = unravel_pytree(weights)
+            params = _get_params_(pytree_weights, dummy_batch)
+
+            return params
+
+        loss_dict = dict(
+            vg_func=vg_func,
+            array_loss_fn=array_loss_fn,
+            pytree_weights=init_weights,
+            init_weights=flattened_weights,
+            get_params=get_params,
+        )
+
+    else:
+        raise NotImplementedError
+
+    return loss_dict

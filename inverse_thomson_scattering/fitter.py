@@ -4,11 +4,8 @@ from typing import Dict
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
-import pandas
 import scipy.optimize as spopt
-import optax
-from jaxopt import OptaxSolver
-import mlflow
+import optax, jaxopt, pandas, mlflow
 from tqdm import trange
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.misc.load_ts_data import load_data
@@ -19,54 +16,103 @@ from inverse_thomson_scattering.loss_function import get_loss_function
 
 
 def initialize_parameters(config: Dict) -> Dict:
-    init_params = {}
+    # init_params = {}
     lb = {}
     ub = {}
     parameters = config["parameters"]
-    for i, _ in enumerate(config["lineoutloc"]["val"]):
-        for key in parameters.keys():
-            if parameters[key]["active"]:
-                init_params[key] = []
-                lb[key] = []
-                ub[key] = []
-                if np.size(parameters[key]["val"]) > 1:
-                    init_params[key].append(parameters[key]["val"][i])
-                elif isinstance(parameters[key]["val"], list):
-                    init_params[key].append(parameters[key]["val"][0])
-                else:
-                    init_params[key].append(parameters[key]["val"])
-                lb[key].append(parameters[key]["lb"])
-                ub[key].append(parameters[key]["ub"])
+    active_params = []
+    for key in parameters.keys():
+        if parameters[key]["active"]:
+            active_params.append(key)
+            # init_params[key] = []
+            lb[key] = []
+            ub[key] = []
+            lb[key].append(parameters[key]["lb"])
+            ub[key].append(parameters[key]["ub"])
+            # for i, _ in enumerate(config["data"]["lineouts"]["val"]):
+            #     if np.size(parameters[key]["val"]) > 1:
+            #         init_params[key].append(parameters[key]["val"][i])
+            #     elif isinstance(parameters[key]["val"], list):
+            #         init_params[key].append(parameters[key]["val"][0])
+            #     else:
+            #         init_params[key].append(parameters[key]["val"])
 
-    init_params = {k: np.array(v) for k, v in init_params.items()}
+    # init_params = {k: np.array(v) for k, v in init_params.items()}
     lb = {k: np.array(v) for k, v in lb.items()}
     ub = {k: np.array(v) for k, v in ub.items()}
 
     norms = {}
     shifts = {}
     if config["optimizer"]["x_norm"]:
-        for k, v in init_params.items():
+        for k in active_params:
             norms[k] = ub[k] - lb[k]
             shifts[k] = lb[k]
     else:
-        for k, v in init_params.items():
-            norms[k] = np.ones_like(init_params)
-            shifts[k] = np.zeros_like(init_params)
+        for k, v in active_params:
+            norms[k] = np.ones_like(lb[k])
+            shifts[k] = np.zeros_like(lb[k])
 
-    init_params = {k: (v - shifts[k]) / norms[k] for k, v in init_params.items()}
+    # init_params = {k: (v - shifts[k]) / norms[k] for k, v in init_params.items()}
     lower_bound = {k: (v - shifts[k]) / norms[k] for k, v in lb.items()}
     upper_bound = {k: (v - shifts[k]) / norms[k] for k, v in ub.items()}
 
-    init_params_arr = np.array([v for k, v in init_params.items()])
+    # init_params_arr = np.array([v for k, v in init_params.items()])
     lb_arr = np.array([v for k, v in lower_bound.items()])
     ub_arr = np.array([v for k, v in upper_bound.items()])
 
     return {
-        "pytree": {"init_params": init_params, "lb": lb, "rb": ub},
-        "array": {"init_params": init_params_arr, "lb": lb_arr, "ub": ub_arr},
+        "pytree": {"lb": lb, "rb": ub},
+        # "array": {"lb": lb_arr, "ub": ub_arr},
         "norms": norms,
         "shifts": shifts,
     }
+
+
+def validate_inputs(config):
+
+    # get derived quantities
+    config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+
+    # get slices
+    config["data"]["lineouts"]["val"] = [
+        i
+        for i in range(
+            config["data"]["lineouts"]["start"], config["data"]["lineouts"]["end"], config["data"]["lineouts"]["skip"]
+        )
+    ]
+
+    # create fes
+    NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
+    config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+    config["parameters"]["fe"]["lb"] = np.multiply(
+        config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
+    )
+    config["parameters"]["fe"]["ub"] = np.multiply(
+        config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
+    )
+
+    if config["nn"]["use"]:
+        if not len(config["data"]["lineouts"]["val"]) % config["optimizer"]["batch_size"] == 0:
+            print(f"batch size = {config['optimizer']['batch_size']} is not a round divisor of the number of lineouts")
+            num_batches = np.ceil(len(config["data"]["lineouts"]["val"]) / config["optimizer"]["batch_size"])
+            config["optimizer"]["batch_size"] = int(len(config["data"]["lineouts"]["val"]) // num_batches)
+            print(f"new batch size = {config['optimizer']['batch_size']}")
+    else:
+        if len(config["data"]["lineouts"]["val"]) != config["optimizer"]["batch_size"]:
+            print(f"setting batch size to the number of lineouts")
+            config["optimizer"]["batch_size"] = len(config["data"]["lineouts"]["val"])
+
+        for param_name, param_config in config["parameters"].items():
+            if param_config["active"]:
+                pass
+            else:
+                param_config["val"] = [
+                    np.array(param_config["val"]).reshape(1, -1) for _ in range(config["optimizer"]["batch_size"])
+                ]
+
+    config["units"] = initialize_parameters(config)
+
+    return config
 
 
 def fit(config):
@@ -106,60 +152,77 @@ def fit(config):
     Returns:
 
     """
+    config = validate_inputs(config)
 
     # prepare data
-    all_data, amps_list, units, velocity, sa = prepare_data(config)
+    all_data, amps_list, sa = prepare_data(config)
     test_batch = {
         "data": all_data[: config["optimizer"]["batch_size"]],
         "amps": amps_list[: config["optimizer"]["batch_size"]],
     }
 
     # prepare optimizer / solver
-    vg_loss_fn, array_loss_fn, init_weights, get_params = get_loss_function(
-        config, velocity, sa, test_batch, units["norms"], units["shifts"]
-    )
+    loss_dict = get_loss_function(config, sa, test_batch)
+    batch_indices = np.arange(len(all_data))
 
     if config["optimizer"]["method"] == "adam":
-        opt = optax.adam(config["optimizer"]["learning_rate"])
-        solver = OptaxSolver(
-            opt=opt, fun=vg_loss_fn, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+        jaxopt_kwargs = dict(
+            fun=loss_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
         )
+        opt = optax.adam(config["optimizer"]["learning_rate"])
+        solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
+
+        weights = loss_dict["init_weights"]
+        opt_state = solver.init_state(weights, batch=test_batch)
+
+        # start train loop
+        t1 = time.time()
+        print("minimizing")
+        mlflow.set_tag("status", "minimizing")
+
+        epoch_loss = 1e19
+        best_loss = 1e16
+        num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
+        for i_epoch in range(config["optimizer"]["num_epochs"]):
+            if config["nn"]["use"]:
+                np.random.shuffle(batch_indices)
+            batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+            with trange(num_batches, unit="batch") as tbatch:
+                tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {round(epoch_loss)}")
+                epoch_loss = 0.0
+                for i_batch in tbatch:
+                    inds = batch_indices[i_batch]
+                    batch = {"data": all_data[inds], "amps": amps_list[inds]}
+                    weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
+                    epoch_loss += opt_state.value
+                    tbatch.set_postfix({"Prev Batch Loss": round(opt_state.value)})
+
+                epoch_loss /= num_batches
+                if epoch_loss < best_loss:
+                    best_loss = epoch_loss
+                    best_weights = weights
+
+                mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
+            batch_indices = batch_indices.flatten()
+
+    elif config["optimizer"]["method"] == "l-bfgs-b":
+        lb = config["units"]["array"]["lb"]
+        ub = config["units"]["array"]["ub"]
+        # bounds =
+
+        bounds = zip(lb, ub)
+        res = spopt.minimize(
+            loss_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else loss_dict["v_func"],
+            init_array,
+            method=config["optimizer"]["method"],
+            jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+            # hess=hess_fn if config["optimizer"]["hessian"] else None,
+            bounds=bounds,
+            options={"disp": True},
+        )
+
     else:
         raise NotImplementedError
-
-    batch_indices = np.arange(len(all_data))
-    weights = init_weights
-    opt_state = solver.init_state(weights, batch=test_batch)
-
-    # start train loop
-    t1 = time.time()
-    print("minimizing")
-    mlflow.set_tag("status", "minimizing")
-
-    epoch_loss = 1e19
-    best_loss = 1e16
-    for i_epoch in range(config["optimizer"]["num_epochs"]):
-        num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
-        np.random.shuffle(batch_indices)
-        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-        with trange(num_batches, unit="batch") as tbatch:
-            tbatch.set_description(f"Epoch {i_epoch+1}, Prev Epoch Loss {round(epoch_loss)}")
-            epoch_loss = 0.0
-            for i_batch in tbatch:
-                inds = batch_indices[i_batch]
-                batch = {"data": all_data[inds], "amps": amps_list[inds]}
-                weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
-
-                epoch_loss += opt_state.value
-                tbatch.set_postfix({"Prev Batch Loss": round(opt_state.value)})
-
-            epoch_loss /= num_batches
-            if epoch_loss < best_loss:
-                best_loss = epoch_loss
-                best_weights = weights
-
-            mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
-        batch_indices = batch_indices.flatten()
 
     all_params = {}
     for key in config["parameters"].keys():
@@ -205,7 +268,7 @@ def postprocess(config, batch_indices, all_data, all_params, amps_list, best_wei
 
         mlflow.log_metrics({"plot time": round(time.time() - t1, 2)})
 
-        all_params["lineout"] = config["lineoutloc"]["val"]
+        all_params["lineout"] = config["data"]["lineouts"]["val"]
         final_params = pandas.DataFrame(all_params)
         final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
         mlflow.set_tag("status", "done plotting")
@@ -218,8 +281,10 @@ def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, confi
     # make plots
     for i in range(num_plots):
         # plot model vs actual
-        titlestr = r"|Error|$^2$" + f" = {sorted_losses[i]}, line out # {config['lineoutloc']['val'][loss_inds[i]]}"
-        filename = f"loss={round(sorted_losses[i])}-lineout={config['lineoutloc']['val'][loss_inds[i]]}.png"
+        titlestr = (
+            r"|Error|$^2$" + f" = {sorted_losses[i]}, line out # {config['data']['lineouts']['val'][loss_inds[i]]}"
+        )
+        filename = f"loss={round(sorted_losses[i])}-lineout={config['data']['lineouts']['val'][loss_inds[i]]}.png"
         fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
         ax.plot(np.squeeze(sorted_data[i, 0, 256:-256]), label="Data")
         ax.plot(np.squeeze(sorted_fits[i, 256:-256]), label="Fit")
@@ -230,9 +295,12 @@ def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, confi
         plt.close(fig)
 
         titlestr = (
-            r"|Error|$^2$" + f" = {sorted_losses[-1 - i]}, line out # {config['lineoutloc']['val'][loss_inds[-1 - i]]}"
+            r"|Error|$^2$"
+            + f" = {sorted_losses[-1 - i]}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
         )
-        filename = f"loss={round(sorted_losses[-1 - i])}-lineout={config['lineoutloc']['val'][loss_inds[-1 - i]]}.png"
+        filename = (
+            f"loss={round(sorted_losses[-1 - i])}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
+        )
         fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
         ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")
         ax.plot(np.squeeze(sorted_fits[-1 - i, 256:-256]), label="Fit")
@@ -260,7 +328,7 @@ def prepare_data(config):
     shotDay = 0  # turn on to switch file retrieval to shot day location
 
     gain = 1
-    bgscalingE = config["bgscale"]  # multiplicitive factor on the EPW BG lineout
+    bgscalingE = config["data"]["bgscale"]  # multiplicitive factor on the EPW BG lineout
     bgscalingI = 0.1  # multiplicitive factor on the IAW BG lineout
     bgshotmult = 1
     flatbg = 0
@@ -302,7 +370,9 @@ def prepare_data(config):
     cmap = mpl.colors.ListedColormap(cmap, name="myColorMap", N=cmap.shape[0])
 
     # Retrieve calibrated axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(config["shotnum"], tstype, CCDsize)
+    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(
+        config["data"]["shotnum"], tstype, CCDsize
+    )
 
     # Data loading and corrections
     # Open data stored from the previous run (inactivated for now)
@@ -313,7 +383,7 @@ def prepare_data(config):
     #    shift_zero = prevShot.shift_zero;
 
     [elecData, ionData, xlab, shift_zero] = load_data(
-        config["shotnum"], shotDay, tstype, magE, config["other"]["extraoptions"]
+        config["data"]["shotnum"], shotDay, tstype, magE, config["other"]["extraoptions"]
     )
 
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
@@ -334,9 +404,9 @@ def prepare_data(config):
     # prevShot.shift_zero = shift_zero;
 
     # Background Shot subtraction
-    if config["bgshot"]["type"] == "Shot":
+    if config["data"]["background_shot"]["type"] == "Shot":
         [BGele, BGion, _, _] = load_data(
-            config["bgshot"]["val"], shotDay, tstype, magE, config["other"]["extraoptions"]
+            config["data"]["background_shot"]["val"], shotDay, tstype, magE, config["other"]["extraoptions"]
         )
         if config["other"]["extraoptions"]["load_ion_spec"]:
             ionData_bsub = ionData - conv2(BGion, np.ones([5, 3]) / 15, mode="same")
@@ -352,33 +422,34 @@ def prepare_data(config):
         ionData_bsub = ionData
 
     # Assign lineout locations
-    if config["lineoutloc"]["type"] == "ps":
-        LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["lineoutloc"]["val"]]
+    if config["data"]["lineouts"]["type"] == "ps":
+        LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
         LineoutPixelI = LineoutPixelE
 
-    elif config["lineoutloc"]["type"] == "um":  # [char(hex2dec('03bc')) 'm']:
-        LineoutPixelE = [np.argmin(abs(axisxE - loc)) for loc in config["lineoutloc"]["val"]]
+    elif config["data"]["lineouts"]["type"] == "um":  # [char(hex2dec('03bc')) 'm']:
+        LineoutPixelE = [np.argmin(abs(axisxE - loc)) for loc in config["data"]["lineouts"]["val"]]
         LineoutPixelI = LineoutPixelE
 
-    elif config["lineoutloc"]["type"] == "pixel":
-        LineoutPixelE = config["lineoutloc"]["val"]
+    elif config["data"]["lineouts"]["type"] == "pixel":
+        LineoutPixelE = config["data"]["lineouts"]["val"]
         LineoutPixelI = LineoutPixelE
 
-    if config["bgloc"]["type"] == "ps":
-        BackgroundPixel = np.argmin(abs(axisxE - config["bgloc"]["val"]))
+    if config["data"]["background"]["type"] == "ps":
+        BackgroundPixel = np.argmin(abs(axisxE - config["data"]["background"]["slice"]))
 
-    elif config["bgloc"]["type"] == "pixel":
-        BackgroundPixel = config["bgloc"]["val"]
+    elif config["data"]["background"]["type"] == "pixel":
+        BackgroundPixel = config["data"]["background"]["slice"]
 
-    elif config["bgloc"]["type"] == "auto":
+    elif config["data"]["background"]["type"] == "auto":
         BackgroundPixel = LineoutPixelE + 100
 
-    span = 2 * config["dpixel"] + 1
+    span = 2 * config["data"]["dpixel"] + 1
     # (span must be odd)
 
     if config["other"]["extraoptions"]["load_ele_spec"]:
         LineoutTSE = [
-            np.mean(elecData_bsub[:, a - config["dpixel"] : a + config["dpixel"]], axis=1) for a in LineoutPixelE
+            np.mean(elecData_bsub[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1)
+            for a in LineoutPixelE
         ]
         LineoutTSE_smooth = [
             np.convolve(LineoutTSE[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
@@ -386,18 +457,20 @@ def prepare_data(config):
 
     if config["other"]["extraoptions"]["load_ion_spec"]:
         LineoutTSI = [
-            np.mean(ionData_bsub[:, a - IAWtime - config["dpixel"] : a - IAWtime + config["dpixel"]], axis=1)
+            np.mean(
+                ionData_bsub[:, a - IAWtime - config["data"]["dpixel"] : a - IAWtime + config["data"]["dpixel"]], axis=1
+            )
             for a in LineoutPixelI
         ]
         LineoutTSI_smooth = [
             np.convolve(LineoutTSI[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
         ]  # was divided by 10 for some reason (removed 8-9-22)
 
-    if config["bgshot"]["type"] == "Fit":
+    if config["data"]["background_shot"]["type"] == "Fit":
         if config["other"]["extraoptions"]["load_ele_spec"]:
             if tstype == 1:
                 [BGele, _, _, _] = load_data(
-                    config["bgshot"]["val"], shotDay, tstype, magE, config["other"]["extraoptions"]
+                    config["data"]["background_shot"]["val"], shotDay, tstype, magE, config["other"]["extraoptions"]
                 )
                 xx = np.arange(1024)
 
@@ -436,7 +509,7 @@ def prepare_data(config):
                 def rat11(x, a, b, c):
                     return (a * x + b) / (x + c)
 
-                for i, _ in enumerate(config["lineoutloc"]["val"]):
+                for i, _ in enumerate(config["data"]["lineouts"]["val"]):
                     [rat1bg, _] = spopt.curve_fit(rat11, bgfitx, LineoutTSE_smooth[i][bgfitx], [-16, 200000, 170])
                     # plt.plot(rat11(np.arange(1024), *rat1bg))
                     # plt.plot(LineoutTSE_smooth[i])
@@ -446,14 +519,18 @@ def prepare_data(config):
     # Attempt to quantify any residual background
     # this has been switched from mean of elecData to mean of elecData_bsub 8-9-22
     if config["other"]["extraoptions"]["load_ion_spec"]:
-        noiseI = np.mean(ionData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
+        noiseI = np.mean(
+            ionData_bsub[:, BackgroundPixel - config["data"]["dpixel"] : BackgroundPixel + config["data"]["dpixel"]], 1
+        )
         noiseI = np.convolve(noiseI, np.ones(span) / span, "same")
         bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
         noiseI = np.mean(noiseI[bgfitx])
         noiseI = np.ones(1024) * bgscalingI * noiseI
 
     if config["other"]["extraoptions"]["load_ele_spec"]:
-        noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
+        noiseE = np.mean(
+            elecData_bsub[:, BackgroundPixel - config["data"]["dpixel"] : BackgroundPixel + config["data"]["dpixel"]], 1
+        )
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
 
         # print(noiseE)
@@ -546,20 +623,10 @@ def prepare_data(config):
 
     parameters = config["parameters"]
 
-    # Setup x0
-    velocity = np.linspace(-7, 7, parameters["fe"]["length"])
-
-    NumDistFunc = get_num_dist_func(parameters["fe"]["type"], velocity)
-    parameters["fe"]["val"] = np.log(NumDistFunc(parameters["m"]["val"]))
-    parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
-    parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
-
-    units = initialize_parameters(config)
-
     all_data = []
     amps_list = []
     # run fitting code for each lineout
-    for i, _ in enumerate(config["lineoutloc"]["val"]):
+    for i, _ in enumerate(config["data"]["lineouts"]["val"]):
         # this probably needs to be done differently
         if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
             data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
@@ -579,4 +646,4 @@ def prepare_data(config):
 
     all_data = np.concatenate(all_data)
     amps_list = np.concatenate(amps_list)
-    return all_data, amps_list, units, velocity, sa
+    return all_data, amps_list, sa
