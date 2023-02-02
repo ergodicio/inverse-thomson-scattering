@@ -10,3 +10,4 @@ mlflow
 boto3
 flatten-dict
 flatdict
+dm-haiku

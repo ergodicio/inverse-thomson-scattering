@@ -2,7 +2,7 @@
 #new calibration values should be added here as they are calculated
 import numpy as np
 
-def getCalibrations(shotNum,tstype,CCDsize):
+def get_calibrations(shotNum,tstype,CCDsize):
 
     # Dispersions and calibrations
     if tstype == 1:

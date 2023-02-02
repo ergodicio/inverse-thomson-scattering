@@ -2,10 +2,10 @@ from os.path import join
 
 from pyhdf.SD import SD, SDC
 import numpy as np
-from inverse_thomson_scattering.v0.warpcorr import warpCorrection
+from inverse_thomson_scattering.process.warpcorr import perform_warp_correction
 
 
-def loadData(sNum, sDay, specType, magE, loadspecs):
+def load_data(sNum, sDay, specType, magE, loadspecs):
     """
     This function loads the appropriate data based off the provided shot number (sNum) and the type of data specified
     using specType. The flag sDay changes the default path to the temporary archive on the redwood server and will
@@ -71,10 +71,10 @@ def loadData(sNum, sDay, specType, magE, loadspecs):
                 eDat = sds_obj.get()  # get sds data
                 eDat = eDat.astype("float64")
                 eDat = eDat[0, :, :] - eDat[1, :, :]
-                
-                eDat = warpCorrection(eDat) #correction file need to be updated
-                #eDat = eDat[16:1039,16:1039]
-                
+
+                eDat = perform_warp_correction(eDat)  # correction file need to be updated
+                # eDat = eDat[16:1039,16:1039]
+
             except BaseException:
                 print("Unable to find Streaked EPW")
                 eDat = []

@@ -6,34 +6,66 @@ import matplotlib as mpl
 import numpy as np
 import scipy.optimize as spopt
 import time
-import mlflow, jax
+import mlflow
 import yaml
 
 from scipy.signal import convolve2d as conv2
-from inverse_thomson_scattering.v0.loadTSdata import loadData
-from inverse_thomson_scattering.v0.correctThroughput import correctThroughput
-from inverse_thomson_scattering.v0.getCalibrations import getCalibrations
-from inverse_thomson_scattering.v0.numDistFunc import get_num_dist_func
-from inverse_thomson_scattering.v0.plotstate import plotState
-from inverse_thomson_scattering.v0.fitmodl import get_fit_model
-from inverse_thomson_scattering.v0.loss_function import get_loss_function
+from inverse_thomson_scattering.misc.load_ts_data import load_data
+from inverse_thomson_scattering.process.correct_throughput import correct_throughput
+from inverse_thomson_scattering.misc.calibration import get_calibrations
+from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
+from inverse_thomson_scattering.loss_function import get_loss_function
 
 
-def unnumpy_dict(this_dict: Dict):
-    new_dict = {}
-    for k, v in this_dict.items():
-        if isinstance(v, Dict):
-            new_v = unnumpy_dict(v)
-        elif isinstance(v, np.ndarray):
-            new_v = [float(val) for val in v]
-        elif isinstance(v, jax.numpy.ndarray):
-            new_v = [float(val) for val in v]
-        else:
-            new_v = v
+def initialize_parameters(config: Dict) -> Dict:
+    init_params = {}
+    lb = {}
+    ub = {}
+    parameters = config["parameters"]
+    for i, _ in enumerate(config["lineoutloc"]["val"]):
+        for key in parameters.keys():
+            if parameters[key]["active"]:
+                init_params[key] = []
+                lb[key] = []
+                ub[key] = []
+                if np.size(parameters[key]["val"]) > 1:
+                    init_params[key].append(parameters[key]["val"][i])
+                elif isinstance(parameters[key]["val"], list):
+                    init_params[key].append(parameters[key]["val"][0])
+                else:
+                    init_params[key].append(parameters[key]["val"])
+                lb[key].append(parameters[key]["lb"])
+                ub[key].append(parameters[key]["ub"])
 
-        new_dict[k] = new_v
+    init_params = {k: np.array(v) for k, v in init_params.items()}
+    lb = {k: np.array(v) for k, v in lb.items()}
+    ub = {k: np.array(v) for k, v in ub.items()}
 
-    return new_dict
+    norms = {}
+    shifts = {}
+    if config["optimizer"]["x_norm"]:
+        for k, v in init_params.items():
+            norms[k] = 2 * (ub[k] - lb[k])
+            shifts[k] = lb[k]
+    else:
+        for k, v in init_params.items():
+            norms[k] = np.ones_like(init_params)
+            shifts[k] = np.zeros_like(init_params)
+
+    init_params = {k: (v - shifts[k]) / norms[k] for k, v in init_params.items()}
+    lower_bound = {k: (v - shifts[k]) / norms[k] for k, v in lb.items()}
+    upper_bound = {k: (v - shifts[k]) / norms[k] for k, v in ub.items()}
+
+    init_params_arr = np.array([v for k, v in init_params.items()])
+    lb_arr = np.array([v for k, v in lower_bound.items()])
+    ub_arr = np.array([v for k, v in upper_bound.items()])
+
+    return {
+        "pytree": {"init_params": init_params, "lb": lb, "rb": ub},
+        "array": {"init_params": init_params_arr, "lb": lb_arr, "ub": ub_arr},
+        "norms": norms,
+        "shifts": shifts,
+    }
 
 
 def fit(config):
@@ -134,7 +166,7 @@ def fit(config):
     cmap = mpl.colors.ListedColormap(cmap, name="myColorMap", N=cmap.shape[0])
 
     # Retrieve calibrated axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = getCalibrations(config["shotnum"], tstype, CCDsize)
+    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(config["shotnum"], tstype, CCDsize)
 
     # Data loading and corrections
     # Open data stored from the previous run (inactivated for now)
@@ -144,7 +176,7 @@ def fit(config):
     #    xlab = prevShot.xlab;
     #    shift_zero = prevShot.shift_zero;
 
-    [elecData, ionData, xlab, shift_zero] = loadData(
+    [elecData, ionData, xlab, shift_zero] = load_data(
         config["shotnum"], shotDay, tstype, magE, config["D"]["extraoptions"]
     )
 
@@ -158,7 +190,7 @@ def fit(config):
         print("EPW data not loaded, omitting EPW fit")
 
     if config["D"]["extraoptions"]["load_ele_spec"]:
-        elecData = correctThroughput(elecData, tstype, axisyE)
+        elecData = correct_throughput(elecData, tstype, axisyE)
     # prevShot.config["shotnum"] = config["shotnum"];
     # prevShot.elecData = elecData;
     # prevShot.ionData = ionData;
@@ -167,11 +199,11 @@ def fit(config):
 
     # Background Shot subtraction
     if config["bgshot"]["type"] == "Shot":
-        [BGele, BGion, _, _] = loadData(config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"])
+        [BGele, BGion, _, _] = load_data(config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"])
         if config["D"]["extraoptions"]["load_ion_spec"]:
             ionData_bsub = ionData - conv2(BGion, np.ones([5, 3]) / 15, mode="same")
         if config["D"]["extraoptions"]["load_ele_spec"]:
-            BGele = correctThroughput(BGele, tstype, axisyE)
+            BGele = correct_throughput(BGele, tstype, axisyE)
             if tstype == 1:
                 elecData_bsub = elecData - bgshotmult * conv2(BGele, np.ones([5, 5]) / 25, mode="same")
             else:
@@ -226,7 +258,7 @@ def fit(config):
     if config["bgshot"]["type"] == "Fit":
         if config["D"]["extraoptions"]["load_ele_spec"]:
             if tstype == 1:
-                [BGele, _, _, _] = loadData(
+                [BGele, _, _, _] = load_data(
                     config["bgshot"]["val"], shotDay, tstype, magE, config["D"]["extraoptions"]
                 )
                 xx = np.arange(1024)
@@ -267,10 +299,10 @@ def fit(config):
                     return (a * x + b) / (x + c)
 
                 for i, _ in enumerate(config["lineoutloc"]["val"]):
-                    [rat1bg, _] = spopt.curve_fit(rat11, bgfitx, LineoutTSE_smooth[i][bgfitx],[-16,200000,170])
-                    #plt.plot(rat11(np.arange(1024), *rat1bg))
-                    #plt.plot(LineoutTSE_smooth[i])
-                    #plt.show()
+                    [rat1bg, _] = spopt.curve_fit(rat11, bgfitx, LineoutTSE_smooth[i][bgfitx], [-16, 200000, 170])
+                    # plt.plot(rat11(np.arange(1024), *rat1bg))
+                    # plt.plot(LineoutTSE_smooth[i])
+                    # plt.show()
                     LineoutTSE_smooth[i] = LineoutTSE_smooth[i] - rat11(np.arange(1024), *rat1bg)
 
     # Attempt to quantify any residual background
@@ -285,19 +317,19 @@ def fit(config):
     if config["D"]["extraoptions"]["load_ele_spec"]:
         noiseE = np.mean(elecData_bsub[:, BackgroundPixel - config["dpixel"] : BackgroundPixel + config["dpixel"]], 1)
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
-        #print(noiseE)
+        # print(noiseE)
         def exp2(x, a, b, c, d):
             return a * np.exp(-b * x) + c * np.exp(-d * x)
 
         bgfitx = np.hstack(
             [np.arange(250, 480), np.arange(540, 900)]
         )  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
-        plt.plot(bgfitx,noiseE[bgfitx])
-        #[expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
+        plt.plot(bgfitx, noiseE[bgfitx])
+        # [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[1000, 0.001, 1000, 0.001])
         [expbg, _] = spopt.curve_fit(exp2, bgfitx, noiseE[bgfitx], p0=[200, 0.001, 200, 0.001])
         noiseE = bgscalingE * exp2(np.arange(1024), *expbg)
-        plt.plot(bgfitx,noiseE[bgfitx])
-        plt.plot(bgfitx,exp2(bgfitx,200,0.001,200,0.001))
+        plt.plot(bgfitx, noiseE[bgfitx])
+        plt.plot(bgfitx, exp2(bgfitx, 200, 0.001, 200, 0.001))
         plt.show()
 
         # temporary constant addition to the background
@@ -383,25 +415,11 @@ def fit(config):
     parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
     parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
 
-    x0 = []
-    lb = []
-    ub = []
-    xiter = []
-    for i, _ in enumerate(config["lineoutloc"]["val"]):
-        for key in parameters.keys():
-            if parameters[key]["active"]:
-                if np.size(parameters[key]["val"])>1:
-                    x0.append(parameters[key]["val"][i])
-                elif isinstance(parameters[key]["val"], list):
-                    x0.append(parameters[key]["val"][0])
-                else:
-                    x0.append(parameters[key]["val"])
-                lb.append(parameters[key]["lb"])
-                ub.append(parameters[key]["ub"])
+    units = initialize_parameters(config)
 
-    x0=np.array(x0)
-    lb=np.array(lb)
-    ub=np.array(ub)
+    #x0=np.array(x0)
+    #lb=np.array(lb)
+    #ub=np.array(ub)
 
     all_data = []
     config["D"]["PhysParams"]["amps"] = []
@@ -423,97 +441,87 @@ def fit(config):
         all_data.append(data[None, :])
         config["D"]["PhysParams"]["amps"].append(np.array(amps)[None, :])
 
-    #x0 = np.repeat(np.array(x0)[None, :], repeats=len(all_data), axis=0).flatten()
-    #lb = np.repeat(np.array(lb)[None, :], repeats=len(all_data), axis=0).flatten()
-    #ub = np.repeat(np.array(ub)[None, :], repeats=len(all_data), axis=0).flatten()
-    if config["optimizer"]["x_norm"]:
-        norms = 2 * (ub - lb)
-        shifts = lb
-    else:
-        norms = np.ones_like(x0)
-        shifts = np.zeros_like(x0)
-
-    x0 = (x0 - shifts) / norms
-    lb = (lb - shifts) / norms
-    ub = (ub - shifts) / norms
-    #print(x0)
-    #print(shifts)
-    #print(norms)
-
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, np.concatenate(all_data), norms, shifts)
+    loss_fn, vg_loss_fn, hess_fn = get_loss_function(
+        config, xie, sa, np.concatenate(all_data), units["norms"], units["shifts"], backend="haiku"
+    )
 
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
     # Perform fit
-    if np.shape(x0)[0] != 0:
+    if np.shape(units["array"]["init_params"])[0] != 0:
         res = spopt.minimize(
             vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
-            x0,
+            units["array"]["init_params"],
             method=config["optimizer"]["method"],
             jac=True if config["optimizer"]["grad_method"] == "AD" else False,
             hess=hess_fn if config["optimizer"]["hessian"] else None,
-            bounds=zip(lb, ub),
+            bounds=zip(units["array"]["lb"], units["array"]["ub"]),
             options={"disp": True},
         )
     else:
-        x = x0
+        x = units["pytree"]["init_params"]
 
-    print(res.status)
-    print(res.message)
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
-    fit_model = get_fit_model(config, xie, sa)
-    init_x = (x0 * norms + shifts).reshape((len(all_data), -1))
-    final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
+    i = 0
+    final_x = []
+    for k, v in units["pytree"]["init_params"].items():
+        final_x.append((res.x[i] * units["norms"][k] + units["shifts"][k]).reshape((len(all_data), -1)))
+        i += 1
 
-    print("plotting")
-    mlflow.set_tag("status", "plotting")
+    final_x = np.concatenate(final_x, axis=-1)
+    # fit_model = get_fit_model(config, xie, sa)
+    # init_x = (init_params * norms + shifts).reshape((len(all_data), -1))
+    # final_x = (res.x * norms + shifts).reshape((len(all_data), -1))
 
-    if len(config["lineoutloc"]["val"]) > 4:
-        plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 2, replace=False)
-    else:
-        #plot_inds = config["lineoutloc"]["val"]
-        plot_inds = np.arange(len(config["lineoutloc"]["val"]))
-
-    t1 = time.time()
-    fig = plt.figure(figsize=(14, 6))
-    with tempfile.TemporaryDirectory() as td:
-        for i in plot_inds:
-            curline=config["lineoutloc"]["val"][i]
-            fig.clf()
-            ax = fig.add_subplot(1, 2, 1)
-            ax2 = fig.add_subplot(1, 2, 2)
-            # Plot initial guess
-            fig, ax = plotState(
-                init_x[i],
-                config,
-                config["D"]["PhysParams"]["amps"][i][0],
-                xie,
-                sa,
-                all_data[i][0],
-                fitModel2=fit_model,
-                fig=fig,
-                ax=[ax, ax2],
-            )
-            fig.savefig(os.path.join(td, f"before-{curline}.png"), bbox_inches="tight")
-
-            fig.clf()
-            ax = fig.add_subplot(1, 2, 1)
-            ax2 = fig.add_subplot(1, 2, 2)
-            fig, ax = plotState(
-                final_x[i],
-                config,
-                config["D"]["PhysParams"]["amps"][i][0],
-                xie,
-                sa,
-                all_data[i][0],
-                fitModel2=fit_model,
-                fig=fig,
-                ax=[ax, ax2],
-            )
-            fig.savefig(os.path.join(td, f"after-{curline}.png"), bbox_inches="tight")
-        mlflow.log_artifacts(td, artifact_path="plots")
+    # print("plotting")
+    # mlflow.set_tag("status", "plotting")
+    #
+    # if len(config["lineoutloc"]["val"]) > 4:
+    #     plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 2, replace=False)
+    # else:
+    #     # plot_inds = config["lineoutloc"]["val"]
+    #     plot_inds = np.arange(len(config["lineoutloc"]["val"]))
+    #
+    # t1 = time.time()
+    # fig = plt.figure(figsize=(14, 6))
+    # with tempfile.TemporaryDirectory() as td:
+    #     for i in plot_inds:
+    #         curline = config["lineoutloc"]["val"][i]
+    #         fig.clf()
+    #         ax = fig.add_subplot(1, 2, 1)
+    #         ax2 = fig.add_subplot(1, 2, 2)
+    #         # Plot initial guess
+    #         fig, ax = plotState(
+    #             init_x[i],
+    #             config,
+    #             config["D"]["PhysParams"]["amps"][i][0],
+    #             xie,
+    #             sa,
+    #             all_data[i][0],
+    #             fitModel2=fit_model,
+    #             fig=fig,
+    #             ax=[ax, ax2],
+    #         )
+    #         fig.savefig(os.path.join(td, f"before-{curline}.png"), bbox_inches="tight")
+    #
+    #         fig.clf()
+    #         ax = fig.add_subplot(1, 2, 1)
+    #         ax2 = fig.add_subplot(1, 2, 2)
+    #         fig, ax = plotState(
+    #             final_x[i],
+    #             config,
+    #             config["D"]["PhysParams"]["amps"][i][0],
+    #             xie,
+    #             sa,
+    #             all_data[i][0],
+    #             fitModel2=fit_model,
+    #             fig=fig,
+    #             ax=[ax, ax2],
+    #         )
+    #         fig.savefig(os.path.join(td, f"after-{curline}.png"), bbox_inches="tight")
+    #     mlflow.log_artifacts(td, artifact_path="plots")
 
     metrics_dict = {"loss": res.fun, "num_iterations": res.nit, "num_fun_eval": res.nfev, "num_jac_eval": res.njev}
     mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})
@@ -537,14 +545,16 @@ def fit(config):
     #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
     # elif result["m"]["active"]:
     #    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
-    
-    #mlflow.log_params(config["parameters"])
-    #result = config["parameters"]
+
+    # mlflow.log_params(config["parameters"])
+    # result = config["parameters"]
 
     with tempfile.TemporaryDirectory() as td:
         with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
             yaml.dump(outputs, fi)
 
         mlflow.log_artifacts(td)
-    result = config["parameters"]
-    return result
+
+    return outputs
+    # result = config["parameters"]
+    # return result
