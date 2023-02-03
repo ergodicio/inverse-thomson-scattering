@@ -13,14 +13,14 @@ from inverse_thomson_scattering.misc import utils
 
 if __name__ == "__main__":
 
-    numtimes = 10
+    numtimes = 1
     starttimes = np.linspace(1600, 3700, numtimes + 1)
     ms = [3.0, 3.0, 3.0, 3.5, 3.0, 3.0, 2.5, 2.5, 2.5, 2.5]
     for ii in range(numtimes):
         tstart = starttimes[ii]
         tend = starttimes[ii + 1]
 
-        for num_slices in [8]:  # [1, 2, 4, 8, 16, 32][::-1]:
+        for num_slices in [2]:#[8]:  # [1, 2, 4, 8, 16, 32][::-1]:
             slices = [int(i) for i in np.linspace(tstart, tend, num_slices)]
             slices = slices[:-1]
 
@@ -35,68 +35,18 @@ if __name__ == "__main__":
             config = unflatten(defaults)
 
             bgshot = {"type": [], "val": []}
-            # bgshot = {"type": "Fit", "val": 102584}
-            lnout = {"type": "ps", "val": slices}
-            # lnout = {"type": "um", "val": slices}
-            bglnout = {"type": "pixel", "val": 900}
-            extraoptions = {"spectype": 2}
+            #bgshot = {"type": "Fit", "val": []}
+            #bgshot = {"type": "Fit", "val": 94477}
+            #lnout = {"type": "ps", "val": slices}
+            #lnout = {"type": "um", "val": slices}
+            lnout = {"type": "pixel", "val": [500]}
+            #lnout = {"type": "range", "val": [90, 1015]} #new unique option for ARTS defines the range over which to perform the full matching
+            bglnout = {"type": "pixel", "val": 900, "show": True}
 
-            config["parameters"]["Te"]["val"] = list(
-                np.interp(
-                    slices,
-                    np.linspace(1600, 3700, 19),
-                    [
-                        0.2,
-                        0.4,
-                        0.5,
-                        0.55,
-                        0.6,
-                        0.6,
-                        0.65,
-                        0.65,
-                        0.65,
-                        0.65,
-                        0.65,
-                        0.5,
-                        0.4,
-                        0.4,
-                        0.3,
-                        0.3,
-                        0.25,
-                        0.2,
-                        0.2,
-                    ],
-                )
-            )
-            config["parameters"]["ne"]["val"] = list(
-                np.interp(
-                    slices,
-                    np.linspace(1600, 3700, 19),
-                    [
-                        0.15,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.2,
-                        0.15,
-                        0.15,
-                        0.15,
-                        0.15,
-                    ],
-                )
-            )
-            # config["parameters"]["m"]["val"]= np.array(np.interp(slices, np.linspace(1600,3700,19), [2.2,3.,3.,3.,3.,3.,3.5,3.5,3.5,3.,3.,3.,3.,2.5,2.5,2.5,2.5,2.5,2.5]))
-            config["parameters"]["m"]["val"] = ms[ii]
+            #config["parameters"]["Te"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.2,.4,.5,.55,.6,.6,.65,.65,.65,.65,.65,.5,.4,.4,.3,.3,.25,.2,.2]))
+            #config["parameters"]["ne"]["val"]= list(np.interp(slices, np.linspace(1600,3700,19), [.15,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.2,.15,.15,.15,.15]))
+            #config["parameters"]["m"]["val"]= np.array(np.interp(slices, np.linspace(1600,3700,19), [2.2,3.,3.,3.,3.,3.,3.5,3.5,3.5,3.,3.,3.,3.,2.5,2.5,2.5,2.5,2.5,2.5]))
+            #config["parameters"]["m"]["val"]=ms[ii]
 
             mlflow.set_experiment(config["mlflow"]["experiment"])
 
@@ -109,10 +59,10 @@ if __name__ == "__main__":
                 config["bgshot"] = bgshot
                 config["lineoutloc"] = lnout
                 config["bgloc"] = bglnout
-                config["extraoptions"] = extraoptions
                 config["num_cores"] = int(mp.cpu_count())
 
-                config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
+                #config = {**config, **dict(shotnum=94475, dpixel=2)}
+                config = {**config, **dict(shotnum=101675, dpixel=2)}
 
                 mlflow.log_params({"num_slices": len(slices)})
                 t0 = time.time()

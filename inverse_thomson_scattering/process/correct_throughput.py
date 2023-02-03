@@ -7,20 +7,22 @@ from os.path import join, exists
 import matplotlib.pyplot as plt
 
 
-def correct_throughput(data, tstype, axisy):
-
-    if tstype == 1:
-        imp = sio.loadmat(join("files", "spectral_sensitivity.mat"), variable_names="speccal")
-        speccal = imp["speccal"]
-        if Fshotnum < 95000:
-            vq1 = speccal
+def correctThroughput(data, tstype, axisy, shotNum):
+    if tstype == "angular":
+        imp = sio.loadmat(join('files', 'spectral_sensitivity.mat'), variable_names='speccal')
+        speccal = imp['speccal']
+        # not sure if this transpose is correct, need to check once plotting is working
+        speccal = np.transpose(speccal)
+        if shotNum < 95000:
+            vq1 = 1. / speccal
         else:
-            specax = np.array(0, 1023) * 0.214116 + 449.5272
+            specax = np.arange(0, 1023) * .214116 + 449.5272
             speccalshift = sp.interp1d(specax, speccal, "linear", bounds_error=False, fill_value=speccal[0])
-            vq1 = speccalshift(axisy)
+            vq1 = 1. / speccalshift(axisy)
+        # print(np.shape(vq1))
 
-    elif tstype == 2:
-        wb = xlrd.open_workbook(join("files", "Copy of MeasuredSensitivity_9.21.15.xls"))
+    elif tstype == "temporal":
+        wb = xlrd.open_workbook(join('files', 'Copy of MeasuredSensitivity_9.21.15.xls'))
         sheet = wb.sheet_by_index(0)
         sens = np.zeros([301, 2])
 
@@ -28,7 +30,7 @@ def correct_throughput(data, tstype, axisy):
             sens[i - 2, 0] = sheet.cell_value(i, 0)
             sens[i - 2, 1] = sheet.cell_value(i, 1)
 
-        sens[:, 1] = 1.0 / sens[:, 1]
+        sens[:, 1] = 1. / sens[:, 1]
         sens[0:17, 1] = sens[18, 1]  # the sensitivity goes to zero in this location and is not usable
 
         speccalshift = sp.interp1d(sens[:, 0], sens[:, 1], "linear", bounds_error=False, fill_value=sens[0, 1])

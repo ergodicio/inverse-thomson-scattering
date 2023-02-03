@@ -1,15 +1,20 @@
+import copy
+
 from inverse_thomson_scattering.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
+
 from jax import numpy as jnp
 from jax import jit
+#from jax.config import config
 
+#config.update('jax_disable_jit', True)
 
-def get_forward_pass(config, xie, sa):
-    nonMaxwThomsonE_jax = get_form_factor_fn(config["D"]["lamrangE"], backend="jax")
-    nonMaxwThomsonI_jax = get_form_factor_fn(config["D"]["lamrangI"], backend="jax")
+def get_fit_model(config, xie, sa):
+    nonMaxwThomsonE_jax = get_form_factor_fn(config["D"]["lamrangE"], config["D"]["npts"], backend="jax")
+    nonMaxwThomsonI_jax = get_form_factor_fn(config["D"]["lamrangI"], config["D"]["npts"], backend="jax")
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], xie)
 
-    def forward_pass(fitted_params):
+    def fit_model(fitted_params, sa_weights):
 
         parameters = config["parameters"]
         for key in parameters.keys():
@@ -58,7 +63,7 @@ def get_forward_pass(config, xie, sa):
             ThryI = jnp.mean(ThryI, axis=0)
             modlI = jnp.sum(ThryI * sa["weights"], axis=1)
         else:
-            modlI = []
+            modlI = 0
             lamAxisI = []
 
         if config["D"]["extraoptions"]["load_ele_spec"]:
@@ -90,7 +95,10 @@ def get_forward_pass(config, xie, sa):
 
             ThryE = jnp.real(ThryE)
             ThryE = jnp.mean(ThryE, axis=0)
-            modlE = jnp.sum(ThryE * sa["weights"], axis=1)
+            if config["D"]["extraoptions"]["spectype"] == "angular_full":
+                modlE = jnp.matmul(sa_weights, ThryE.transpose())
+            else: 
+                modlE = jnp.sum(ThryE * sa_weights, axis=1)
 
             if config["D"]["iawoff"] and (config["D"]["lamrangE"][0] < lam < config["D"]["lamrangE"][1]):
                 # set the ion feature to 0 #should be switched to a range about lam
@@ -115,9 +123,9 @@ def get_forward_pass(config, xie, sa):
                     modlE = jnp.where(indices, modlE * 10 ** (-config["D"]["iawfilter"][1]), modlE)
 
         else:
-            modlE = []
+            modlE = 0
             lamAxisE = []
 
         return modlE, modlI, lamAxisE, lamAxisI, parameters
 
-    return forward_pass
+    return fit_model
