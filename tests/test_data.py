@@ -30,7 +30,7 @@ def test_data():
 
     bgshot = {"type": [], "val": []}
     lnout = {"type": "pixel", "val": [500]}
-    bglnout = {"type": "pixel", "val": 900}
+    bglnout = {"type": "pixel", "val": 900, "show": False}
     extraoptions = {"spectype": 2}
 
     config["parameters"]["Te"]["val"] = 0.5
