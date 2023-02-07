@@ -2,16 +2,16 @@ import copy
 
 from inverse_thomson_scattering.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
+
 from jax import numpy as jnp
 
 
-def get_forward_pass(config, sa, backend: str = "haiku"):
-    nonMaxwThomsonE_jax = get_form_factor_fn(config["other"]["lamrangE"], backend=backend)
-    nonMaxwThomsonI_jax = get_form_factor_fn(config["other"]["lamrangI"], backend=backend)
+def get_fit_model(config, sa, backend: str = "haiku"):
+    nonMaxwThomsonE_jax = get_form_factor_fn(config["other"]["lamrangE"], npts=config["other"]["npts"], backend=backend)
+    nonMaxwThomsonI_jax = get_form_factor_fn(config["other"]["lamrangI"], npts=config["other"]["npts"], backend=backend)
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
 
-    def forward_pass(fitted_params):
-
+    def fit_model(fitted_params, sa_weights):
         parameters = copy.deepcopy(config["parameters"])
         for key in parameters.keys():
             # if parameters[key]["active"]:
@@ -59,7 +59,7 @@ def get_forward_pass(config, sa, backend: str = "haiku"):
             ThryI = jnp.mean(ThryI, axis=0)
             modlI = jnp.sum(ThryI * sa["weights"], axis=1)
         else:
-            modlI = []
+            modlI = 0
             lamAxisI = []
 
         if config["other"]["extraoptions"]["load_ele_spec"]:
@@ -91,7 +91,10 @@ def get_forward_pass(config, sa, backend: str = "haiku"):
 
             ThryE = jnp.real(ThryE)
             ThryE = jnp.mean(ThryE, axis=0)
-            modlE = jnp.sum(ThryE * sa["weights"], axis=1)
+            if config["other"]["extraoptions"]["spectype"] == "angular_full":
+                modlE = jnp.matmul(sa_weights, ThryE.transpose())
+            else:
+                modlE = jnp.sum(ThryE * sa_weights, axis=1)
 
             if config["other"]["iawoff"] and (config["other"]["lamrangE"][0] < lam < config["other"]["lamrangE"][1]):
                 # set the ion feature to 0 #should be switched to a range about lam
@@ -118,9 +121,9 @@ def get_forward_pass(config, sa, backend: str = "haiku"):
                     indices = (filterb < lamAxisE) & (filterr > lamAxisE)
                     modlE = jnp.where(indices, modlE * 10 ** (-config["other"]["iawfilter"][1]), modlE)
         else:
-            modlE = []
+            modlE = 0
             lamAxisE = []
 
         return modlE, modlI, lamAxisE, lamAxisI, parameters
 
-    return forward_pass
+    return fit_model

@@ -28,6 +28,11 @@ def test_data():
     defaults.update(flatten(inputs))
     config = unflatten(defaults)
 
+    bgshot = {"type": [], "val": []}
+    lnout = {"type": "pixel", "val": [500]}
+    bglnout = {"type": "pixel", "val": 900}
+    extraoptions = {"spectype": 2}
+
     config["parameters"]["Te"]["val"] = 0.5
     config["parameters"]["ne"]["val"] = 0.2  # 0.25
     config["parameters"]["m"]["val"] = 3.0  # 2.2

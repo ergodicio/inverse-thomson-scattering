@@ -100,13 +100,22 @@ other:
         norm: 0
     iawoff: 0
     iawfilter: [1, 4, 24, 528]
+    CCDsize: [1024, 1024]
+    flatbg: 0
+    gain: 1
+    points_per_pixel: 5
 
 data:
     shotnum: 101675
-    background_shot:
-        type: None
-        val: None
-    bgscale: 1
+    shotDay: False
+    fit_rng:
+        blue_min: 450
+        blue_max: 510
+        red_min: 540
+        red_max: 625
+    bgscaleE: 1.0
+    bgscaleI: 0.1
+    bgshotmult: 1
     dpixel: 2
     lineouts:
         type:
@@ -128,15 +137,16 @@ optimizer:
     method: adam
     hessian: False
     y_norm: False
-    x_norm: True
+    x_norm: False
     grad_method: AD
     batch_size: 4
-    num_epochs: 300
+    num_epochs: 10
     learning_rate: 5.0e-3
+    parameter_norm: True
 
 nn:
-    use: False
-    conv_filters: 64|32|32 # 64|64|32|32|32
+    use: True
+    conv_filters: 64|32|32 #|32|32
     linear_widths: 32|16
 
 
