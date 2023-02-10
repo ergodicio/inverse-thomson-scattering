@@ -261,13 +261,13 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         def __call__(self, batch):
             params = self.initialize_params(batch["data"])
-            modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params, sas["weights"])
+            modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)  # , sas["weights"])
             ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess_thry(
                 modlE, modlI, lamAxisE, lamAxisI, batch["amps"], live_TSinputs
             )
 
-            ThryE = ThryE + jnp.array(config["other"]["PhysParams"]["noiseE"])
-            ThryI = ThryI + jnp.array(config["other"]["PhysParams"]["noiseI"])
+            ThryE = ThryE + batch["noise_e"]
+            # ThryI = ThryI + batch["noise_i"]
 
             return ThryE, ThryI, lamAxisE, lamAxisI, params
 
@@ -285,17 +285,18 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         i_error = 0.0
         e_error = 0.0
         spectrumator = TSSpectraGenerator(config_for_loss)
-        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator({"data": normed_batch, "amps": batch["amps"]})
+        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator(
+            {"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]}
+        )
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-            i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm), axis=0)
+            i_error += jnp.square(i_data - ThryI) / jnp.square(i_norm)
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
             _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
             _error_ = jnp.where(
-                (lamAxisE > config["data"]["fit_rng"]["blue_min"])
-                & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
+                (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
                 _error_,
                 0.0,
             )
@@ -311,7 +312,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             )
             e_error += _error_
 
-        return i_error + e_error, [ThryE, normed_e_data, params]
+        return e_error, [ThryE, normed_e_data, params]
 
     def loss_fn(batch):
         i_data = batch["data"][:, 1, :]
@@ -325,17 +326,17 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         i_error = 0.0
         e_error = 0.0
         spectrumator = TSSpectraGenerator(config_for_loss)
-        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator({"data": normed_batch, "amps": batch["amps"]})
+        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator(
+            {"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]}
+        )
 
         if config["other"]["extraoptions"]["fit_IAW"]:
-            #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
             i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
             _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
             _error_ = jnp.where(
-                (lamAxisE > config["data"]["fit_rng"]["blue_min"])
-                & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
+                (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
                 _error_,
                 0.0,
             )
@@ -394,10 +395,13 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     config_for_params = copy.deepcopy(config)
 
     def __get_params__(batch):
-        i_data = batch["data"][:, 1, :] / i_norm
-        e_data = batch["data"][:, 0, :] / e_norm
+        i_data = batch["data"][:, 1, :]
+        e_data = batch["data"][:, 0, :]
 
-        normed_batch = jnp.concatenate([e_data[:, None, :], i_data[:, None, :]], axis=1)
+        normed_i_data = i_data / i_input_norm
+        normed_e_data = e_data / e_input_norm
+
+        normed_batch = jnp.concatenate([normed_e_data[:, None, :], normed_i_data[:, None, :]], axis=1)
         spectrumator = TSSpectraGenerator(config_for_params)
         ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator({"data": normed_batch, "amps": batch["amps"]})
 

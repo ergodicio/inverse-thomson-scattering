@@ -11,7 +11,7 @@ def get_fit_model(config, sa, backend: str = "haiku"):
     nonMaxwThomsonI_jax = get_form_factor_fn(config["other"]["lamrangI"], npts=config["other"]["npts"], backend=backend)
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
 
-    def fit_model(fitted_params, sa_weights):
+    def fit_model(fitted_params):
         parameters = copy.deepcopy(config["parameters"])
         for key in parameters.keys():
             # if parameters[key]["active"]:
@@ -92,9 +92,9 @@ def get_fit_model(config, sa, backend: str = "haiku"):
             ThryE = jnp.real(ThryE)
             ThryE = jnp.mean(ThryE, axis=0)
             if config["other"]["extraoptions"]["spectype"] == "angular_full":
-                modlE = jnp.matmul(sa_weights, ThryE.transpose())
+                modlE = jnp.matmul(sa["weights"], ThryE.transpose())
             else:
-                modlE = jnp.sum(ThryE * sa_weights, axis=1)
+                modlE = jnp.sum(ThryE * sa["weights"][0], axis=1)
 
             if config["other"]["iawoff"] and (config["other"]["lamrangE"][0] < lam < config["other"]["lamrangE"][1]):
                 # set the ion feature to 0 #should be switched to a range about lam

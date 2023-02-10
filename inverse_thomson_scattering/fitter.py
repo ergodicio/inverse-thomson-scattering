@@ -100,6 +100,10 @@ def validate_inputs(config):
 
     if config["nn"]["use"]:
         if not len(config["data"]["lineouts"]["val"]) % config["optimizer"]["batch_size"] == 0:
+            num_slices = len(config["data"]["lineouts"]["val"])
+            batch_size = config["optimizer"]["batch_size"]
+            print(f"total slices: {num_slices}")
+            print(f"{batch_size=}")
             print(f"batch size = {config['optimizer']['batch_size']} is not a round divisor of the number of lineouts")
             num_batches = np.ceil(len(config["data"]["lineouts"]["val"]) / config["optimizer"]["batch_size"])
             config["optimizer"]["batch_size"] = int(len(config["data"]["lineouts"]["val"]) // num_batches)
@@ -153,11 +157,13 @@ def fit(config):
     test_batch = {
         "data": all_data["data"][: config["optimizer"]["batch_size"]],
         "amps": all_data["amps"][: config["optimizer"]["batch_size"]],
+        "noise_e": config["other"]["PhysParams"]["noiseE"][: config["optimizer"]["batch_size"]],
+        # "noise_i": config["other"]["PhysParams"]["noiseI"][: config["optimizer"]["batch_size"]],
     }
 
     # prepare optimizer / solver
     loss_dict = get_loss_function(config, sa, test_batch)
-    batch_indices = np.arange(len(all_data))
+    batch_indices = np.arange(len(all_data["data"]))
 
     if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
         jaxopt_kwargs = dict(
@@ -182,14 +188,18 @@ def fit(config):
                 np.random.shuffle(batch_indices)
             batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
             with trange(num_batches, unit="batch") as tbatch:
-                tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {round(epoch_loss)}")
+                tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
                 epoch_loss = 0.0
                 for i_batch in tbatch:
                     inds = batch_indices[i_batch]
-                    batch = {"data": all_data["data"][inds], "amps": all_data["amps"][inds]}
+                    batch = {
+                        "data": all_data["data"][inds],
+                        "amps": all_data["amps"][inds],
+                        "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                    }
                     weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
                     epoch_loss += opt_state.value
-                    tbatch.set_postfix({"Prev Batch Loss": round(opt_state.value)})
+                    tbatch.set_postfix({"Prev Batch Loss": opt_state.value})
 
                 epoch_loss /= num_batches
                 if epoch_loss < best_loss:
@@ -233,10 +243,14 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, array_loss_
         t1 = time.time()
         batch_indices.sort()
         batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-        losses = np.zeros_like(batch_indices)
+        losses = np.zeros_like(batch_indices, dtype=np.float64)
         fits = np.zeros((all_data["data"].shape[0], all_data["data"].shape[2]))
         for i_batch, inds in enumerate(batch_indices):
-            batch = {"data": all_data["data"][inds], "amps": all_data["amps"][inds]}
+            batch = {
+                "data": all_data["data"][inds],
+                "amps": all_data["amps"][inds],
+                "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+            }
             loss, [ThryE, _, params] = array_loss_fn(best_weights, batch)
             losses[i_batch] = np.mean(loss, axis=1)
             fits[inds] = ThryE
@@ -276,9 +290,9 @@ def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, confi
     for i in range(num_plots):
         # plot model vs actual
         titlestr = (
-            r"|Error|$^2$" + f" = {sorted_losses[i]}, line out # {config['data']['lineouts']['val'][loss_inds[i]]}"
+            r"|Error|$^2$" + f" = {sorted_losses[i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[i]]}"
         )
-        filename = f"loss={round(sorted_losses[i])}-lineout={config['data']['lineouts']['val'][loss_inds[i]]}.png"
+        filename = f"loss={sorted_losses[i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[i]]}.png"
         fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
         ax.plot(np.squeeze(sorted_data[i, 0, 256:-256]), label="Data")
         ax.plot(np.squeeze(sorted_fits[i, 256:-256]), label="Fit")
@@ -290,10 +304,10 @@ def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, confi
 
         titlestr = (
             r"|Error|$^2$"
-            + f" = {sorted_losses[-1 - i]}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
+            + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
         )
         filename = (
-            f"loss={round(sorted_losses[-1 - i])}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
+            f"loss={sorted_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
         )
         fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
         ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")

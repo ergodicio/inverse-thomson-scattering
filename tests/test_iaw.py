@@ -25,7 +25,7 @@ def test_iaw():
     re = 2.8179e-13  # classical electron radius cm
     Esq = Me * C**2 * re  # sq of the electron charge keV cm
 
-    nonMaxwThomsonI_jax = get_form_factor_fn([525, 528], backend="jax")
+    nonMaxwThomsonI_jax = get_form_factor_fn([525, 528], npts=8192, backend="jax")
     xie = np.linspace(-7, 7, 1024)
     sa = np.array([60])
     num_dist_func = get_num_dist_func({"DLM": []}, xie)
