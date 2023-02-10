@@ -1,6 +1,99 @@
-import matplotlib.pyplot as plt
 import matplotlib as mpl
+import mlflow, tempfile, os
 import numpy as np
+import matplotlib.pyplot as plt
+
+
+from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
+from inverse_thomson_scattering.generate_spectra import get_fit_model
+
+
+def plotinput(config, sa):
+    parameters = config["parameters"]
+
+    # Setup x0
+    xie = np.linspace(-7, 7, parameters["fe"]["length"])
+
+    NumDistFunc = get_num_dist_func(parameters["fe"]["type"], xie)
+    parameters["fe"]["val"] = np.log(NumDistFunc(parameters["m"]["val"]))
+    parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
+    parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
+
+    x0 = []
+    lb = []
+    ub = []
+    xiter = []
+    for i, _ in enumerate(config["data"]["lineouts"]["val"]):
+        for key in parameters.keys():
+            if parameters[key]["active"]:
+                if np.size(parameters[key]["val"]) > 1:
+                    x0.append(parameters[key]["val"][i])
+                elif isinstance(parameters[key]["val"], list):
+                    x0.append(parameters[key]["val"][0])
+                else:
+                    x0.append(parameters[key]["val"])
+                lb.append(parameters[key]["lb"])
+                ub.append(parameters[key]["ub"])
+
+    x0 = np.array(x0)
+    fit_model = get_fit_model(config, xie, sa)
+
+    print("plotting")
+    mlflow.set_tag("status", "plotting")
+
+    fig = plt.figure(figsize=(14, 6))
+    with tempfile.TemporaryDirectory() as td:
+        fig.clf()
+        ax = fig.add_subplot(1, 2, 1)
+        ax2 = fig.add_subplot(1, 2, 2)
+        fig, ax = plotState(
+            x0,
+            config,
+            [1, 1],
+            xie,
+            sa,
+            [],
+            fitModel2=fit_model,
+            fig=fig,
+            ax=[ax, ax2],
+        )
+        fig.savefig(os.path.join(td, "simulated_spectrum.png"), bbox_inches="tight")
+        mlflow.log_artifacts(td, artifact_path="plots")
+    return
+
+
+def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds):
+    # make plots
+    for i in range(num_plots):
+        # plot model vs actual
+        titlestr = (
+            r"|Error|$^2$" + f" = {sorted_losses[i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[i]]}"
+        )
+        filename = f"loss={sorted_losses[i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[i]]}.png"
+        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
+        ax.plot(np.squeeze(sorted_data[i, 0, 256:-256]), label="Data")
+        ax.plot(np.squeeze(sorted_fits[i, 256:-256]), label="Fit")
+        ax.set_title(titlestr, fontsize=14)
+        ax.legend(fontsize=14)
+        ax.grid()
+        fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
+        plt.close(fig)
+
+        titlestr = (
+            r"|Error|$^2$"
+            + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
+        )
+        filename = (
+            f"loss={sorted_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
+        )
+        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
+        ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")
+        ax.plot(np.squeeze(sorted_fits[-1 - i, 256:-256]), label="Fit")
+        ax.set_title(titlestr, fontsize=14)
+        ax.legend(fontsize=14)
+        ax.grid()
+        fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
+        plt.close(fig)
 
 
 def LinePlots(
@@ -84,6 +177,7 @@ def TScmap():
 
     return cmap
 
+
 def ColorPlots(
     x,
     y,
@@ -140,10 +234,11 @@ def ColorPlots(
         aspect="auto",
         vmin=vmin,
         vmax=vmax,
-        )
-    ax0.set_title(title,
-                  fontdict={"fontsize": 10, "fontweight": "bold"},
-                  )
+    )
+    ax0.set_title(
+        title,
+        fontdict={"fontsize": 10, "fontweight": "bold"},
+    )
     ax0.set_xlabel(XLabel)
     ax0.set_ylabel(YLabel)
     plt.colorbar(im, ax=ax0)
@@ -154,23 +249,23 @@ def ColorPlots(
             ax0.plot(Line[i], Line[i + 1], next(line_colors))
 
     if kaxis:
-        ax2 = ax0.secondary_yaxis('right', fucntions=(forward_kaxis, backward_kaxis))
-        secax_y2.set_ylabel(r'$~v_p/v_{th}$')
+        ax2 = ax0.secondary_yaxis("right", fucntions=(forward_kaxis, backward_kaxis))
+        secax_y2.set_ylabel(r"$~v_p/v_{th}$")
 
         def forward_kaxis(y):
             c = 2.99792458e10
             omgL = 2 * np.pi * 1e7 * c / kaxis[2]
-            omgpe = 5.64 * 10 ** 4 * np.sqrt(kaxis[0])
-            ko = np.sqrt((omgL ** 2 - omgpe ** 2) / c ** 2)
-            newy = np.sqrt(kaxis[0] / (1000 * kaxis[1])) * 1. / (1486 * ko * np.sin(y / 360 * np.pi))
+            omgpe = 5.64 * 10**4 * np.sqrt(kaxis[0])
+            ko = np.sqrt((omgL**2 - omgpe**2) / c**2)
+            newy = np.sqrt(kaxis[0] / (1000 * kaxis[1])) * 1.0 / (1486 * ko * np.sin(y / 360 * np.pi))
             return newy
 
         def backward_kaxis(y):
             c = 2.99792458e10
             omgL = 2 * np.pi * 1e7 * c / kaxis[2]
-            omgpe = 5.64 * 10 ** 4 * np.sqrt(kaxis[0])
-            ko = np.sqrt((omgL ** 2 - omgpe ** 2) / c ** 2)
-            newy = 360 / np.pi * np.arcsin(np.sqrt(kaxis[0] / (1000 * kaxis[1])) * 1. / (1486 * ko * y))
+            omgpe = 5.64 * 10**4 * np.sqrt(kaxis[0])
+            ko = np.sqrt((omgL**2 - omgpe**2) / c**2)
+            newy = 360 / np.pi * np.arcsin(np.sqrt(kaxis[0] / (1000 * kaxis[1])) * 1.0 / (1486 * ko * y))
             return newy
 
     if Residuals:
@@ -182,8 +277,8 @@ def ColorPlots(
 
     plt.show()
 
-def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, ax):
 
+def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, ax):
     [modlE, modlI, lamAxisE, lamAxisI, tsdict] = fitModel2(x, sas["weights"])
 
     lam = config["parameters"]["lam"]["val"]
@@ -197,8 +292,7 @@ def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, a
         stddevI = config["other"]["PhysParams"]["widIRF"]["spect_stddev_ion"]
         originI = (np.amax(lamAxisI) + np.amin(lamAxisI)) / 2.0
         inst_funcI = np.squeeze(
-            (1.0 / (stddevI * np.sqrt(2.0 * np.pi)))
-            * np.exp(-((lamAxisI - originI) ** 2.0) / (2.0 * (stddevI) ** 2.0))
+            (1.0 / (stddevI * np.sqrt(2.0 * np.pi))) * np.exp(-((lamAxisI - originI) ** 2.0) / (2.0 * (stddevI) ** 2.0))
         )  # Gaussian
         ThryI = np.convolve(modlI, inst_funcI, "same")
         ThryI = (np.amax(modlI) / np.amax(ThryI)) * ThryI
@@ -215,8 +309,7 @@ def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, a
         # Conceptual_origin so the convolution doesn't shift the signal
         originE = (np.amax(lamAxisE) + np.amin(lamAxisE)) / 2.0
         inst_funcE = np.squeeze(
-            (1.0 / (stddevE * np.sqrt(2.0 * np.pi)))
-            * np.exp(-((lamAxisE - originE) ** 2.0) / (2.0 * (stddevE) ** 2.0))
+            (1.0 / (stddevE * np.sqrt(2.0 * np.pi))) * np.exp(-((lamAxisE - originE) ** 2.0) / (2.0 * (stddevE) ** 2.0))
         )  # Gaussian
         ThryE = np.convolve(modlE, inst_funcE, "same")
         ThryE = (np.amax(modlE) / np.amax(ThryE)) * ThryE
@@ -299,21 +392,25 @@ def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, a
 
     loss = 0
     if config["other"]["extraoptions"]["fit_IAW"]:
-        loss = loss + np.sum(np.square(data[1, :] - ThryI) /i_data)
+        loss = loss + np.sum(np.square(data[1, :] - ThryI) / i_data)
 
     if config["other"]["extraoptions"]["fit_EPWb"]:
         sqdev = np.square(data[0, :] - ThryE) / ThryE
-        sqdev = np.where((lamAxisE > config["data"]["fit_rng"]["blue_min"])
-                          & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
-                          sqdev, 0.0)
+        sqdev = np.where(
+            (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
+            sqdev,
+            0.0,
+        )
 
         loss = loss + np.sum(sqdev)
 
     if config["other"]["extraoptions"]["fit_EPWr"]:
         sqdev = np.square(data[0, :] - ThryE) / ThryE
-        sqdev = np.where((lamAxisE > config["data"]["fit_rng"]["red_min"])
-                          & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
-                          sqdev, 0.0)
+        sqdev = np.where(
+            (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
+            sqdev,
+            0.0,
+        )
 
         loss = loss + np.sum(sqdev)
 

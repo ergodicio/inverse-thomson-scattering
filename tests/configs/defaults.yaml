@@ -134,7 +134,7 @@ optimizer:
     # use adam for nn / stochastic gradient descent
     # use L-BFGS-B for full batch / parameter learning
     # although adam will work here too
-    method: adam #l-bfgs-b
+    method: l-bfgs-b
     hessian: False
     y_norm: True
     x_norm: False
@@ -145,7 +145,7 @@ optimizer:
     parameter_norm: True
 
 nn:
-    use: True
+    use: False
     conv_filters: 64|32|32 #|32|32
     linear_widths: 32|16
 
