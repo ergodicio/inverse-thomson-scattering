@@ -275,6 +275,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         get_params = _get_params_
         loss_dict = dict(vg_func=vg_func, array_loss_fn=array_loss_fn, init_weights=init_weights, get_params=get_params)
     elif config["optimizer"]["method"] == "l-bfgs-b":
+        if config["nn"]["use"]:
+            raise NotImplementedError("full batch optimization using neural networks is not yet implemented")
         lb, ub, init_weights = init_weights_and_bounds(
             config, init_weights, num_slices=len(config["data"]["lineouts"]["val"])
         )
