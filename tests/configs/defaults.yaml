@@ -121,7 +121,7 @@ data:
         type:
             pixel
         start: 500
-        end: 580
+        end: 502
         skip: 1
     background:
         type:
@@ -134,7 +134,7 @@ optimizer:
     # use adam for nn / stochastic gradient descent
     # use L-BFGS-B for full batch / parameter learning
     # although adam will work here too
-    method: adam
+    method: adam #l-bfgs-b
     hessian: False
     y_norm: True
     x_norm: False

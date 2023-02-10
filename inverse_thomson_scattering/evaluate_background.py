@@ -28,9 +28,7 @@ def get_shot_bg(config, axisyE, elecData):
                 BGele = conv2(BGele, np.ones([5, 3]) / 15, mode="same")
         else:
             BGele = 0
-    elif (
-        config["other"]["extraoptions"]["spectype"] == "angular" and config["data"]["background"]["type"] == "Fit"
-    ):
+    elif config["other"]["extraoptions"]["spectype"] == "angular" and config["data"]["background"]["type"] == "Fit":
         [BGele, _, _, _] = loadData(
             config["data"]["background"]["slice"], config["data"]["shotDay"], config["other"]["extraoptions"]
         )
@@ -106,7 +104,10 @@ def get_lineout_bg(
     if config["other"]["extraoptions"]["load_ion_spec"]:
         # quantify a uniform background
         noiseI = np.mean(
-            (ionData - BGion)[:, BackgroundPixel - config["data"]["dpixel"] : BackgroundPixel + config["data"]["dpixel"]], 1
+            (ionData - BGion)[
+                :, BackgroundPixel - config["data"]["dpixel"] : BackgroundPixel + config["data"]["dpixel"]
+            ],
+            1,
         )
         noiseI = np.convolve(noiseI, np.ones(span) / span, "same")
         bgfitx = np.hstack([np.arange(200, 400), np.arange(700, 850)])
@@ -116,7 +117,9 @@ def get_lineout_bg(
         # add the uniform background to the background from the background shot
         if np.shape(BGion) == tuple(config["other"]["CCDsize"]):
             LineoutBGI = [
-                np.mean(BGion[:, a - IAWtime - config["data"]["dpixel"] : a - IAWtime + config["data"]["dpixel"]], axis=1)
+                np.mean(
+                    BGion[:, a - IAWtime - config["data"]["dpixel"] : a - IAWtime + config["data"]["dpixel"]], axis=1
+                )
                 for a in LineoutPixelI
             ]
             noiseI = noiseI + LineoutBGI
@@ -130,7 +133,10 @@ def get_lineout_bg(
 
         # quantify a background lineout
         noiseE = np.mean(
-            (elecData - BGele)[:, BackgroundPixel - config["data"]["dpixel"] : BackgroundPixel + config["data"]["dpixel"]], 1
+            (elecData - BGele)[
+                :, BackgroundPixel - config["data"]["dpixel"] : BackgroundPixel + config["data"]["dpixel"]
+            ],
+            1,
         )
         noiseE = np.convolve(noiseE, np.ones(span) / span, "same")
 
@@ -173,7 +179,8 @@ def get_lineout_bg(
     if config["other"]["extraoptions"]["load_ele_spec"]:
         if np.shape(BGele) == tuple(config["other"]["CCDsize"]):
             LineoutBGE2 = [
-                np.mean(BGele[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1) for a in LineoutPixelE
+                np.mean(BGele[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1)
+                for a in LineoutPixelE
             ]
             noiseE = noiseE + np.array(LineoutBGE2)
         else:

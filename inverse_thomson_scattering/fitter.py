@@ -1,5 +1,5 @@
 from typing import Dict
-import time, mlflow, os, tempfile, yaml
+import time, os, tempfile
 
 import numpy as np
 import scipy.optimize as spopt
@@ -8,10 +8,7 @@ import matplotlib.pyplot as plt
 import optax, jaxopt, pandas, mlflow
 from tqdm import trange
 from scipy.signal import convolve2d as conv2
-from inverse_thomson_scattering.misc.additional_functions import (
-    get_scattering_angles,
-    plotinput,
-)  # , initialize_parameters
+from inverse_thomson_scattering.misc.additional_functions import get_scattering_angles, plotinput
 from inverse_thomson_scattering.evaluate_background import get_shot_bg
 from inverse_thomson_scattering.misc.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
@@ -19,8 +16,6 @@ from inverse_thomson_scattering.misc.calibration import get_calibrations
 from inverse_thomson_scattering.lineouts import get_lineouts
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.loss_function import get_loss_function
-from inverse_thomson_scattering.generate_spectra import get_fit_model
-from inverse_thomson_scattering.misc.plotters import plotState
 
 
 def initialize_parameters(config: Dict) -> Dict:
@@ -33,10 +28,10 @@ def initialize_parameters(config: Dict) -> Dict:
         if parameters[key]["active"]:
             active_params.append(key)
             # init_params[key] = []
-            lb[key] = []
-            ub[key] = []
-            lb[key].append(parameters[key]["lb"])
-            ub[key].append(parameters[key]["ub"])
+            # lb[key] = []
+            # ub[key] = []
+            lb[key] = parameters[key]["lb"]
+            ub[key] = parameters[key]["ub"]
             # for i, _ in enumerate(config["data"]["lineouts"]["val"]):
             #     if np.size(parameters[key]["val"]) > 1:
             #         init_params[key].append(parameters[key]["val"][i])
@@ -46,8 +41,8 @@ def initialize_parameters(config: Dict) -> Dict:
             #         init_params[key].append(parameters[key]["val"])
 
     # init_params = {k: np.array(v) for k, v in init_params.items()}
-    lb = {k: np.array(v) for k, v in lb.items()}
-    ub = {k: np.array(v) for k, v in ub.items()}
+    # lb = {k: np.array(v) for k, v in lb.items()}
+    # ub = {k: np.array(v) for k, v in ub.items()}
 
     norms = {}
     shifts = {}
@@ -61,12 +56,12 @@ def initialize_parameters(config: Dict) -> Dict:
             shifts[k] = np.zeros_like(lb[k])
 
     # init_params = {k: (v - shifts[k]) / norms[k] for k, v in init_params.items()}
-    lower_bound = {k: (v - shifts[k]) / norms[k] for k, v in lb.items()}
-    upper_bound = {k: (v - shifts[k]) / norms[k] for k, v in ub.items()}
+    # lower_bound = {k: (v - shifts[k]) / norms[k] for k, v in lb.items()}
+    # upper_bound = {k: (v - shifts[k]) / norms[k] for k, v in ub.items()}
 
     # init_params_arr = np.array([v for k, v in init_params.items()])
-    lb_arr = np.array([v for k, v in lower_bound.items()])
-    ub_arr = np.array([v for k, v in upper_bound.items()])
+    # lb_arr = np.array([v for k, v in lower_bound.items()])
+    # ub_arr = np.array([v for k, v in upper_bound.items()])
 
     return {
         "pytree": {"lb": lb, "rb": ub},
@@ -384,15 +379,12 @@ def prepare_data(config: Dict) -> Dict:
         data_res_unit = np.array(
             [np.average(elecData[i : i + lam_res_unit, :], axis=0) for i in range(0, elecData.shape[0], lam_res_unit)]
         )
-        # print("data shape after 1 resize", np.shape(data_res_unit))
         data_res_unit = np.array(
             [
                 np.average(data_res_unit[:, i : i + ang_res_unit], axis=1)
                 for i in range(0, data_res_unit.shape[1], ang_res_unit)
             ]
         )
-        # print("data shape after 2 resize", np.shape(data_res_unit))
-
         all_data = data_res_unit
         config["other"]["PhysParams"]["noiseI"] = 0
         config["other"]["PhysParams"]["noiseE"] = BGele
