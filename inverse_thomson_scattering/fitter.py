@@ -199,7 +199,7 @@ def get_nn_inferences(config, batch_indices, all_data, best_weights, func, empty
         losses[i_batch] = np.mean(loss, axis=1)
         fits[inds] = ThryE
         for k in empty_params.keys():
-            empty_params[k] = np.concatenate([empty_params[k], np.squeeze(params[k])])
+            empty_params[k] = np.concatenate([empty_params[k], params[k].reshape(-1)])
 
     mlflow.log_metrics({"inference time": round(time.time() - t1, 2)})
 
@@ -217,7 +217,7 @@ def get_param_inferences(config, all_data, best_weights, func, empty_params):
         },
     )
     for k in empty_params.keys():
-        empty_params[k] = np.concatenate([empty_params[k], np.squeeze(params[k])])
+        empty_params[k] = np.concatenate([empty_params[k], params[k].reshape(-1)])
     losses = np.mean(loss, axis=1)
     fits = ThryE
     mlflow.log_metrics({"inference time": round(time.time() - t1, 2)})
