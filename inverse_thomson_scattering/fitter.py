@@ -2,6 +2,7 @@ from typing import Dict
 import time, os, tempfile
 
 import numpy as np
+import xarray as xr
 import scipy.optimize as spopt
 
 import optax, jaxopt, pandas, mlflow
@@ -248,6 +249,12 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, array_loss_
         final_params = pandas.DataFrame(all_params)
         final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
         mlflow.set_tag("status", "done plotting")
+
+        coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", np.arange(fits.shape[1]))
+        dat = {"fit": fits, "data": all_data["data"][:, 0, :]}
+        savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
+        savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
+
         mlflow.log_artifacts(td)
 
     return final_params
