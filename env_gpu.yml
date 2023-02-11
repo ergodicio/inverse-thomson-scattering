@@ -30,3 +30,4 @@ dependencies:
       - typing-extensions
       - optax
       - tqdm
+      - xarray
