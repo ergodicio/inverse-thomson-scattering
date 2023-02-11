@@ -33,7 +33,11 @@ def test_iaw():
     lam = 526.5
     constants = jnp.sqrt(4 * jnp.pi * Esq / Me)
 
-    ThryI, lamAxisI = jit(nonMaxwThomsonI_jax)(0.5, 0.2, 1, 1, 1, np.array([0.2 * 1e20]), 0, 0, sa, (fecur, xie), lam)
+    inps = dict(
+        Te=0.5, Ti=0.2, Z=1, A=1, fract=1, ne=np.array([0.2 * 1e20]), Va=0, ud=0, sa=sa, fe=(fecur, xie), lam=lam
+    )
+
+    ThryI, lamAxisI = jit(nonMaxwThomsonI_jax)(**inps)
 
     ThryI = jnp.real(ThryI)
     ThryI = jnp.mean(ThryI, axis=0)

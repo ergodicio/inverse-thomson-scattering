@@ -148,7 +148,8 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         # fe is separated into components distribution function, v / vth axis, angles between f1 and kL
         # if len(fe) == 2:
         DF, x = fe
-        fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
+        fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))
+        # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
 
         # elif len(fe) == 3:
         #     [DF, x, thetaphi] = fe
@@ -173,7 +174,7 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         #
         #     fe_vphi[jnp.isnan(fe_vphi)] = 0
 
-        df = jnp.diff(fe_vphi.squeeze(), 1, 1) / jnp.diff(xie.squeeze(), 1, 1)
+        df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
         df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
 
         chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df

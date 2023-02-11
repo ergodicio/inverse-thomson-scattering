@@ -268,7 +268,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
     rng_key = jax.random.PRNGKey(42)
     init_weights = _get_params_.init(rng_key, dummy_batch)
-    _vg_func_ = jit(value_and_grad(loss_fn, has_aux=True))
+    _vg_func_ = jit(value_and_grad(loss_fn, argnums=0, has_aux=True))
 
     if config["optimizer"]["method"] == "adam":
         vg_func = _vg_func_
@@ -276,35 +276,39 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         loss_dict = dict(vg_func=vg_func, array_loss_fn=array_loss_fn, init_weights=init_weights, get_params=get_params)
     elif config["optimizer"]["method"] == "l-bfgs-b":
         if config["nn"]["use"]:
-            raise NotImplementedError("full batch optimization using neural networks is not yet implemented")
-        lb, ub, init_weights = init_weights_and_bounds(
-            config, init_weights, num_slices=len(config["data"]["lineouts"]["val"])
-        )
-        flattened_weights, unravel_pytree = ravel_pytree(init_weights)
-        flattened_lb, _ = ravel_pytree(lb)
-        flattened_ub, _ = ravel_pytree(ub)
-        bounds = zip(flattened_lb, flattened_ub)
+            init_weights = init_weights
+            flattened_weights, unravel_pytree = ravel_pytree(init_weights)
+            bounds = None
+        else:
+            lb, ub, init_weights = init_weights_and_bounds(
+                config, init_weights, num_slices=len(config["data"]["lineouts"]["val"])
+            )
+            flattened_weights, unravel_pytree = ravel_pytree(init_weights)
+            flattened_lb, _ = ravel_pytree(lb)
+            flattened_ub, _ = ravel_pytree(ub)
+            bounds = zip(flattened_lb, flattened_ub)
 
-        def vg_func(weights: np.ndarray):
+        def vg_func(weights: np.ndarray, batch):
             """
             Full batch training so dummy batch actually contains the whole batch
 
             Args:
                 weights:
+                batch:
 
             Returns:
 
             """
 
             pytree_weights = unravel_pytree(weights)
-            (value, aux), grad = _vg_func_(pytree_weights, dummy_batch)
+            (value, aux), grad = _vg_func_(pytree_weights, batch)
             temp_grad, _ = ravel_pytree(grad)
             flattened_grads = np.array(temp_grad)  # .flatten()
             return value, flattened_grads
 
-        def get_params(weights):
+        def get_params(weights, batch):
             pytree_weights = unravel_pytree(weights)
-            _, _, _, _, params, _, _, _ = _get_params_.apply(pytree_weights, dummy_batch)
+            _, _, _, _, params, _, _, _ = _get_params_.apply(pytree_weights, batch)
 
             return params
 

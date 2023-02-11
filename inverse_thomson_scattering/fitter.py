@@ -61,18 +61,13 @@ def validate_inputs(config):
     num_slices = len(config["data"]["lineouts"]["val"])
     batch_size = config["optimizer"]["batch_size"]
 
-    if config["nn"]["use"]:
-        if not len(config["data"]["lineouts"]["val"]) % config["optimizer"]["batch_size"] == 0:
-            print(f"total slices: {num_slices}")
-            print(f"{batch_size=}")
-            print(f"batch size = {config['optimizer']['batch_size']} is not a round divisor of the number of lineouts")
-            num_batches = np.ceil(len(config["data"]["lineouts"]["val"]) / config["optimizer"]["batch_size"])
-            config["optimizer"]["batch_size"] = int(len(config["data"]["lineouts"]["val"]) // num_batches)
-            print(f"new batch size = {config['optimizer']['batch_size']}")
-    else:
-        if len(config["data"]["lineouts"]["val"]) != config["optimizer"]["batch_size"]:
-            print(f"setting batch size to the number of lineouts")
-            config["optimizer"]["batch_size"] = len(config["data"]["lineouts"]["val"])
+    if not len(config["data"]["lineouts"]["val"]) % config["optimizer"]["batch_size"] == 0:
+        print(f"total slices: {num_slices}")
+        print(f"{batch_size=}")
+        print(f"batch size = {config['optimizer']['batch_size']} is not a round divisor of the number of lineouts")
+        num_batches = np.ceil(len(config["data"]["lineouts"]["val"]) / config["optimizer"]["batch_size"])
+        config["optimizer"]["batch_size"] = int(len(config["data"]["lineouts"]["val"]) // num_batches)
+        print(f"new batch size = {config['optimizer']['batch_size']}")
 
     config["units"] = init_param_norm_and_shift(config)
 
@@ -117,7 +112,7 @@ def fit(config):
     # prepare optimizer / solver
     loss_dict = get_loss_function(config, sa, test_batch)
     batch_indices = np.arange(len(all_data["data"]))
-
+    num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
     t1 = time.time()
     if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
         jaxopt_kwargs = dict(
@@ -136,7 +131,6 @@ def fit(config):
 
         epoch_loss = 1e19
         best_loss = 1e16
-        num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
         for i_epoch in range(config["optimizer"]["num_epochs"]):
             if config["nn"]["use"]:
                 np.random.shuffle(batch_indices)
@@ -164,16 +158,27 @@ def fit(config):
             batch_indices = batch_indices.flatten()
 
     elif config["optimizer"]["method"] == "l-bfgs-b":
-        res = spopt.minimize(
-            loss_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else loss_dict["v_func"],
-            loss_dict["init_weights"],
-            method=config["optimizer"]["method"],
-            jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-            # hess=hess_fn if config["optimizer"]["hessian"] else None,
-            bounds=loss_dict["bounds"],
-            options={"disp": True},
-        )
-        best_weights = loss_dict["unravel_pytree"](res["x"])
+        best_weights = {}
+        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+        with trange(num_batches, unit="batch") as tbatch:
+            for i_batch in tbatch:
+                inds = batch_indices[i_batch]
+                batch = {
+                    "data": all_data["data"][inds],
+                    "amps": all_data["amps"][inds],
+                    "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                }
+                res = spopt.minimize(
+                    loss_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else loss_dict["v_func"],
+                    loss_dict["init_weights"],
+                    args=batch,
+                    method=config["optimizer"]["method"],
+                    jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+                    # hess=hess_fn if config["optimizer"]["hessian"] else None,
+                    bounds=loss_dict["bounds"],
+                    options={"disp": True},
+                )
+                best_weights[i_batch] = loss_dict["unravel_pytree"](res["x"])
     else:
         raise NotImplementedError
 
@@ -183,7 +188,7 @@ def fit(config):
     return final_params
 
 
-def get_nn_inferences(config, batch_indices, all_data, best_weights, func, empty_params):
+def get_inferences(config, batch_indices, all_data, best_weights, func, empty_params):
     t1 = time.time()
     batch_indices.sort()
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
@@ -195,7 +200,11 @@ def get_nn_inferences(config, batch_indices, all_data, best_weights, func, empty
             "amps": all_data["amps"][inds],
             "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
         }
-        loss, [ThryE, _, params] = func(best_weights, batch)
+        if not config["optimizer"]["method"] == "adam":
+            these_weights = best_weights[i_batch]
+        else:
+            these_weights = best_weights
+        loss, [ThryE, _, params] = func(these_weights, batch)
         losses[i_batch] = np.mean(loss, axis=1)
         fits[inds] = ThryE
         for k in empty_params.keys():
@@ -206,36 +215,13 @@ def get_nn_inferences(config, batch_indices, all_data, best_weights, func, empty
     return losses, fits, empty_params
 
 
-def get_param_inferences(config, all_data, best_weights, func, empty_params):
-    t1 = time.time()
-    loss, [ThryE, _, params] = func(
-        best_weights,
-        {
-            "data": all_data["data"],
-            "amps": all_data["amps"],
-            "noise_e": config["other"]["PhysParams"]["noiseE"],
-        },
-    )
-    for k in empty_params.keys():
-        empty_params[k] = np.concatenate([empty_params[k], params[k].reshape(-1)])
-    losses = np.mean(loss, axis=1)
-    fits = ThryE
-    mlflow.log_metrics({"inference time": round(time.time() - t1, 2)})
-    return losses, fits, empty_params
-
-
 def postprocess(config, batch_indices, all_data: Dict, best_weights, array_loss_fn):
     all_params = {}
     for key in config["parameters"].keys():
         if config["parameters"][key]["active"]:
             all_params[key] = np.empty(0)
 
-    if config["nn"]["use"]:
-        losses, fits, all_params = get_nn_inferences(
-            config, batch_indices, all_data, best_weights, array_loss_fn, all_params
-        )
-    else:
-        losses, fits, all_params = get_param_inferences(config, all_data, best_weights, array_loss_fn, all_params)
+    losses, fits, all_params = get_inferences(config, batch_indices, all_data, best_weights, array_loss_fn, all_params)
 
     losses = losses.flatten() / np.amax(all_data["data"][:, 0, :], axis=-1)
     loss_inds = losses.argsort()[::-1]
