@@ -268,6 +268,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
     rng_key = jax.random.PRNGKey(42)
     init_weights = _get_params_.init(rng_key, dummy_batch)
+    _v_func_ = jit(loss_fn)
     _vg_func_ = jit(value_and_grad(loss_fn, argnums=0, has_aux=True))
 
     if config["optimizer"]["method"] == "adam":
@@ -306,6 +307,22 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             flattened_grads = np.array(temp_grad)  # .flatten()
             return value, flattened_grads
 
+        def v_func(weights: np.ndarray, batch):
+            """
+            Full batch training so dummy batch actually contains the whole batch
+
+            Args:
+                weights:
+                batch:
+
+            Returns:
+
+            """
+
+            pytree_weights = unravel_pytree(weights)
+            value, _ = _v_func_(pytree_weights, batch)
+            return value
+
         def get_params(weights, batch):
             pytree_weights = unravel_pytree(weights)
             _, _, _, _, params, _, _, _ = _get_params_.apply(pytree_weights, batch)
@@ -320,6 +337,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             get_params=get_params,
             bounds=bounds,
             unravel_pytree=unravel_pytree,
+            v_func=v_func,
         )
 
     else:
