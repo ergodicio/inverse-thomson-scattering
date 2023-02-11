@@ -193,7 +193,6 @@ def fit(config):
 
 
 def get_inferences(config, batch_indices, all_data, best_weights, func, empty_params):
-    t1 = time.time()
     batch_indices.sort()
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
     losses = np.zeros_like(batch_indices, dtype=np.float64)
@@ -213,8 +212,6 @@ def get_inferences(config, batch_indices, all_data, best_weights, func, empty_pa
         fits[inds] = ThryE
         for k in empty_params.keys():
             empty_params[k] = np.concatenate([empty_params[k], params[k].reshape(-1)])
-
-    mlflow.log_metrics({"inference time": round(time.time() - t1, 2)})
 
     return losses, fits, empty_params
 
