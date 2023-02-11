@@ -98,8 +98,8 @@ def fit(config):
     Returns:
 
     """
+    t1 = time.time()
     config = validate_inputs(config)
-
     # prepare data
     all_data, sa = prepare.prepare_data(config)
     test_batch = {
@@ -113,6 +113,8 @@ def fit(config):
     loss_dict = get_loss_function(config, sa, test_batch)
     batch_indices = np.arange(len(all_data["data"]))
     num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
+    mlflow.log_metrics({"setup_time": round(time.time() - t1, 2)})
+
     t1 = time.time()
     if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
         jaxopt_kwargs = dict(
@@ -181,9 +183,11 @@ def fit(config):
                 best_weights[i_batch] = loss_dict["unravel_pytree"](res["x"])
     else:
         raise NotImplementedError
+    mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
+    t1 = time.time()
     final_params = postprocess(config, batch_indices, all_data, best_weights, loss_dict["array_loss_fn"])
-    mlflow.log_metrics({"fit time": round(time.time() - t1, 2)})
+    mlflow.log_metrics({"inference_time": round(time.time() - t1, 2)})
 
     return final_params
 

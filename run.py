@@ -40,7 +40,7 @@ def test_data():
 
         t0 = time.time()
         fit_results = fitter.fit(config=config)
-        metrics_dict = {"fit_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
+        metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
         mlflow.log_metrics(metrics=metrics_dict)
         mlflow.set_tag("status", "completed")
 
