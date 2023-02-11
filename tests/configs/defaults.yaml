@@ -121,7 +121,7 @@ data:
         type:
             pixel
         start: 500
-        end: 512
+        end: 504
         skip: 1
     background:
         type:
@@ -145,7 +145,7 @@ optimizer:
     parameter_norm: True
 
 nn:
-    use: True
+    use: False
     conv_filters: 32|16|16 #|32|32
     linear_widths: 32|16
 

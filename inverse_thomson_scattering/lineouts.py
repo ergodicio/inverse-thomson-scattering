@@ -14,6 +14,9 @@ def get_lineouts(
         LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
     elif config["data"]["lineouts"]["type"] == "pixel":
         LineoutPixelE = config["data"]["lineouts"]["val"]
+    else:
+        raise NotImplementedError
+
     LineoutPixelI = LineoutPixelE
 
     if config["data"]["background"]["type"] == "ps":

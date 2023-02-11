@@ -1,4 +1,4 @@
-import time
+import time, pytest
 import multiprocessing as mp
 import yaml
 import mlflow
@@ -14,7 +14,8 @@ from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
 
 
-def test_data():
+@pytest.mark.parametrize("nn", [True, False])
+def test_data(nn):
     # Test #3: Data test, compare fit to a preknown fit result
     # currently just runs one line of shot 101675 for the electron, should be expanded in the future
 
@@ -28,11 +29,7 @@ def test_data():
     defaults.update(flatten(inputs))
     config = unflatten(defaults)
 
-    bgshot = {"type": [], "val": []}
-    lnout = {"type": "pixel", "val": [500]}
-    bglnout = {"type": "pixel", "val": 900}
-    extraoptions = {"spectype": 2}
-
+    config["nn"]["use"] = nn
     config["parameters"]["Te"]["val"] = 0.5
     config["parameters"]["ne"]["val"] = 0.2  # 0.25
     config["parameters"]["m"]["val"] = 3.0  # 2.2
