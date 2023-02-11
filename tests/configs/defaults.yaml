@@ -121,7 +121,7 @@ data:
         type:
             pixel
         start: 500
-        end: 504
+        end: 502
         skip: 1
     background:
         type:
@@ -139,7 +139,7 @@ optimizer:
     y_norm: True
     x_norm: False
     grad_method: AD
-    batch_size: 4
+    batch_size: 2
     num_epochs: 200
     learning_rate: 1.0e-4
     parameter_norm: True

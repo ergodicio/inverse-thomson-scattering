@@ -162,6 +162,8 @@ def fit(config):
     elif config["optimizer"]["method"] == "l-bfgs-b":
         best_weights = {}
         batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+
+        overall_loss = 0.0
         with trange(num_batches, unit="batch") as tbatch:
             for i_batch in tbatch:
                 inds = batch_indices[i_batch]
@@ -181,6 +183,8 @@ def fit(config):
                     options={"disp": True},
                 )
                 best_weights[i_batch] = loss_dict["unravel_pytree"](res["x"])
+                overall_loss += res["fun"]
+        mlflow.log_metrics({"overall loss": float(overall_loss / num_batches)})
     else:
         raise NotImplementedError
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
