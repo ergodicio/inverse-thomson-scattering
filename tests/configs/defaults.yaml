@@ -152,3 +152,4 @@ nn:
 
 mlflow:
     experiment: inverse-thomson-scattering
+    run: base
