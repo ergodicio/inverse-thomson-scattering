@@ -111,13 +111,14 @@ def fit(config):
     }
 
     # prepare optimizer / solver
-    loss_dict = get_loss_function(config, sa, test_batch)
+
     batch_indices = np.arange(len(all_data["data"]))
     num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
     mlflow.log_metrics({"setup_time": round(time.time() - t1, 2)})
 
     t1 = time.time()
     if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
+        loss_dict = get_loss_function(config, sa, test_batch)
         jaxopt_kwargs = dict(
             fun=loss_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
         )
@@ -167,6 +168,7 @@ def fit(config):
         overall_loss = 0.0
         with trange(num_batches, unit="batch") as tbatch:
             for i_batch in tbatch:
+                loss_dict = get_loss_function(config, sa, test_batch)
                 inds = batch_indices[i_batch]
                 batch = {
                     "data": all_data["data"][inds],
