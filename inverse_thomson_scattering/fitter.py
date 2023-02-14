@@ -103,10 +103,10 @@ def fit(config):
     config = validate_inputs(config)
     # prepare data
     all_data, sa = prepare.prepare_data(config)
-    test_batch = {
-        "data": all_data["data"][: config["optimizer"]["batch_size"]],
-        "amps": all_data["amps"][: config["optimizer"]["batch_size"]],
-        "noise_e": config["other"]["PhysParams"]["noiseE"][: config["optimizer"]["batch_size"]],
+    all_batches = {
+        "data": all_data["data"],
+        "amps": all_data["amps"],
+        "noise_e": config["other"]["PhysParams"]["noiseE"],
         # "noise_i": config["other"]["PhysParams"]["noiseI"][: config["optimizer"]["batch_size"]],
     }
 
@@ -118,6 +118,7 @@ def fit(config):
 
     t1 = time.time()
     if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
+        test_batch = {k: v[config["optimizer"]["batch_size"]] for k, v in all_batches.items()}
         loss_dict = get_loss_function(config, sa, test_batch)
         jaxopt_kwargs = dict(
             fun=loss_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True

@@ -15,18 +15,18 @@ def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, data, lam):
         (1.0 / (stddev_ang * jnp.sqrt(2.0 * jnp.pi)))
         * jnp.exp(-((sas["angAxis"] - origin_ang) ** 2.0) / (2.0 * (stddev_ang) ** 2.0))
     )  # Gaussian
-    print("inst ang shape ", jnp.shape(inst_func_ang))
-    print("inst lam shape ", jnp.shape(inst_func_lam))
+    # print("inst ang shape ", jnp.shape(inst_func_ang))
+    # print("inst lam shape ", jnp.shape(inst_func_lam))
     # apply 2d convolution
-    print("modlE shape ", jnp.shape(modlE))
+    # print("modlE shape ", jnp.shape(modlE))
     ThryE = jnp.array([jnp.convolve(modlE[:, i], inst_func_ang, "same") for i in range(modlE.shape[1])])
-    print("ThryE shape after conv1 ", jnp.shape(ThryE))
+    # print("ThryE shape after conv1 ", jnp.shape(ThryE))
     ThryE = jnp.array([jnp.convolve(ThryE[:, i], inst_func_lam, "same") for i in range(ThryE.shape[1])])
     # renorm (not sure why this is needed)
     ThryE = jnp.array([(jnp.amax(modlE[:, i]) / jnp.amax(ThryE[:, i])) * ThryE[:, i] for i in range(modlE.shape[1])])
     ThryE = ThryE.transpose()
 
-    print("ThryE shape after conv2 ", jnp.shape(ThryE))
+    # print("ThryE shape after conv2 ", jnp.shape(ThryE))
 
     if config["other"]["PhysParams"]["norm"] > 0:
         ThryE = jnp.where(
@@ -35,14 +35,14 @@ def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, data, lam):
             TSins["amp2"] * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
         )
 
-    print("ThryE shape after amps", jnp.shape(ThryE))
+    # print("ThryE shape after amps", jnp.shape(ThryE))
     lam_step = round(ThryE.shape[1] / data.shape[1])
     ang_step = round(ThryE.shape[0] / data.shape[0])
 
     ThryE = jnp.array([jnp.average(ThryE[:, i : i + lam_step], axis=1) for i in range(0, ThryE.shape[1], lam_step)])
-    print("ThryE shape after 1 resize", jnp.shape(ThryE))
+    # print("ThryE shape after 1 resize", jnp.shape(ThryE))
     ThryE = jnp.array([jnp.average(ThryE[:, i : i + ang_step], axis=1) for i in range(0, ThryE.shape[1], ang_step)])
-    print("ThryE shape after 2 resize", jnp.shape(ThryE))
+    # print("ThryE shape after 2 resize", jnp.shape(ThryE))
 
     # ThryE = ThryE.transpose()
     if config["other"]["PhysParams"]["norm"] == 0:
@@ -52,7 +52,7 @@ def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, data, lam):
         )
         ThryE = amps[0] * ThryE / jnp.amax(ThryE)
         ThryE = jnp.where(lamAxisE < lam, TSins["amp1"]["val"] * ThryE, TSins["amp2"]["val"] * ThryE)
-    print("ThryE shape after norm ", jnp.shape(ThryE))
+    # print("ThryE shape after norm ", jnp.shape(ThryE))
     # ThryE = ThryE.transpose()
 
     return lamAxisE, ThryE
