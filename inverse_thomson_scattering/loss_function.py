@@ -24,7 +24,12 @@ class TSParameterGenerator(hk.Module):
         self.num_spectra = num_spectra
         self.nn = cfg["nn"]
         convs = [int(i) for i in cfg["nn"]["conv_filters"].split("|")]
-        linears = [int(i) for i in cfg["nn"]["linear_widths"].split("|")]
+        widths = (
+            [cfg["nn"]["linear_widths"]]
+            if isinstance(cfg["nn"]["linear_widths"], int)
+            else cfg["nn"]["linear_widths"].split("|")
+        )
+        linears = [int(i) for i in widths]
 
         num_outputs = 0
         for k, v in self.cfg["parameters"].items():
@@ -88,7 +93,7 @@ class TSParameterGenerator(hk.Module):
                     temp_out = res_block(out)
                     out = down_conv(temp_out + out)
                 embedding.append(out)
-            return jax.nn.sigmoid(self.combiner(jnp.concatenate(embedding)))
+            return jax.nn.sigmoid(self.combiner(hk.Flatten()(embedding)))
         else:
             embeddings = jnp.concatenate(
                 [self.param_extractors[i](spectra[:, i][..., None]) for i in range(self.num_spectra)], axis=-1
