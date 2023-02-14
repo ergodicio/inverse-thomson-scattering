@@ -61,8 +61,8 @@ class TSParameterGenerator(hk.Module):
                     layers.append(hk.Conv1D(output_channels=cc, kernel_shape=3, stride=1))
                     layers.append(jax.nn.tanh)
 
-                layers.append(hk.Conv1D(1, 3))
-                layers.append(jax.nn.tanh)
+                # layers.append(hk.Conv1D(1, 3))
+                # layers.append(jax.nn.tanh)
 
                 layers.append(hk.Flatten())
                 for ll in linears:
