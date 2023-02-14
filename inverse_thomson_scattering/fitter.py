@@ -168,13 +168,13 @@ def fit(config):
         overall_loss = 0.0
         with trange(num_batches, unit="batch") as tbatch:
             for i_batch in tbatch:
-                loss_dict = get_loss_function(config, sa, test_batch)
-                inds = batch_indices[i_batch]
                 batch = {
                     "data": all_data["data"][inds],
                     "amps": all_data["amps"][inds],
                     "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
                 }
+                loss_dict = get_loss_function(config, sa, batch)
+                inds = batch_indices[i_batch]
                 res = spopt.minimize(
                     loss_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else loss_dict["v_func"],
                     loss_dict["init_weights"],
