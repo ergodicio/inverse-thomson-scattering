@@ -282,7 +282,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             bounds = None
         else:
             lb, ub, init_weights = init_weights_and_bounds(
-                config, init_weights, num_slices=len(config["data"]["lineouts"]["val"])
+                config, init_weights, num_slices=config["optimizer"]["batch_size"]
             )
             flattened_weights, unravel_pytree = ravel_pytree(init_weights)
             flattened_lb, _ = ravel_pytree(lb)
