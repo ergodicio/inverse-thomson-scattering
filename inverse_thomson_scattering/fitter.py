@@ -7,6 +7,8 @@ import scipy.optimize as spopt
 
 import optax, jaxopt, pandas, mlflow
 from tqdm import trange
+from matplotlib import pyplot as plt
+
 from inverse_thomson_scattering.misc import plotters
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.loss_function import get_loss_function
@@ -258,6 +260,11 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, array_loss_
         dat = {"fit": fits, "data": all_data["data"][:, 0, :]}
         savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
         savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
+
+        fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
+        savedata["fit"].plot(ax=ax[0], cmap="gist_ncar")
+        savedata["data"].plot(ax=ax[1], cmap="gist_ncar")
+        fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
 
         mlflow.log_artifacts(td)
 
