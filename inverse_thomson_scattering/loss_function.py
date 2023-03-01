@@ -17,9 +17,9 @@ from inverse_thomson_scattering.generate_spectra import get_fit_model
 from inverse_thomson_scattering.process import irf
 
 
-class TSParameterGenerator(hk.Module):
+class NNReparameterizer(hk.Module):
     def __init__(self, cfg, num_spectra):
-        super(TSParameterGenerator, self).__init__()
+        super(NNReparameterizer, self).__init__()
         self.cfg = cfg
         self.num_spectra = num_spectra
         self.nn = cfg["nn"]
@@ -112,9 +112,9 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     Returns:
 
     """
-    forward_pass = get_fit_model(config, sas, backend="haiku")
+    forward_pass = get_fit_model(config, sas, backend="jax")
     lam = config["parameters"]["lam"]["val"]
-    vmap = partial(hk.vmap, split_rng=False)
+    vmap = jax.vmap
 
     @jit
     def postprocess_thry(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
@@ -156,19 +156,19 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     else:
         i_input_norm = e_input_norm = 1.0
 
-    class TSSpectraGenerator(hk.Module):
+    class TSParameterGenerator(hk.Module):
         def __init__(self, cfg: Dict, num_spectra: int = 2):
-            super(TSSpectraGenerator, self).__init__()
+            super(TSParameterGenerator, self).__init__()
             self.cfg = cfg
             self.num_spectra = num_spectra
             self.batch_size = cfg["optimizer"]["batch_size"]
             if cfg["nn"]["use"]:
-                self.ts_parameter_generator = TSParameterGenerator(cfg, num_spectra)
+                self.nn_reparameterizer = NNReparameterizer(cfg, num_spectra)
 
             self.crop_window = cfg["other"]["crop_window"]
 
         def _init_nn_params_(self, batch):
-            all_params = self.ts_parameter_generator(batch[:, :, self.crop_window : -self.crop_window])
+            all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
             these_params = defaultdict(list)
             for i_slice in range(self.batch_size):
                 # unpack all params which is an array that came out of the NN and into a dictionary that contains
@@ -219,17 +219,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         def __call__(self, batch):
             params = self.initialize_params(batch["data"])
-            modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)  # , sas["weights"])
-            ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess_thry(
-                modlE, modlI, lamAxisE, lamAxisI, batch["amps"], live_TSinputs
-            )
 
-            ThryE = ThryE + batch["noise_e"]
-            # ThryI = ThryI + batch["noise_i"]
-
-            return ThryE, ThryI, lamAxisE, lamAxisI, params
-
-    config_for_params = copy.deepcopy(config)
+            return params
 
     def __get_params__(batch):
         i_data = batch["data"][:, 1, :]
@@ -239,17 +230,33 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         normed_e_data = e_data / e_input_norm
 
         normed_batch = jnp.concatenate([normed_e_data[:, None, :], normed_i_data[:, None, :]], axis=1)
-        spectrumator = TSSpectraGenerator(config_for_params)
-        ThryE, ThryI, lamAxisE, lamAxisI, params = spectrumator(
-            {"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]}
-        )
+        spectrumator = TSParameterGenerator(config_for_params)
+        params = spectrumator({"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]})
 
-        return ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data
+        return params, i_data, e_data, normed_e_data
 
     _get_params_ = hk.without_apply_rng(hk.transform(__get_params__))
 
+    def get_spectra_from_params(params, batch):
+        modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)  # , sas["weights"])
+        ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess_thry(
+            modlE, modlI, lamAxisE, lamAxisI, batch["amps"], live_TSinputs
+        )
+
+        ThryE = ThryE + batch["noise_e"]
+        # ThryI = ThryI + batch["noise_i"]
+
+        return ThryE, ThryI, lamAxisE, lamAxisI
+
+    def calculate_spectra(weights, batch):
+        params, i_data, e_data, normed_e_data = _get_params_.apply(weights, batch)
+        ThryE, ThryI, lamAxisE, lamAxisI = get_spectra_from_params(params, batch)
+        return ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data
+
+    config_for_params = copy.deepcopy(config)
+
     def array_loss_fn(weights, batch):
-        ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data = _get_params_.apply(weights, batch)
+        ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data = calculate_spectra(weights, batch)
 
         i_error = 0.0
         e_error = 0.0
@@ -280,7 +287,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         return e_error, [ThryE, normed_e_data, params]
 
     def loss_fn(weights, batch):
-        ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data = _get_params_.apply(weights, batch)
+        ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data = calculate_spectra(weights, batch)
         i_error = 0.0
         e_error = 0.0
 
@@ -311,12 +318,21 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     rng_key = jax.random.PRNGKey(42)
     init_weights = _get_params_.init(rng_key, dummy_batch)
     _v_func_ = jit(loss_fn)
-    _vg_func_ = jit(value_and_grad(loss_fn, argnums=0, has_aux=True))
+    __vg_func__ = value_and_grad(loss_fn, argnums=0, has_aux=True)
+    _vg_func_ = jit(__vg_func__)
+    _h_func_ = jit(jax.hessian(loss_fn, argnums=0, has_aux=True))
 
     if config["optimizer"]["method"] == "adam":
         vg_func = _vg_func_
         get_params = _get_params_
-        loss_dict = dict(vg_func=vg_func, array_loss_fn=array_loss_fn, init_weights=init_weights, get_params=get_params)
+        h_func = _h_func_
+        loss_dict = dict(
+            vg_func=vg_func,
+            array_loss_fn=array_loss_fn,
+            init_weights=init_weights,
+            get_params=get_params,
+            h_func=h_func,
+        )
     elif config["optimizer"]["method"] == "l-bfgs-b":
         if config["nn"]["use"]:
             init_weights = init_weights
@@ -346,7 +362,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             pytree_weights = unravel_pytree(weights)
             (value, aux), grad = _vg_func_(pytree_weights, batch)
             temp_grad, _ = ravel_pytree(grad)
-            flattened_grads = np.array(temp_grad)  # .flatten()
+            flattened_grads = np.array(temp_grad)
             return value, flattened_grads
 
         def v_func(weights: np.ndarray, batch):
@@ -365,6 +381,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             value, _ = _v_func_(pytree_weights, batch)
             return value
 
+        h_func = _h_func_
+
         def get_params(weights, batch):
             pytree_weights = unravel_pytree(weights)
             _, _, _, _, params, _, _, _ = _get_params_.apply(pytree_weights, batch)
@@ -380,6 +398,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             bounds=bounds,
             unravel_pytree=unravel_pytree,
             v_func=v_func,
+            h_func=h_func,
         )
 
     else:
@@ -400,14 +419,14 @@ def init_weights_and_bounds(config, init_weights, num_slices):
     Returns:
 
     """
-    lb = {"ts_spectra_generator": {}}
-    ub = {"ts_spectra_generator": {}}
-    iw = {"ts_spectra_generator": {}}
-    for k, v in init_weights["ts_spectra_generator"].items():
-        lb["ts_spectra_generator"][k] = np.array([0 * config["units"]["lb"][k] for _ in range(num_slices)])
-        ub["ts_spectra_generator"][k] = np.array([1.0 + 0 * config["units"]["ub"][k] for _ in range(num_slices)])
-        iw["ts_spectra_generator"][k] = np.array([config["parameters"][k]["val"] for _ in range(num_slices)])[:, None]
-        iw["ts_spectra_generator"][k] = (iw["ts_spectra_generator"][k] - config["units"]["shifts"][k]) / config[
+    lb = {"ts_parameter_generator": {}}
+    ub = {"ts_parameter_generator": {}}
+    iw = {"ts_parameter_generator": {}}
+    for k, v in init_weights["ts_parameter_generator"].items():
+        lb["ts_parameter_generator"][k] = np.array([0 * config["units"]["lb"][k] for _ in range(num_slices)])
+        ub["ts_parameter_generator"][k] = np.array([1.0 + 0 * config["units"]["ub"][k] for _ in range(num_slices)])
+        iw["ts_parameter_generator"][k] = np.array([config["parameters"][k]["val"] for _ in range(num_slices)])[:, None]
+        iw["ts_parameter_generator"][k] = (iw["ts_parameter_generator"][k] - config["units"]["shifts"][k]) / config[
             "units"
         ]["norms"][k]
 

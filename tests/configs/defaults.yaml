@@ -145,7 +145,7 @@ optimizer:
     parameter_norm: True
 
 nn:
-    use: resnet
+    use: false
     conv_filters: 32|16|16 #|32|32
     linear_widths: 32|16
 

@@ -1,6 +1,8 @@
+from collections import defaultdict
 from typing import Dict
 import time, os, tempfile
 
+import jax.flatten_util
 import numpy as np
 import xarray as xr
 import scipy.optimize as spopt
@@ -177,19 +179,19 @@ def fit(config):
                     "amps": all_data["amps"][inds],
                     "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
                 }
-                loss_dict = get_loss_function(config, sa, batch)
+                func_dict = get_loss_function(config, sa, batch)
 
                 res = spopt.minimize(
-                    loss_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else loss_dict["v_func"],
-                    loss_dict["init_weights"],
+                    func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict["v_func"],
+                    func_dict["init_weights"],
                     args=batch,
                     method=config["optimizer"]["method"],
                     jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                     # hess=hess_fn if config["optimizer"]["hessian"] else None,
-                    bounds=loss_dict["bounds"],
+                    bounds=func_dict["bounds"],
                     options={"disp": True},
                 )
-                best_weights[i_batch] = loss_dict["unravel_pytree"](res["x"])
+                best_weights[i_batch] = func_dict["unravel_pytree"](res["x"])
                 overall_loss += res["fun"]
         mlflow.log_metrics({"overall loss": float(overall_loss / num_batches)})
     else:
@@ -197,16 +199,36 @@ def fit(config):
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     t1 = time.time()
-    final_params = postprocess(config, batch_indices, all_data, best_weights, loss_dict["array_loss_fn"])
+    final_params = postprocess(config, batch_indices, all_data, best_weights, func_dict)
     mlflow.log_metrics({"inference_time": round(time.time() - t1, 2)})
 
     return final_params
 
 
-def get_inferences(config, batch_indices, all_data, best_weights, func, empty_params):
+def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weights, func_dict):
+    """
+    Gets parameters and the result of the full forward pass i.e. fits
+
+
+    Args:
+        config:
+        batch_indices:
+        all_data:
+        best_weights:
+        func_dict:
+
+    Returns:
+
+    """
+
+    all_params = {}
+    for key in config["parameters"].keys():
+        if config["parameters"][key]["active"]:
+            all_params[key] = np.empty(0)
     batch_indices.sort()
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
     losses = np.zeros_like(batch_indices, dtype=np.float64)
+    sigmas = np.zeros((all_data["data"].shape[0], len(all_params.keys())))
     fits = np.zeros((all_data["data"].shape[0], all_data["data"].shape[2]))
     for i_batch, inds in enumerate(batch_indices):
         batch = {
@@ -218,22 +240,41 @@ def get_inferences(config, batch_indices, all_data, best_weights, func, empty_pa
             these_weights = best_weights[i_batch]
         else:
             these_weights = best_weights
-        loss, [ThryE, _, params] = func(these_weights, batch)
+
+        loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
+        hess, [_, _, _] = func_dict["h_func"](these_weights, batch)
         losses[i_batch] = np.mean(loss, axis=1)
+
+        sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
         fits[inds] = ThryE
-        for k in empty_params.keys():
-            empty_params[k] = np.concatenate([empty_params[k], params[k].reshape(-1)])
 
-    return losses, fits, empty_params
+        for k in all_params.keys():
+            all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+
+    return losses, fits, sigmas, all_params
 
 
-def postprocess(config, batch_indices, all_data: Dict, best_weights, array_loss_fn):
-    all_params = {}
-    for key in config["parameters"].keys():
-        if config["parameters"][key]["active"]:
-            all_params[key] = np.empty(0)
+def get_sigmas(keys, hess, batch_size):
+    sigmas = np.zeros((batch_size, len(keys)))
 
-    losses, fits, all_params = get_inferences(config, batch_indices, all_data, best_weights, array_loss_fn, all_params)
+    for i in range(batch_size):
+        temp = np.zeros((len(keys), len(keys)))
+        for k1, param in enumerate(keys):
+            for k2, param2 in enumerate(keys):
+                temp[k1, k2] = np.squeeze(hess["ts_parameter_generator"][param]["ts_parameter_generator"][param2])[i, i]
+
+        inv = np.linalg.inv(temp)
+
+        for k1, param in enumerate(keys):
+            sigmas[i, k1] = np.sqrt(inv[k1, k1])
+
+    return sigmas
+
+
+def postprocess(config, batch_indices, all_data: Dict, best_weights, func_dict):
+    losses, fits, sigmas, all_params = recalculate_with_chosen_weights(
+        config, batch_indices, all_data, best_weights, func_dict
+    )
 
     losses = losses.flatten() / np.amax(all_data["data"][:, 0, :], axis=-1)
     loss_inds = losses.argsort()[::-1]
@@ -251,20 +292,44 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, array_loss_
 
         mlflow.log_metrics({"plot time": round(time.time() - t1, 2)})
 
-        all_params["lineout"] = config["data"]["lineouts"]["val"]
+        # store fitted parameters
         final_params = pandas.DataFrame(all_params)
         final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
         mlflow.set_tag("status", "done plotting")
 
+        # fit vs data storage and plot
         coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", np.arange(fits.shape[1]))
         dat = {"fit": fits, "data": all_data["data"][:, 0, :]}
         savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
         savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
 
         fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-        savedata["fit"].plot(ax=ax[0], cmap="gist_ncar")
-        savedata["data"].plot(ax=ax[1], cmap="gist_ncar")
+        clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 11)
+        savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
+        savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
         fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
+
+        # fig, ax = plt.subplots(1, 1, figsize=(10, 4))
+        lslc = slice(config["other"]["crop_window"], -config["other"]["crop_window"])
+        losses = np.mean((savedata["data"][:, lslc] - savedata["fit"][:, lslc]) ** 2.0, axis=-1) / np.square(
+            np.amax(savedata["data"])
+        )
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4), tight_layout=True)
+        ax.hist(losses, 128)
+        ax.set_yscale("log")
+        ax.set_xlabel(r"$N^{-1}~ \sum~ (\hat{y} - y)^2 / y_{max}^2$")
+        ax.set_ylabel("Counts")
+        ax.set_title("Normalized $L^2$ Norm of the Error")
+        ax.grid()
+        fig.savefig(os.path.join(td, "error_hist.png"), bbox_inches="tight")
+
+        # Calculate Hessian and plots? save to csv?
+        # sigma^2_ij = [H^-1]_ij
+        # sigma=sqrt(diag(H^-1))
+        sigmas_ds = xr.Dataset(
+            {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(all_params.keys())}
+        )
+        sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
 
         mlflow.log_artifacts(td)
 
