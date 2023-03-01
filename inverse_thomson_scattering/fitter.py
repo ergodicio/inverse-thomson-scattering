@@ -323,9 +323,6 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, func_dict):
         ax.grid()
         fig.savefig(os.path.join(td, "error_hist.png"), bbox_inches="tight")
 
-        # Calculate Hessian and plots? save to csv?
-        # sigma^2_ij = [H^-1]_ij
-        # sigma=sqrt(diag(H^-1))
         sigmas_ds = xr.Dataset(
             {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(all_params.keys())}
         )
