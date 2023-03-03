@@ -286,6 +286,35 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         return e_error, [ThryE, normed_e_data, params]
 
+    def loss_for_hess_fn(params, batch, i_data, e_data):
+        ThryE, ThryI, lamAxisE, lamAxisI = get_spectra_from_params(params, batch)
+        i_error = 0.0
+        e_error = 0.0
+
+        if config["other"]["extraoptions"]["fit_IAW"]:
+            i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
+
+        if config["other"]["extraoptions"]["fit_EPWb"]:
+            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
+            _error_ = jnp.where(
+                (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
+                _error_,
+                0.0,
+            )
+
+            e_error += jnp.mean(_error_)
+
+        if config["other"]["extraoptions"]["fit_EPWr"]:
+            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
+            _error_ = jnp.where(
+                (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
+                _error_,
+                0.0,
+            )
+            e_error += jnp.mean(_error_)
+
+        return i_error + e_error
+
     def loss_fn(weights, batch):
         ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data = calculate_spectra(weights, batch)
         i_error = 0.0
@@ -318,9 +347,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     rng_key = jax.random.PRNGKey(42)
     init_weights = _get_params_.init(rng_key, dummy_batch)
     _v_func_ = jit(loss_fn)
-    __vg_func__ = value_and_grad(loss_fn, argnums=0, has_aux=True)
-    _vg_func_ = jit(__vg_func__)
-    _h_func_ = jit(jax.hessian(loss_fn, argnums=0, has_aux=True))
+    _vg_func_ = jit(value_and_grad(loss_fn, argnums=0, has_aux=True))
+    _h_func_ = jit(jax.hessian(loss_for_hess_fn, argnums=0))
 
     if config["optimizer"]["method"] == "adam":
         vg_func = _vg_func_
@@ -385,9 +413,9 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         def get_params(weights, batch):
             pytree_weights = unravel_pytree(weights)
-            _, _, _, _, params, _, _, _ = _get_params_.apply(pytree_weights, batch)
+            params, i_data, e_data, normed_e_data = _get_params_.apply(pytree_weights, batch)
 
-            return params
+            return params, i_data, e_data
 
         loss_dict = dict(
             vg_func=vg_func,

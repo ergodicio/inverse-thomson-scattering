@@ -242,7 +242,8 @@ def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weight
             these_weights = best_weights
 
         loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
-        hess, [_, _, _] = func_dict["h_func"](these_weights, batch)
+        these_params, i_data, e_data = func_dict["get_params"](these_weights, batch)
+        hess, [_, _, _] = func_dict["h_func"](these_params, batch)
         losses[i_batch] = np.mean(loss, axis=1)
 
         sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
