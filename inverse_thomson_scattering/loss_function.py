@@ -292,7 +292,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         e_error = 0.0
 
         if config["other"]["extraoptions"]["fit_IAW"]:
-            i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
+            i_error += jnp.mean(jnp.square(i_data - ThryI))
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
             _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
@@ -305,7 +305,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             e_error += jnp.mean(_error_)
 
         if config["other"]["extraoptions"]["fit_EPWr"]:
-            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
+            _error_ = jnp.square(e_data - ThryE)
             _error_ = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
                 _error_,
