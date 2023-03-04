@@ -202,7 +202,39 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
             return these_params
 
-        def initialize_params(self, batch):
+        def get_active_params(self, batch):
+            if self.cfg["nn"]["use"]:
+                all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
+                these_params = defaultdict(list)
+                for i_slice in range(self.batch_size):
+                    # unpack all params which is an array that came out of the NN and into a dictionary that contains
+                    # the parameter names
+                    i = 0
+                    for param_name, param_config in self.cfg["parameters"].items():
+                        if param_config["active"]:
+                            these_params[param_name].append(all_params[i_slice, i].reshape((1, 1)))
+                            i = i + 1
+
+                for param_name, param_config in these_params.items():
+                    these_params[param_name] = jnp.concatenate(these_params[param_name])
+
+            else:
+                these_params = dict()
+                for param_name, param_config in self.cfg["parameters"].items():
+                    if param_config["active"]:
+                        these_params[param_name] = hk.get_parameter(
+                            param_name,
+                            shape=[self.batch_size, 1],
+                            init=hk.initializers.RandomUniform(minval=0, maxval=1),
+                        )
+                        these_params[param_name] = (
+                            these_params[param_name] * self.cfg["units"]["norms"][param_name]
+                            + self.cfg["units"]["shifts"][param_name]
+                        )
+
+            return these_params
+
+        def __call__(self, batch):
             if self.cfg["nn"]["use"]:
                 these_params = self._init_nn_params_(batch)
             else:
@@ -217,25 +249,51 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
             return these_params
 
-        def __call__(self, batch):
-            params = self.initialize_params(batch["data"])
+    def initialize_rest_of_params(config):
+        these_params = dict()
+        for param_name, param_config in config["parameters"].items():
+            if param_config["active"]:
+                pass
+            else:
+                these_params[param_name] = jnp.concatenate(
+                    [jnp.array(param_config["val"]).reshape(1, -1) for _ in range(config["optimizer"]["batch_size"])]
+                ).reshape(config["optimizer"]["batch_size"], -1)
 
-            return params
+        return these_params
 
-    def __get_params__(batch):
+    def get_normed_e_and_i_data(batch):
         i_data = batch["data"][:, 1, :]
         e_data = batch["data"][:, 0, :]
 
         normed_i_data = i_data / i_input_norm
         normed_e_data = e_data / e_input_norm
 
+        return normed_e_data, normed_i_data
+
+    def get_normed_batch(batch):
+        normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
         normed_batch = jnp.concatenate([normed_e_data[:, None, :], normed_i_data[:, None, :]], axis=1)
+        return normed_batch
+
+    def __get_params__(batch):
+        normed_batch = get_normed_batch(batch)
         spectrumator = TSParameterGenerator(config_for_params)
         params = spectrumator({"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]})
 
-        return params, i_data, e_data, normed_e_data
+        return params
 
     _get_params_ = hk.without_apply_rng(hk.transform(__get_params__))
+
+    def __get_active_params__(batch):
+        normed_batch = get_normed_batch(batch)
+        spectrumator = TSParameterGenerator(config_for_params)
+        active_params = spectrumator.get_active_params(
+            {"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]}
+        )
+
+        return active_params
+
+    _get_active_params_ = hk.without_apply_rng(hk.transform(__get_active_params__))
 
     def get_spectra_from_params(params, batch):
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)  # , sas["weights"])
@@ -249,17 +307,21 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         return ThryE, ThryI, lamAxisE, lamAxisI
 
     def calculate_spectra(weights, batch):
-        params, i_data, e_data, normed_e_data = _get_params_.apply(weights, batch)
+        params = _get_params_.apply(weights, batch)
         ThryE, ThryI, lamAxisE, lamAxisI = get_spectra_from_params(params, batch)
-        return ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data
+        return ThryE, ThryI, lamAxisE, lamAxisI, params
 
     config_for_params = copy.deepcopy(config)
 
     def array_loss_fn(weights, batch):
-        ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data = calculate_spectra(weights, batch)
+        ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
 
         i_error = 0.0
         e_error = 0.0
+
+        i_data = batch["data"][:, 1, :]
+        e_data = batch["data"][:, 0, :]
+        normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
@@ -286,16 +348,20 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         return e_error, [ThryE, normed_e_data, params]
 
-    def loss_for_hess_fn(params, batch, i_data, e_data):
+    def loss_for_hess_fn(params, batch):
+        params = {**params, **initialize_rest_of_params(config)}
         ThryE, ThryI, lamAxisE, lamAxisI = get_spectra_from_params(params, batch)
         i_error = 0.0
         e_error = 0.0
+
+        i_data = batch["data"][:, 1, :]
+        e_data = batch["data"][:, 0, :]
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             i_error += jnp.mean(jnp.square(i_data - ThryI))
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
-            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
+            _error_ = jnp.square(e_data - ThryE) #/ jnp.square(e_norm)
             _error_ = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
                 _error_,
@@ -316,9 +382,13 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         return i_error + e_error
 
     def loss_fn(weights, batch):
-        ThryE, ThryI, lamAxisE, lamAxisI, params, i_data, e_data, normed_e_data = calculate_spectra(weights, batch)
+        ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
         i_error = 0.0
         e_error = 0.0
+
+        i_data = batch["data"][:, 1, :]
+        e_data = batch["data"][:, 0, :]
+        normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
@@ -413,9 +483,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         def get_params(weights, batch):
             pytree_weights = unravel_pytree(weights)
-            params, i_data, e_data, normed_e_data = _get_params_.apply(pytree_weights, batch)
-
-            return params, i_data, e_data
+            return _get_params_.apply(pytree_weights, batch)
 
         loss_dict = dict(
             vg_func=vg_func,
@@ -423,6 +491,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             pytree_weights=init_weights,
             init_weights=flattened_weights,
             get_params=get_params,
+            get_active_params=_get_active_params_.apply,
             bounds=bounds,
             unravel_pytree=unravel_pytree,
             v_func=v_func,

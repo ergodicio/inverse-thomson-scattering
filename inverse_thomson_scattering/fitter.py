@@ -242,9 +242,8 @@ def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weight
             these_weights = best_weights
 
         loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
-        flattened_weights, _ = ravel_pytree(these_weights)
-        these_params, i_data, e_data = func_dict["get_params"](flattened_weights, batch)
-        hess, [_, _, _] = func_dict["h_func"](these_params, batch)
+        these_params = func_dict["get_active_params"](these_weights, batch)
+        hess = func_dict["h_func"](these_params, batch)
         losses[i_batch] = np.mean(loss, axis=1)
 
         sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
@@ -263,7 +262,7 @@ def get_sigmas(keys, hess, batch_size):
         temp = np.zeros((len(keys), len(keys)))
         for k1, param in enumerate(keys):
             for k2, param2 in enumerate(keys):
-                temp[k1, k2] = np.squeeze(hess["ts_parameter_generator"][param]["ts_parameter_generator"][param2])[i, i]
+                temp[k1, k2] = np.squeeze(hess[param][param2])[i, i]
 
         inv = np.linalg.inv(temp)
 
