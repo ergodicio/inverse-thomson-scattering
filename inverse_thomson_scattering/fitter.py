@@ -81,7 +81,7 @@ def validate_inputs(config):
 
 def fit(config):
     """
-    #This function fits the Thomson scattering spectral dnesity fucntion to experimental data, or plots specified spectra. All inputs are derived from the input dictionary config.
+    This function fits the Thomson scattering spectral density function to experimental data, or plots specified spectra. All inputs are derived from the input dictionary config.
 
     Summary of additional needs:
           A wrapper to allow for multiple lineouts or shots to be analyzed and gradients to be handled

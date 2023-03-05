@@ -1,6 +1,5 @@
 import copy
 from typing import Dict
-from functools import partial
 from collections import defaultdict
 from jax import config
 
@@ -361,7 +360,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             i_error += jnp.mean(jnp.square(i_data - ThryI))
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
-            _error_ = jnp.square(e_data - ThryE) #/ jnp.square(e_norm)
+            _error_ = jnp.square(e_data - ThryE)  # / jnp.square(e_norm)
             _error_ = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
                 _error_,
