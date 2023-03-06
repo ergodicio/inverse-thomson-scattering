@@ -1,40 +1,87 @@
-import time, mlflow, os, tempfile, yaml
+from collections import defaultdict
+from typing import Dict
+import time, os, tempfile
 
+from jax.flatten_util import ravel_pytree
 import numpy as np
+import xarray as xr
 import scipy.optimize as spopt
-import matplotlib.pyplot as plt
 
-from scipy.signal import convolve2d as conv2
-from inverse_thomson_scattering.misc.additional_functions import get_scattering_angles, plotinput, initialize_parameters
-from inverse_thomson_scattering.evaluate_background import get_shot_bg
-from inverse_thomson_scattering.misc.load_ts_data import loadData
-from inverse_thomson_scattering.process.correct_throughput import correctThroughput
-from inverse_thomson_scattering.misc.calibration import get_calibrations
-from inverse_thomson_scattering.lineouts import get_lineouts
+import optax, jaxopt, pandas, mlflow
+from tqdm import trange
+from matplotlib import pyplot as plt
+
+from inverse_thomson_scattering.misc import plotters
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.loss_function import get_loss_function
-from inverse_thomson_scattering.generate_spectra import get_fit_model
-from inverse_thomson_scattering.misc.plotters import plotState
+from inverse_thomson_scattering.process import prepare
 
-#def unnumpy_dict(this_dict: Dict):
-#    new_dict = {}
-#    for k, v in this_dict.items():
-#        if isinstance(v, Dict):
-#            new_v = unnumpy_dict(v)
-#        elif isinstance(v, np.ndarray):
-#            new_v = [float(val) for val in v]
-#        elif isinstance(v, jax.numpy.ndarray):
-#            new_v = [float(val) for val in v]
-#        else:
-#            new_v = v
-#
-#        new_dict[k] = new_v
-#
-#    return new_dict
+
+def init_param_norm_and_shift(config: Dict) -> Dict:
+    # init_params = {}
+    lb = {}
+    ub = {}
+    parameters = config["parameters"]
+    active_params = []
+    for key in parameters.keys():
+        if parameters[key]["active"]:
+            active_params.append(key)
+            lb[key] = parameters[key]["lb"]
+            ub[key] = parameters[key]["ub"]
+
+    norms = {}
+    shifts = {}
+    if config["optimizer"]["parameter_norm"]:
+        for k in active_params:
+            norms[k] = ub[k] - lb[k]
+            shifts[k] = lb[k]
+    else:
+        for k in active_params:
+            norms[k] = 1.0
+            shifts[k] = 0.0
+    return {"norms": norms, "shifts": shifts, "lb": lb, "ub": ub}
+
+
+def validate_inputs(config):
+    # get derived quantities
+    config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+
+    # get slices
+    config["data"]["lineouts"]["val"] = [
+        i
+        for i in range(
+            config["data"]["lineouts"]["start"], config["data"]["lineouts"]["end"], config["data"]["lineouts"]["skip"]
+        )
+    ]
+
+    # create fes
+    NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
+    config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+    config["parameters"]["fe"]["lb"] = np.multiply(
+        config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
+    )
+    config["parameters"]["fe"]["ub"] = np.multiply(
+        config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
+    )
+    num_slices = len(config["data"]["lineouts"]["val"])
+    batch_size = config["optimizer"]["batch_size"]
+
+    if not len(config["data"]["lineouts"]["val"]) % config["optimizer"]["batch_size"] == 0:
+        print(f"total slices: {num_slices}")
+        print(f"{batch_size=}")
+        print(f"batch size = {config['optimizer']['batch_size']} is not a round divisor of the number of lineouts")
+        num_batches = np.ceil(len(config["data"]["lineouts"]["val"]) / config["optimizer"]["batch_size"])
+        config["optimizer"]["batch_size"] = int(len(config["data"]["lineouts"]["val"]) // num_batches)
+        print(f"new batch size = {config['optimizer']['batch_size']}")
+
+    config["units"] = init_param_norm_and_shift(config)
+
+    return config
+
 
 def fit(config):
     """
-    #This function fits the Thomson scattering spectral dnesity fucntion to experimental data, or plots specified spectra. All inputs are derived from the input dictionary config.
+    This function fits the Thomson scattering spectral density function to experimental data, or plots specified spectra. All inputs are derived from the input dictionary config.
 
     Summary of additional needs:
           A wrapper to allow for multiple lineouts or shots to be analyzed and gradients to be handled
@@ -56,245 +103,232 @@ def fit(config):
     Returns:
 
     """
-    #initialize timer
-    t0 = time.time()
-    
-    #load data
-    [elecData, ionData, xlab, config["D"]["extraoptions"]["spectype"]] = loadData(
-        config["shotnum"], config["D"]["shotDay"], config["D"]["extraoptions"])
-    
-    #get scattering angles and weights
-    sa = get_scattering_angles(config["D"]["extraoptions"]["spectype"])
-    
-    #Calibrate axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(
-        config["shotnum"], config["D"]["extraoptions"]["spectype"], config["D"]["CCDsize"])
-    
-    # turn off ion or electron fitting if the corresponding spectrum was not loaded
-    if not config["D"]["extraoptions"]["load_ion_spec"]:
-        config["D"]["extraoptions"]["fit_IAW"] = 0
-        print("IAW data not loaded, omitting IAW fit")
-    if not config["D"]["extraoptions"]["load_ele_spec"]:
-        config["D"]["extraoptions"]["fit_EPWb"] = 0
-        config["D"]["extraoptions"]["fit_EPWr"] = 0
-        print("EPW data not loaded, omitting EPW fit")
+    t1 = time.time()
+    config = validate_inputs(config)
+    # prepare data
+    all_data, sa = prepare.prepare_data(config)
+    all_batches = {
+        "data": all_data["data"],
+        "amps": all_data["amps"],
+        "noise_e": config["other"]["PhysParams"]["noiseE"],
+        # "noise_i": config["other"]["PhysParams"]["noiseI"][: config["optimizer"]["batch_size"]],
+    }
 
-    #If no data is loaded or being fit plot the input and quit
-    if config["lineoutloc"]["val"]==[] or (config["D"]["extraoptions"]["fit_IAW"]+config["D"]["extraoptions"]["fit_EPWb"]+config["D"]["extraoptions"]["fit_EPWr"]) == 0 or (elecData==[] and ionData==[]):
-        print("No data loaded, plotting input")
-        plotinput(config, sa)
-        return []
-    
-    #Correct for spectral throughput
-    if config["D"]["extraoptions"]["load_ele_spec"]:
-        elecData = correctThroughput(elecData, config["D"]["extraoptions"]["spectype"], axisyE, config["shotnum"])
-    
-    
-    #load and correct background
-    [BGele, BGion] = get_shot_bg(config, axisyE, elecData)
-    
-    #extract ARTS section
-    if (config["lineoutloc"]["type"] == "range") & (config["D"]["extraoptions"]["spectype"] == "angular"):
-        
-        config["D"]["extraoptions"]["spectype"] = "angular_full"
-        config["D"]["PhysParams"]["amps"] = np.array([np.amax(elecData), 1])
-        sa["angAxis"] = axisxE
-        
-        if config["D"]["extraoptions"]["plot_raw_data"]:
-            ColorPlots(axisxE, axisyE,
-                conv2(elecData-BGele, np.ones([5, 5]) / 25, mode="same"),
-                vmin=0,
-                XLabel=xlab,
-                YLabel="Wavelength (nm)",
-                title="Shot : " + str(config["shotnum"]) + " : " + "TS : Corrected and background subtracted")
-            
-        #down sample image to resolution units by summation
-        ang_res_unit = 10 #in pixels
-        lam_res_unit = 5 #in pixels
-        
-        data_res_unit = np.array([np.average(elecData[i:i+lam_res_unit,:], axis=0) for i in range(0, elecData.shape[0], lam_res_unit)])
-        #print("data shape after 1 resize", np.shape(data_res_unit))
-        data_res_unit = np.array([np.average(data_res_unit[:,i:i+ang_res_unit], axis=1) for i in range(0, data_res_unit.shape[1], ang_res_unit)])
-        #print("data shape after 2 resize", np.shape(data_res_unit))
-        
-        all_data = data_res_unit
-        config["D"]["PhysParams"]["noiseI"] = 0
-        config["D"]["PhysParams"]["noiseE"] = BGele
-        
-    else: 
-        all_data = get_lineouts(elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, 0, IAWtime, xlab, sa, config)
+    # prepare optimizer / solver
 
-    config["D"]["PhysParams"]["widIRF"] = stddev
-    config["D"]["lamrangE"] = [axisyE[0], axisyE[-1]]
-    config["D"]["lamrangI"] = [axisyI[0], axisyI[-1]]
-    config["D"]["npts"] = config["D"]["CCDsize"][0] * config["D"]["points_per_pixel"]
-
-    parameters = config["parameters"]
-
-    # Setup x0
-    xie = np.linspace(-7, 7, parameters["fe"]["length"])
-
-    # Initialize fe
-    NumDistFunc = get_num_dist_func(parameters["fe"]["type"], xie)
-    parameters["fe"]["val"] = np.log(NumDistFunc(parameters["m"]["val"]))
-    parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
-    parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
-
-    #[x0, bnds, norms, shifts] = init_params(config, parameters)
-    fitting_params = initialize_parameters(config)
-    
-    
-    #loss_fn, vg_loss_fn, hess_fn = get_loss_function(config, xie, sa, all_data, norms, shifts)
-    loss_fn, vg_loss_fn, hess_fn = get_loss_function(
-        config, xie, sa, all_data, fitting_params["norms"], fitting_params["shifts"], backend="haiku"
-    )
-    x0 = fitting_params["array"]["init_params"]
-    bnds = list(zip(fitting_params["array"]["lb"], fitting_params["array"]["ub"]))
+    batch_indices = np.arange(len(all_data["data"]))
+    num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
+    mlflow.log_metrics({"setup_time": round(time.time() - t1, 2)})
 
     t1 = time.time()
-    print("minimizing")
-    mlflow.set_tag("status", "minimizing")
-    # Perform fit
-    if np.shape(x0)[0] != 0:
-        if config["optimizer"]["method"]=="basinhopping":
-            res = spopt.basinhopping(vg_loss_fn, x0, T=5e6, niter= 10, stepsize=0.004, disp=True,
-                                     minimizer_kwargs = {"method": "L-BFGS-B", "jac": True,
-                                                         "bounds": bnds,
-                                                         "options": {"disp": True}})
-        elif config["optimizer"]["method"]=="shgo":
-            res = spopt.shgo(vg_loss_fn, bounds=bnds,
-                             minimizer_kwargs = {"method": "L-BFGS-B", "jac": True},
-                             options={"disp": True, "jac": True})
-        elif config["optimizer"]["method"]=="dual_annealing":
-            res = spopt.dual_annealing(loss_fn, bounds=bnds, maxiter = 20, initial_temp=500, maxfun = 1e5,
-                             minimizer_kwargs = {"method": "L-BFGS-B", "jac": vg_loss_fn(1), "bounds": bnds, "options": {"disp": True, "maxiter": 100}},
-                             x0=x0)
-        else:
-            res = spopt.minimize(
-                vg_loss_fn if config["optimizer"]["grad_method"] == "AD" else loss_fn,
-                x0,
-                method=config["optimizer"]["method"],
-                jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-                hess=hess_fn if config["optimizer"]["hessian"] else None,
-                bounds=bnds,
-                options={"disp": True},
-            )
-    else:
-        x = fitting_params["pytree"]["init_params"]
+    if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
+        test_batch = {k: v[config["optimizer"]["batch_size"]] for k, v in all_batches.items()}
+        loss_dict = get_loss_function(config, sa, test_batch)
+        jaxopt_kwargs = dict(
+            fun=loss_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+        )
+        opt = optax.adam(config["optimizer"]["learning_rate"])
+        solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
 
+        weights = loss_dict["init_weights"]
+        opt_state = solver.init_state(weights, batch=test_batch)
+
+        # start train loop
+        t1 = time.time()
+        print("minimizing")
+        mlflow.set_tag("status", "minimizing")
+
+        epoch_loss = 1e19
+        best_loss = 1e16
+        for i_epoch in range(config["optimizer"]["num_epochs"]):
+            if config["nn"]["use"]:
+                np.random.shuffle(batch_indices)
+            batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+            with trange(num_batches, unit="batch") as tbatch:
+                tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
+                epoch_loss = 0.0
+                for i_batch in tbatch:
+                    inds = batch_indices[i_batch]
+                    batch = {
+                        "data": all_data["data"][inds],
+                        "amps": all_data["amps"][inds],
+                        "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                    }
+                    weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
+                    epoch_loss += opt_state.value
+                    tbatch.set_postfix({"Prev Batch Loss": opt_state.value})
+
+                epoch_loss /= num_batches
+                if epoch_loss < best_loss:
+                    best_loss = epoch_loss
+                    best_weights = weights
+
+                mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
+            batch_indices = batch_indices.flatten()
+
+    elif config["optimizer"]["method"] == "l-bfgs-b":
+        best_weights = {}
+        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+
+        overall_loss = 0.0
+        with trange(num_batches, unit="batch") as tbatch:
+            for i_batch in tbatch:
+                inds = batch_indices[i_batch]
+                batch = {
+                    "data": all_data["data"][inds],
+                    "amps": all_data["amps"][inds],
+                    "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                }
+                func_dict = get_loss_function(config, sa, batch)
+
+                res = spopt.minimize(
+                    func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict["v_func"],
+                    func_dict["init_weights"],
+                    args=batch,
+                    method=config["optimizer"]["method"],
+                    jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+                    # hess=hess_fn if config["optimizer"]["hessian"] else None,
+                    bounds=func_dict["bounds"],
+                    options={"disp": True},
+                )
+                best_weights[i_batch] = func_dict["unravel_pytree"](res["x"])
+                overall_loss += res["fun"]
+        mlflow.log_metrics({"overall loss": float(overall_loss / num_batches)})
+    else:
+        raise NotImplementedError
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
-    i = 0
-    final_x = []
-    init_x = []
-    for k, v in fitting_params["pytree"]["init_params"].items():
-        init_x.append((x0[i] * fitting_params["norms"][k] + fitting_params["shifts"][k]).reshape((len(all_data), -1)))
-        final_x.append((res.x[i] * fitting_params["norms"][k] + fitting_params["shifts"][k]).reshape((len(all_data), -1)))
-        i += 1
-    
-    final_x = np.concatenate(final_x, axis=-1)
-    init_x = np.concatenate(init_x, axis=-1)
-    
-    count = 0
-    #final_x.reshape((len(config["lineoutloc"]["val"]), -1))
-
-    outputs = {}
-    inits = {}
-    for key in config["parameters"].keys():
-        if config["parameters"][key]["active"]:
-            # config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
-            outputs[key] = np.array([float(val) for val in list(final_x[:, count])])
-            inits[key] = np.array([float(val) for val in list(init_x[:, count])])
-            count = count + 1
-    
-    
-    fit_model = get_fit_model(config, xie, sa)
-    
-    #init_x = (fitting_params["pytree"]["init_params"] * fitting_params["norms"] + fitting_params["shifts"]).reshape((len(all_data), -1))
-    #final_x = (res.x * fitting_params["norms"] + fitting_params["shifts"]).reshape((len(all_data), -1))
-
-    print("plotting")
-    mlflow.set_tag("status", "plotting")
-    if len(config["lineoutloc"]["val"]) > 4:
-        plot_inds = np.random.choice(len(config["lineoutloc"]["val"]), 2, replace=False)
-    else:
-        plot_inds = np.arange(len(config["lineoutloc"]["val"]))
-
     t1 = time.time()
-    fig = plt.figure(figsize=(14, 6))
-    with tempfile.TemporaryDirectory() as td:
-        for i in plot_inds:
-            curline = config["lineoutloc"]["val"][i]
-            cur_sa = dict(sa=sa["sa"], weights=sa["weights"][i])
-            fig.clf()
-            ax = fig.add_subplot(1, 2, 1)
-            ax2 = fig.add_subplot(1, 2, 2)
-            # Plot initial guess
-            fig, ax = plotState(
-                inits,
-                config,
-                config["D"]["PhysParams"]["amps"][i][0],
-                xie,
-                cur_sa,
-                all_data[i],
-                config["D"]["PhysParams"]["noiseE"][i] if config["D"]["extraoptions"]["load_ele_spec"] else config["D"]["PhysParams"]["noiseE"],
-                config["D"]["PhysParams"]["noiseI"][i] if config["D"]["extraoptions"]["load_ion_spec"] else config["D"]["PhysParams"]["noiseI"],
-                fitModel2=fit_model,
-                fig=fig,
-                ax=[ax, ax2],
-            )
-            fig.savefig(os.path.join(td, f"before-{curline}.png"), bbox_inches="tight")
+    final_params = postprocess(config, batch_indices, all_data, best_weights, func_dict)
+    mlflow.log_metrics({"inference_time": round(time.time() - t1, 2)})
 
-            fig.clf()
-            ax = fig.add_subplot(1, 2, 1)
-            ax2 = fig.add_subplot(1, 2, 2)
-            fig, ax = plotState(
-                outputs,
-                config,
-                config["D"]["PhysParams"]["amps"][i][0],
-                xie,
-                cur_sa,
-                all_data[i],
-                config["D"]["PhysParams"]["noiseE"][i] if config["D"]["extraoptions"]["load_ele_spec"] else config["D"]["PhysParams"]["noiseE"],
-                config["D"]["PhysParams"]["noiseI"][i] if config["D"]["extraoptions"]["load_ion_spec"] else config["D"]["PhysParams"]["noiseI"],
-                fitModel2=fit_model,
-                fig=fig,
-                ax=[ax, ax2],
-            )
-            fig.savefig(os.path.join(td, f"after-{curline}.png"), bbox_inches="tight")
-        mlflow.log_artifacts(td, artifact_path="plots")
+    return final_params
 
-    print(res)
-    metrics_dict = {"loss": res.fun, "num_iterations": res.nit, "num_fun_eval": res.nfev}
-    mlflow.log_metrics({"plot_time": round(time.time() - t1, 2)})
-    mlflow.log_metrics(metrics_dict)
 
-    mlflow.set_tag("status", "done plotting")
+def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weights, func_dict):
+    """
+    Gets parameters and the result of the full forward pass i.e. fits
 
-    result = config["parameters"]
-    count = 0
-    #final_x.reshape((len(config["lineoutloc"]["val"]), -1))
 
-    outputs = {}
+    Args:
+        config:
+        batch_indices:
+        all_data:
+        best_weights:
+        func_dict:
+
+    Returns:
+
+    """
+
+    all_params = {}
     for key in config["parameters"].keys():
         if config["parameters"][key]["active"]:
-            # config["parameters"][key]["val"] = [float(val) for val in list(final_x[:, count])]
-            outputs[key] = [float(val) for val in list(final_x[:, count])]
-            count = count + 1
+            all_params[key] = np.empty(0)
+    batch_indices.sort()
+    batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+    losses = np.zeros_like(batch_indices, dtype=np.float64)
+    sigmas = np.zeros((all_data["data"].shape[0], len(all_params.keys())))
+    fits = np.zeros((all_data["data"].shape[0], all_data["data"].shape[2]))
+    for i_batch, inds in enumerate(batch_indices):
+        batch = {
+            "data": all_data["data"][inds],
+            "amps": all_data["amps"][inds],
+            "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+        }
+        if not config["optimizer"]["method"] == "adam":
+            these_weights = best_weights[i_batch]
+        else:
+            these_weights = best_weights
 
-    # needs to be fixed
-    # if result["fe"]["active"]:
-    #    result["fe"]["val"] = res.x[-result["fe"]["length"] : :]
-    # elif result["m"]["active"]:
-    #    TSinputs["fe"]["val"] = np.log(NumDistFunc(TSinputs["m"]["val"]))  # initFe(result, xie)
-    
-    #mlflow.log_params(config["parameters"])
-    #result = config["parameters"]
+        loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
+        these_params = func_dict["get_active_params"](these_weights, batch)
+        hess = func_dict["h_func"](these_params, batch)
+        losses[i_batch] = np.mean(loss, axis=1)
 
+        sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
+        fits[inds] = ThryE
+
+        for k in all_params.keys():
+            all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+
+    return losses, fits, sigmas, all_params
+
+
+def get_sigmas(keys, hess, batch_size):
+    sigmas = np.zeros((batch_size, len(keys)))
+
+    for i in range(batch_size):
+        temp = np.zeros((len(keys), len(keys)))
+        for k1, param in enumerate(keys):
+            for k2, param2 in enumerate(keys):
+                temp[k1, k2] = np.squeeze(hess[param][param2])[i, i]
+
+        inv = np.linalg.inv(temp)
+
+        for k1, param in enumerate(keys):
+            sigmas[i, k1] = np.sqrt(inv[k1, k1])
+
+    return sigmas
+
+
+def postprocess(config, batch_indices, all_data: Dict, best_weights, func_dict):
+    losses, fits, sigmas, all_params = recalculate_with_chosen_weights(
+        config, batch_indices, all_data, best_weights, func_dict
+    )
+
+    losses = losses.flatten() / np.amax(all_data["data"][:, 0, :], axis=-1)
+    loss_inds = losses.argsort()[::-1]
+    sorted_losses = losses[loss_inds]
+    sorted_fits = fits[loss_inds]
+    sorted_data = all_data["data"][loss_inds]
+
+    num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
     with tempfile.TemporaryDirectory() as td:
-        with open(os.path.join(td, "ts_parameters.yaml"), "w") as fi:
-            yaml.dump(outputs, fi)
+        t1 = time.time()
+        os.makedirs(os.path.join(td, "worst"))
+        os.makedirs(os.path.join(td, "best"))
+
+        plotters.model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds)
+
+        mlflow.log_metrics({"plot time": round(time.time() - t1, 2)})
+
+        # store fitted parameters
+        final_params = pandas.DataFrame(all_params)
+        final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
+        mlflow.set_tag("status", "done plotting")
+
+        # fit vs data storage and plot
+        coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", np.arange(fits.shape[1]))
+        dat = {"fit": fits, "data": all_data["data"][:, 0, :]}
+        savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
+        savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
+
+        fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
+        clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 11)
+        savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
+        savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
+        fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
+
+        # fig, ax = plt.subplots(1, 1, figsize=(10, 4))
+        lslc = slice(config["other"]["crop_window"], -config["other"]["crop_window"])
+        losses = np.mean((savedata["data"][:, lslc] - savedata["fit"][:, lslc]) ** 2.0, axis=-1) / np.square(
+            np.amax(savedata["data"])
+        )
+        fig, ax = plt.subplots(1, 1, figsize=(6, 4), tight_layout=True)
+        ax.hist(losses, 128)
+        ax.set_yscale("log")
+        ax.set_xlabel(r"$N^{-1}~ \sum~ (\hat{y} - y)^2 / y_{max}^2$")
+        ax.set_ylabel("Counts")
+        ax.set_title("Normalized $L^2$ Norm of the Error")
+        ax.grid()
+        fig.savefig(os.path.join(td, "error_hist.png"), bbox_inches="tight")
+
+        sigmas_ds = xr.Dataset(
+            {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(all_params.keys())}
+        )
+        sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
 
         mlflow.log_artifacts(td)
 
-    return outputs
+    return final_params

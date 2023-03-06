@@ -44,7 +44,7 @@ def zprimeMaxw(xi):
     # print(jnp.shape(Zp))
     return Zp
 
-def get_form_factor_fn(lamrang, npts=20460, backend="jax"):
+def get_form_factor_fn(lamrang, npts, backend:str="jax"):
 
     # basic quantities
     C = 2.99792458e10
@@ -95,7 +95,7 @@ def get_form_factor_fn(lamrang, npts=20460, backend="jax"):
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
 
-        omgL, omgs, lamAxis, _ = lam_parse.lamParse(lamrang, lam, npts)  # , True)
+        omgL, omgs, lamAxis, _ = lam_parse.lamParse(lamrang, lam, npts=npts)  # , True)
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
@@ -148,7 +148,8 @@ def get_form_factor_fn(lamrang, npts=20460, backend="jax"):
         # fe is separated into components distribution function, v / vth axis, angles between f1 and kL
         # if len(fe) == 2:
         DF, x = fe
-        fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(DF)))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
+        fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))
+        # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
 
         # elif len(fe) == 3:
         #     [DF, x, thetaphi] = fe
@@ -178,7 +179,7 @@ def get_form_factor_fn(lamrang, npts=20460, backend="jax"):
 
         chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
-        ratmod = jnp.exp(jnp.interp(xi1, x, jnp.log(DF)))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
+        ratmod = jnp.exp(jnp.interp(xi1, x, jnp.log(jnp.squeeze(DF))))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
         ratdf = jnp.gradient(ratmod, xi1[1] - xi1[0])
 
         def this_ratintn(this_dx):
@@ -227,4 +228,4 @@ def get_form_factor_fn(lamrang, npts=20460, backend="jax"):
         # formfactorE = PsLamE # commented because unused
         return formfactor, lams
 
-    return jit(nonMaxwThomson)
+    return nonMaxwThomson

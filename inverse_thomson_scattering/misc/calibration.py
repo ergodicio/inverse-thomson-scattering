@@ -113,3 +113,33 @@ def get_calibrations(shotNum,tstype,CCDsize):
         axisxI = np.arange(1,CCDsize[1]+1)
         
     return axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev
+
+
+
+def get_scattering_angles(spectype):
+    if spectype != "angular":
+        # Scattering angle in degrees for OMEGA TIM6 TS
+        sa = dict(
+            sa=np.linspace(53.637560, 66.1191, 10),
+            weights=np.array(
+                [
+                    0.00702671050853565,
+                    0.0391423809738300,
+                    0.0917976667717670,
+                    0.150308544660150,
+                    0.189541011666141,
+                    0.195351560740507,
+                    0.164271879645061,
+                    0.106526733030044,
+                    0.0474753389486960,
+                    0.00855817305526778,
+                ]
+            ),
+        )
+    else:
+        # Scattering angle in degrees for Artemis
+        imp = sio.loadmat(join("files", "angleWghtsFredfine.mat"), variable_names="weightMatrix")
+        weights = imp["weightMatrix"]
+        sa = dict(sa=np.arange(19, 139.5, 0.5), weights=weights)
+    return sa
+

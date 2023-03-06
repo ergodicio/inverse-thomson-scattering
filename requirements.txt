@@ -11,3 +11,7 @@ boto3
 flatten-dict
 flatdict
 dm-haiku
+optax
+tqdm
+jaxopt
+xarray

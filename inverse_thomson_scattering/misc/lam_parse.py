@@ -1,9 +1,9 @@
 from jax import numpy as jnp
 
-def lamParse(lamrang, lam, npts=20480, fineion=True):
+def lamParse(lamrang, lam, npts, fineion=True):
     """
     This function handles the calculation of wavelength grids and their associated frequency grids.
-    Uses a minimum and maximum wavlength (string inputs have beeen depreciated). 
+    Uses a minimum and maximum wavlength (string inputs have beeen depreciated).
     A boolean switch is included to allow a finer griding in the ion spectrum allowing for simultaneous resolution of
     the ion and electron frequencies (currently inoperable working on a solution 11/7/22).
     """
