@@ -1,39 +1,16 @@
 from jax import numpy as jnp
 
-
 def lamParse(lamrang, lam, npts, fineion=True):
     """
-    This function handles the calculation of wavelength grids and their associated frequency grids. A few predefined ranges
-    are provided as string input options or a numeric range can be selected. A boolean switch is included to allow a finer
-    griding in the ion spectrum allowing for simultaneous resolution of the ion and electron frequencies.
+    This function handles the calculation of wavelength grids and their associated frequency grids.
+    Uses a minimum and maximum wavlength (string inputs have beeen depreciated).
+    A boolean switch is included to allow a finer griding in the ion spectrum allowing for simultaneous resolution of
+    the ion and electron frequencies (currently inoperable working on a solution 11/7/22).
     """
 
     c = 2.99792458e10
-    # if isinstance(lamrang, str):
-    #     if lamrang == "EPWb":
-    #         rng = 59.2
-    #         off = 67.2
-    #         npts = 48000
-    #     elif lamrang == "EPWr":
-    #         rng = 150
-    #         off = -173.5
-    #         npts = 37910
-    #     elif lamrang == "Full":
-    #         rng = 450
-    #         off = 0
-    #         npts = 102500
-    #     elif lamrang == "EPWbNIF":
-    #         rng = 35
-    #         off = 45.6
-    #         npts = 20273
-    #
-    #     min_lam = lam - off - rng  # Minimum wavelength to run code over
-    #     max_lam = lam - off + rng  # Max wavelength
-    #
-    # else:
     min_lam = lamrang[0]
     max_lam = lamrang[1]
-    npts = 4096
 
     # if fineion and (min_lam < lam and max_lam > lam):
     #     lamAxis = jnp.linspace(min_lam, max_lam, npts)

@@ -1,4 +1,4 @@
-import time
+import time, pytest
 import multiprocessing as mp
 import yaml
 import mlflow
@@ -14,25 +14,22 @@ from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
 
 
-def test_data():
+@pytest.mark.parametrize("nn", [True, False])
+def test_data(nn):
     # Test #3: Data test, compare fit to a preknown fit result
     # currently just runs one line of shot 101675 for the electron, should be expanded in the future
 
-    with open("./defaults.yaml", "r") as fi:
+    with open("tests/configs/defaults.yaml", "r") as fi:
         defaults = yaml.safe_load(fi)
 
-    with open("./inputs.yaml", "r") as fi:
+    with open("tests/configs/inputs.yaml", "r") as fi:
         inputs = yaml.safe_load(fi)
 
     defaults = flatten(defaults)
     defaults.update(flatten(inputs))
     config = unflatten(defaults)
 
-    bgshot = {"type": [], "val": []}
-    lnout = {"type": "pixel", "val": [500]}
-    bglnout = {"type": "pixel", "val": 900}
-    extraoptions = {"spectype": 2}
-
+    config["nn"]["use"] = nn
     config["parameters"]["Te"]["val"] = 0.5
     config["parameters"]["ne"]["val"] = 0.2  # 0.25
     config["parameters"]["m"]["val"] = 3.0  # 2.2
@@ -41,20 +38,11 @@ def test_data():
 
     with mlflow.start_run() as run:
         utils.log_params(config)
-
-        config["bgshot"] = bgshot
-        config["lineoutloc"] = lnout
-        config["bgloc"] = bglnout
-        config["extraoptions"] = extraoptions
         config["num_cores"] = int(mp.cpu_count())
 
-        config = {**config, **dict(shotnum=101675, bgscale=1, dpixel=2)}
-
-        mlflow.log_params({"num_slices": 1})
         t0 = time.time()
-        # mlflow.log_params(flatten(config))
         fit_results = fitter.fit(config=config)
-        metrics_dict = {"fit_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
+        metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
         mlflow.log_metrics(metrics=metrics_dict)
         mlflow.set_tag("status", "completed")
 

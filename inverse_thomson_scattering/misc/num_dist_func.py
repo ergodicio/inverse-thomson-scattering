@@ -154,13 +154,13 @@ def get_num_dist_func(fe_type, xie):
         #         [X1, X2, X3] = np.meshgrid(params['x'],curDist[1],curDist[2])
         #         f1D = sp.interpn(params['x'],params['m'],params['Z'],IT,X1,X2,X3)
 
-        return jnp.squeeze(f1D)
+        return f1D[None, :]
 
     return num_dist_func
 
 
 def GenTableName(name, *args, nout=1):
-    """GENTABLENAME generates the name of the table based on the the following naming syntax
+    """GENTABLENAME generates the name of the table based on the following naming syntax
      DFName_param1_spacing1_min1_max1_param2_spacing2_min2_max2...
      GENTABLENAME also creates the parameters structure, checking to ensure
      correct syntax based off the distribution function.
@@ -241,4 +241,4 @@ def GenTableName(name, *args, nout=1):
     elif nout == 2:
         return DFName, params
     elif nout == 3:
-        DFName, params, inputs
+        return DFName, params, inputs

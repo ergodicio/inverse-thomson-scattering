@@ -2,28 +2,28 @@ parameters:
     amp1:
         val: 1.
         active: True
-        lb: 0.
-        ub: 10.
+        lb: 0.01
+        ub: 3.75
     amp2:
         val: 1.
         active: True
-        lb: 0.
-        ub: 10.
+        lb: 0.01
+        ub: 3.75
     amp3:
         val: 1.
         active: False
         lb: 0.
         ub: 10.
     lam:
-        val: 524.5
+        val: 524.0
         active: True
         lb: 523.
         ub: 528.
     Te:
         val: .5
         active: True
-        lb: 0.01
-        ub: 3.
+        lb: 0.001
+        ub: 1.5
         gradient: 0.
     Ti:
         val: .2
@@ -39,13 +39,13 @@ parameters:
         val: 40
         active: False
     ne:
-        val: 0.2
+        val: .2
         active: True
         lb: .001
-        ub: 10.
+        ub: 1.
         gradient: 0.
     m:
-        val: 3.0
+        val: 3.
         active: True
         lb: 2.
         ub: 5.
@@ -57,7 +57,6 @@ parameters:
             DLM:
         lb: -100.
         ub: -0.5
-        fe_decrease_strict: True
     blur:
         val: []
         active: False
@@ -72,14 +71,4 @@ parameters:
         val: []
         active: False
 
-D:
-    extraoptions:
-        load_ion_spec: False
-        load_ele_spec: True
-        fit_IAW: False
-        fit_EPWb: True
-        fit_EPWr: True
-        plot_raw_data: True
 
-mlflow:
-    experiment: inverse-thomson-scattering

@@ -1,13 +1,16 @@
 import jax
-from jax import config
+from jax import config, jit
 
 config.update("jax_enable_x64", True)
+#config.update('jax_disable_jit',True)
+
 from functools import partial
-import numpy as np
-import scipy.interpolate as sp
 from jax import numpy as jnp
-from jax import jit
+
+import scipy.interpolate as sp
+import numpy as np
 import haiku as hk
+
 from inverse_thomson_scattering import ratintn
 from inverse_thomson_scattering.misc import lam_parse
 
@@ -31,7 +34,6 @@ def zprimeMaxw(xi):
 
     ai = xi < -10
     bi = xi > 10
-    ci = ~(ai + bi)
 
     rinterp = sp.interp1d(rdWT[:, 0], rdWT[:, 1], "linear")
     rZp = np.concatenate((xi[ai] ** -2, rinterp(xi), xi[bi] ** -2))
@@ -39,12 +41,10 @@ def zprimeMaxw(xi):
     iZp = np.concatenate((0 * xi[ai], iinterp(xi), 0 * xi[bi]))
 
     Zp = np.vstack((rZp, iZp))
-    # print(np.shape(Zp))
+    # print(jnp.shape(Zp))
     return Zp
 
-
-def get_form_factor_fn(lamrang, backend="jax"):
-    npts = 1024
+def get_form_factor_fn(lamrang, npts, backend:str="jax"):
 
     # basic quantities
     C = 2.99792458e10
@@ -95,7 +95,7 @@ def get_form_factor_fn(lamrang, backend="jax"):
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
 
-        omgL, omgs, lamAxis, _ = lam_parse.lamParse(lamrang, lam, npts)  # , True)
+        omgL, omgs, lamAxis, _ = lam_parse.lamParse(lamrang, lam, npts=npts)  # , True)
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
@@ -104,7 +104,6 @@ def get_form_factor_fn(lamrang, backend="jax"):
 
         ks = jnp.sqrt(omgs**2 - omgpe**2) / C
         kL = jnp.sqrt(omgL**2 - omgpe**2) / C
-        # kL = kL[..., jnp.newaxis]
         k = jnp.sqrt(ks**2 + kL**2 - 2 * ks * kL * jnp.cos(sarad))
 
         kdotv = k * Va
@@ -149,7 +148,8 @@ def get_form_factor_fn(lamrang, backend="jax"):
         # fe is separated into components distribution function, v / vth axis, angles between f1 and kL
         # if len(fe) == 2:
         DF, x = fe
-        fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(DF)))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
+        fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))
+        # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
 
         # elif len(fe) == 3:
         #     [DF, x, thetaphi] = fe
@@ -179,7 +179,7 @@ def get_form_factor_fn(lamrang, backend="jax"):
 
         chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
-        ratmod = jnp.exp(jnp.interp(xi1, x, jnp.log(DF)))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
+        ratmod = jnp.exp(jnp.interp(xi1, x, jnp.log(jnp.squeeze(DF))))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
         ratdf = jnp.gradient(ratmod, xi1[1] - xi1[0])
 
         def this_ratintn(this_dx):
@@ -218,7 +218,8 @@ def get_form_factor_fn(lamrang, backend="jax"):
         SKW_ele_omg = 2 * jnp.pi * 1.0 / klde * (ele_comp) / ((jnp.abs(epsilon)) ** 2) * vTe / omgpe
         # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
-        PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
+        PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:,None,None]
+        #PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
         # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * C / omgs
         PsLam = PsOmg * 2 * jnp.pi * C / lams**2
@@ -227,4 +228,4 @@ def get_form_factor_fn(lamrang, backend="jax"):
         # formfactorE = PsLamE # commented because unused
         return formfactor, lams
 
-    return jit(nonMaxwThomson)
+    return nonMaxwThomson

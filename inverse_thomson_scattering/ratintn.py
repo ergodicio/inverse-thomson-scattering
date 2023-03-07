@@ -1,8 +1,6 @@
 from jax import numpy as jnp
-from jax import jit
 
 
-@jit
 def ratintn(f: jnp.ndarray, g: jnp.ndarray, z: jnp.ndarray) -> jnp.ndarray:
     """
     Integrate f / g dz taking each to be piecwise linear.This is more accurate when f / g has a near - pole in an

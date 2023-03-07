@@ -1,250 +1,529 @@
+import copy
 from typing import Dict
-from functools import partial
+from collections import defaultdict
+from jax import config
 
+config.update("jax_enable_x64", True)
 import jax
 from jax import numpy as jnp
 
+
 from jax import jit, value_and_grad
+from jax.flatten_util import ravel_pytree
 import haiku as hk
 import numpy as np
-from inverse_thomson_scattering.generate_spectra import get_forward_pass
+from inverse_thomson_scattering.generate_spectra import get_fit_model
+from inverse_thomson_scattering.process import irf
 
 
-def get_loss_function(config: Dict, xie, sas, dummy_data: np.ndarray, norms: Dict, shifts: Dict, backend="jax"):
+class NNReparameterizer(hk.Module):
+    def __init__(self, cfg, num_spectra):
+        super(NNReparameterizer, self).__init__()
+        self.cfg = cfg
+        self.num_spectra = num_spectra
+        self.nn = cfg["nn"]
+        convs = [int(i) for i in cfg["nn"]["conv_filters"].split("|")]
+        widths = (
+            [cfg["nn"]["linear_widths"]]
+            if isinstance(cfg["nn"]["linear_widths"], int)
+            else cfg["nn"]["linear_widths"].split("|")
+        )
+        linears = [int(i) for i in widths]
+
+        num_outputs = 0
+        for k, v in self.cfg["parameters"].items():
+            if v["active"]:
+                num_outputs += 1
+        if self.nn == "resnet":
+            self.embedding_generators = defaultdict(list)
+            for i in range(num_spectra):
+                res_blocks = []
+                down_convs = []
+                first_convs = []
+                for cc in convs:
+                    first_convs.append(hk.Sequential([hk.Conv1D(cc, 3, padding="same"), jax.nn.tanh]))
+                    res_blocks.append(
+                        hk.Sequential(
+                            [hk.Conv1D(output_channels=cc, kernel_shape=3, stride=1, padding="same"), jax.nn.tanh]
+                        )
+                    )
+                    down_convs.append(
+                        hk.Sequential([hk.Conv1D(output_channels=cc, kernel_shape=3, stride=1), jax.nn.tanh])
+                    )
+                self.embedding_generators["first_convs"].append(first_convs)
+                self.embedding_generators["res_blocks"].append(res_blocks)
+                self.embedding_generators["down_convs"].append(down_convs)
+                self.embedding_generators["final"].append(hk.Sequential([hk.Conv1D(1, 3), jax.nn.tanh]))
+            self.combiner = hk.nets.MLP(linears + [num_outputs], activation=jax.nn.tanh)
+
+        else:
+            self.param_extractors = []
+            for i in range(num_spectra):
+                layers = []
+
+                for cc in convs:
+                    layers.append(hk.Conv1D(output_channels=cc, kernel_shape=3, stride=1))
+                    layers.append(jax.nn.tanh)
+
+                # layers.append(hk.Conv1D(1, 3))
+                # layers.append(jax.nn.tanh)
+
+                layers.append(hk.Flatten())
+                for ll in linears:
+                    layers.append(hk.Linear(ll))
+                    layers.append(jax.nn.tanh)
+
+                self.param_extractors.append(hk.Sequential(layers))
+            self.combiner = hk.Linear(num_outputs)
+
+    def __call__(self, spectra: jnp.ndarray):
+        if self.nn == "resnet":
+            embedding = []
+            for i_spec, (res_blocks, down_convs, first_conv) in enumerate(
+                zip(
+                    self.embedding_generators["res_blocks"],
+                    self.embedding_generators["down_convs"],
+                    self.embedding_generators["first_convs"],
+                )
+            ):
+                out = spectra[:, i_spec, :, None]
+                for res_block, down_conv in zip(res_blocks, down_convs):
+                    out = first_conv(out)
+                    temp_out = res_block(out)
+                    out = down_conv(temp_out + out)
+                embedding.append(out)
+            return jax.nn.sigmoid(self.combiner(hk.Flatten()(embedding)))
+        else:
+            embeddings = jnp.concatenate(
+                [self.param_extractors[i](spectra[:, i][..., None]) for i in range(self.num_spectra)], axis=-1
+            )
+            return jax.nn.sigmoid(self.combiner(embeddings))
+
+
+def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     """
 
     Args:
-        config:
-        xie:
-        sas:
-        dummy_data:
-        norms:
-        shifts:
+        config: Dictionary containing all parameter and static values
+        sas: dictionary of angles and relative weights
+        dummy_batch: Data to be compared against
 
     Returns:
 
     """
-    forward_pass = get_forward_pass(config, xie, sas)
+    forward_pass = get_fit_model(config, sas, backend="jax")
     lam = config["parameters"]["lam"]["val"]
-    stddev = config["D"]["PhysParams"]["widIRF"]
-
-    if backend == "jax":
-        vmap = jax.vmap
-    else:
-        vmap = partial(hk.vmap, split_rng=False)
-
-    def transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins):
-        originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
-        inst_funcI = jnp.squeeze(
-            (1.0 / (stddev[1] * jnp.sqrt(2.0 * jnp.pi)))
-            * jnp.exp(-((lamAxisI - originI) ** 2.0) / (2.0 * (stddev[1]) ** 2.0))
-        )  # Gaussian
-        ThryI = jnp.convolve(modlI, inst_funcI, "same")
-        ThryI = (jnp.amax(modlI) / jnp.amax(ThryI)) * ThryI
-        ThryI = jnp.average(ThryI.reshape(1024, -1), axis=1)
-
-        if config["D"]["PhysParams"]["norm"] == 0:
-            lamAxisI = jnp.average(lamAxisI.reshape(1024, -1), axis=1)
-            ThryI = TSins["amp3"]["val"] * amps[1] * ThryI / jnp.amax(ThryI)
-            lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
-
-        return lamAxisI, lamAxisE, ThryI
-
-    def transform_electron_spec(lamAxisE, modlE, amps, TSins):
-        # Conceptual_origin so the convolution doesn't shift the signal
-        originE = (jnp.amax(lamAxisE) + jnp.amin(lamAxisE)) / 2.0
-        inst_funcE = jnp.squeeze(
-            (1.0 / (stddev[0] * jnp.sqrt(2.0 * jnp.pi)))
-            * jnp.exp(-((lamAxisE - originE) ** 2.0) / (2.0 * (stddev[0]) ** 2.0))
-        )  # Gaussian
-        ThryE = jnp.convolve(modlE, inst_funcE, "same")
-        ThryE = (jnp.amax(modlE) / jnp.amax(ThryE)) * ThryE
-
-        if config["D"]["PhysParams"]["norm"] > 0:
-            ThryE = jnp.where(
-                lamAxisE < lam,
-                TSins["amp1"] * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
-                TSins["amp2"] * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
-            )
-
-        ThryE = jnp.average(ThryE.reshape(1024, -1), axis=1)
-        if config["D"]["PhysParams"]["norm"] == 0:
-            lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
-            ThryE = amps[0] * ThryE / jnp.amax(ThryE)
-            ThryE = jnp.where(lamAxisE < lam, TSins["amp1"]["val"] * ThryE, TSins["amp2"]["val"] * ThryE)
-
-        return lamAxisE, ThryE
+    vmap = jax.vmap
 
     @jit
-    def postprocess(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
-
-        if config["D"]["extraoptions"]["load_ion_spec"]:
-            lamAxisI, lamAxisE, ThryI = transform_ion_spec(lamAxisI, modlI, lamAxisE, amps, TSins)
+    def postprocess_thry(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
+        if config["other"]["extraoptions"]["load_ion_spec"]:
+            lamAxisI, lamAxisE, ThryI = irf.add_ion_IRF(config, lamAxisI, modlI, lamAxisE, amps, TSins)
         else:
             lamAxisI = jnp.nan
             ThryI = jnp.nan
-            # raise NotImplementedError("Need to create an ion spectrum so we can compare it against data!")
 
-        if config["D"]["extraoptions"]["load_ele_spec"]:
-            lamAxisE, ThryE = transform_electron_spec(lamAxisE, modlE, amps, TSins)
+        if config["other"]["extraoptions"]["load_ele_spec"] & (
+            config["other"]["extraoptions"]["spectype"] == "angular_full"
+        ):
+            lamAxisE, ThryE = irf.add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam)
+        elif config["other"]["extraoptions"]["load_ele_spec"]:
+            lamAxisE, ThryE = irf.add_electron_IRF(config, lamAxisE, modlE, amps, TSins, lam)
         else:
-            raise NotImplementedError("Need to create an electron spectrum so we can compare it against data!")
+            lamAxisE = jnp.nan
+            ThryE = jnp.nan
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
-    vmap_forward_pass = vmap(forward_pass)
-    vmap_postprocess = vmap(postprocess)
+    if config["other"]["extraoptions"]["spectype"] == "angular_full":
+        # ATS data can't be vmaped
+        vmap_forward_pass = forward_pass
+        vmap_postprocess_thry = postprocess_thry
+    else:
+        vmap_forward_pass = vmap(forward_pass)
+        vmap_postprocess_thry = vmap(postprocess_thry)
 
     if config["optimizer"]["y_norm"]:
-        i_norm = np.amax(dummy_data[:, 1, :])
-        e_norm = np.amax(dummy_data[:, 0, :])
+        i_norm = np.amax(dummy_batch["data"][:, 1, :])
+        e_norm = np.amax(dummy_batch["data"][:, 0, :])
     else:
         i_norm = e_norm = 1.0
 
-    if backend == "jax":
-
-        def loss_fn(x: jnp.ndarray):
-            these_params = {}
-            i = 0
-            for param_name, param_config in config["parameters"].items():
-                if param_config["active"]:
-                    these_params[param_name] = x[0, i].reshape((1, -1)) * norms[param_name] + shifts[param_name]
-                    i += 1
-                else:
-                    these_params[param_name] = jnp.array(param_config["val"]).reshape((1, -1))
-
-            modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(these_params)
-            ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess(
-                modlE, modlI, lamAxisE, lamAxisI, jnp.concatenate(config["D"]["PhysParams"]["amps"]), live_TSinputs
-            )
-
-            ThryE = ThryE / e_norm
-            ThryI = ThryI / i_norm
-
-            loss = 0
-            i_data = dummy_data[:, 1, :] / i_norm
-            e_data = dummy_data[:, 0, :] / e_norm
-            if config["D"]["extraoptions"]["fit_IAW"]:
-                #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-                loss = loss + jnp.sum(jnp.square(i_data - ThryI))
-
-            if config["D"]["extraoptions"]["fit_EPWb"]:
-                thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
-                data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
-
-                loss = loss + jnp.sum((data_slc - thry_slc) ** 2)
-
-            if config["D"]["extraoptions"]["fit_EPWr"]:
-                thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
-                data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
-
-                loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
-
-            return loss
-
-        vg_func = jit(value_and_grad(loss_fn))
-        loss_func = jit(loss_fn)
-        hess_func = jit(jax.hessian(loss_fn))
-
-        def val_and_grad_loss(x: np.ndarray):
-            reshaped_x = jnp.array(x.reshape((dummy_data.shape[0], -1)))
-            value, grad = vg_func(reshaped_x)
-            return value, np.array(grad).flatten()
-
+    if config["optimizer"]["x_norm"] and config["nn"]["use"]:
+        i_input_norm = np.amax(dummy_batch["data"][:, 1, :])
+        e_input_norm = np.amax(dummy_batch["data"][:, 0, :])
     else:
+        i_input_norm = e_input_norm = 1.0
 
-        class TSSpectraGenerator(hk.Module):
-            def __init__(self, cfg):
-                super(TSSpectraGenerator, self).__init__()
-                self.cfg = cfg
+    class TSParameterGenerator(hk.Module):
+        def __init__(self, cfg: Dict, num_spectra: int = 2):
+            super(TSParameterGenerator, self).__init__()
+            self.cfg = cfg
+            self.num_spectra = num_spectra
+            self.batch_size = cfg["optimizer"]["batch_size"]
+            if cfg["nn"]["use"]:
+                self.nn_reparameterizer = NNReparameterizer(cfg, num_spectra)
 
-            def initialize_params(self):
-                these_params = {}
+            self.crop_window = cfg["other"]["crop_window"]
+
+        def _init_nn_params_(self, batch):
+            all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
+            these_params = defaultdict(list)
+            for i_slice in range(self.batch_size):
+                # unpack all params which is an array that came out of the NN and into a dictionary that contains
+                # the parameter names
+                i = 0
+                for param_name, param_config in self.cfg["parameters"].items():
+                    if param_config["active"]:
+                        these_params[param_name].append(all_params[i_slice, i].reshape((1, 1)))
+                        i = i + 1
+                    else:
+                        these_params[param_name].append(jnp.array(param_config["val"]).reshape((1, -1)))
+
+            for param_name, param_config in self.cfg["parameters"].items():
+                these_params[param_name] = jnp.concatenate(these_params[param_name])
+
+            return these_params
+
+        def _init_params_(self):
+            these_params = dict()
+            for param_name, param_config in self.cfg["parameters"].items():
+                if param_config["active"]:
+                    these_params[param_name] = hk.get_parameter(
+                        param_name,
+                        shape=[self.batch_size, 1],
+                        init=hk.initializers.RandomUniform(minval=0, maxval=1),
+                    )
+                else:
+                    these_params[param_name] = jnp.concatenate(
+                        [jnp.array(param_config["val"]).reshape(1, -1) for _ in range(self.batch_size)]
+                    ).reshape(self.batch_size, -1)
+
+            return these_params
+
+        def get_active_params(self, batch):
+            if self.cfg["nn"]["use"]:
+                all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
+                these_params = defaultdict(list)
+                for i_slice in range(self.batch_size):
+                    # unpack all params which is an array that came out of the NN and into a dictionary that contains
+                    # the parameter names
+                    i = 0
+                    for param_name, param_config in self.cfg["parameters"].items():
+                        if param_config["active"]:
+                            these_params[param_name].append(all_params[i_slice, i].reshape((1, 1)))
+                            i = i + 1
+
+                for param_name, param_config in these_params.items():
+                    these_params[param_name] = jnp.concatenate(these_params[param_name])
+
+            else:
+                these_params = dict()
                 for param_name, param_config in self.cfg["parameters"].items():
                     if param_config["active"]:
                         these_params[param_name] = hk.get_parameter(
                             param_name,
-                            shape=[1, 1],
-                            init=hk.initializers.RandomUniform(minval=param_config["lb"], maxval=param_config["ub"]),
+                            shape=[self.batch_size, 1],
+                            init=hk.initializers.RandomUniform(minval=0, maxval=1),
                         )
-                    else:
-                        these_params[param_name] = jnp.array(param_config["val"]).reshape((1, -1))
+                        these_params[param_name] = (
+                            these_params[param_name] * self.cfg["units"]["norms"][param_name]
+                            + self.cfg["units"]["shifts"][param_name]
+                        )
 
-                for param_name, param_config in self.cfg["parameters"].items():
-                    if param_config["active"]:
-                        these_params[param_name] = these_params[param_name] * norms[param_name] + shifts[param_name]
+            return these_params
 
-                return these_params
+        def __call__(self, batch):
+            if self.cfg["nn"]["use"]:
+                these_params = self._init_nn_params_(batch)
+            else:
+                these_params = self._init_params_()
 
-            def __call__(self, batch):
-                params = self.initialize_params()
-                # params = self.neural_network_parameterizer(batch)
-                modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)
-                ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess(
-                    modlE,
-                    modlI,
-                    lamAxisE,
-                    lamAxisI,
-                    jnp.concatenate(self.cfg["D"]["PhysParams"]["amps"]),
-                    live_TSinputs,
-                )
+            for param_name, param_config in self.cfg["parameters"].items():
+                if param_config["active"]:
+                    these_params[param_name] = (
+                        these_params[param_name] * self.cfg["units"]["norms"][param_name]
+                        + self.cfg["units"]["shifts"][param_name]
+                    )
 
-                ThryE = ThryE / e_norm
-                ThryI = ThryI / i_norm
+            return these_params
 
-                i_data = batch[:, 1, :] / i_norm
-                e_data = batch[:, 0, :] / e_norm
+    def initialize_rest_of_params(config):
+        these_params = dict()
+        for param_name, param_config in config["parameters"].items():
+            if param_config["active"]:
+                pass
+            else:
+                these_params[param_name] = jnp.concatenate(
+                    [jnp.array(param_config["val"]).reshape(1, -1) for _ in range(config["optimizer"]["batch_size"])]
+                ).reshape(config["optimizer"]["batch_size"], -1)
 
-                return e_data, i_data, ThryE, ThryI, lamAxisE, lamAxisI
+        return these_params
 
-        def loss_fn(batch):
-            loss = 0.0
-            Spectrumator = TSSpectraGenerator(config)
-            e_data, i_data, ThryE, ThryI, lamAxisE, lamAxisI = Spectrumator(batch)
+    def get_normed_e_and_i_data(batch):
+        i_data = batch["data"][:, 1, :]
+        e_data = batch["data"][:, 0, :]
 
-            if config["D"]["extraoptions"]["fit_IAW"]:
-                #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-                loss = loss + jnp.sum(jnp.square(i_data - ThryI))
+        normed_i_data = i_data / i_input_norm
+        normed_e_data = e_data / e_input_norm
 
-            if config["D"]["extraoptions"]["fit_EPWb"]:
-                thry_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), ThryE, 0.0)
-                data_slc = jnp.where((lamAxisE > 450) & (lamAxisE < 510), e_data, 0.0)
+        return normed_e_data, normed_i_data
 
-                loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+    def get_normed_batch(batch):
+        normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
+        normed_batch = jnp.concatenate([normed_e_data[:, None, :], normed_i_data[:, None, :]], axis=1)
+        return normed_batch
 
-            if config["D"]["extraoptions"]["fit_EPWr"]:
-                thry_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), ThryE, 0.0)
-                data_slc = jnp.where((lamAxisE > 540) & (lamAxisE < 625), e_data, 0.0)
+    def __get_params__(batch):
+        normed_batch = get_normed_batch(batch)
+        spectrumator = TSParameterGenerator(config_for_params)
+        params = spectrumator({"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]})
 
-                loss = loss + jnp.sum(jnp.square(data_slc - thry_slc))
+        return params
 
-            return loss
+    _get_params_ = hk.without_apply_rng(hk.transform(__get_params__))
 
-        loss_fn = hk.without_apply_rng(hk.transform(loss_fn))
-        vg_func = jit(value_and_grad(loss_fn.apply))
-        loss_func = jit(loss_fn.apply)
-        hess_func = jit(jax.hessian(loss_fn.apply))
+    def __get_active_params__(batch):
+        normed_batch = get_normed_batch(batch)
+        spectrumator = TSParameterGenerator(config_for_params)
+        active_params = spectrumator.get_active_params(
+            {"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]}
+        )
 
-        def val_and_grad_loss(x: np.ndarray):
-            pytree_weights = {"ts_spectra_generator": {}}
-            i = 0
-            for key in config["parameters"].keys():
-                if config["parameters"][key]["active"]:
-                    pytree_weights["ts_spectra_generator"][key] = jnp.array(x[i].reshape((dummy_data.shape[0], -1)))
-                    i += 1
+        return active_params
 
-            value, grad = vg_func(pytree_weights, dummy_data)
-            grads = []
-            for key in config["parameters"].keys():
-                if config["parameters"][key]["active"]:
-                    grads.append(grad["ts_spectra_generator"][key])
-            return value, np.array(np.concatenate(grads)).flatten()
+    _get_active_params_ = hk.without_apply_rng(hk.transform(__get_active_params__))
 
-    def value(x: np.ndarray):
-        x = x * norms + shifts
-        reshaped_x = jnp.array(x.reshape((dummy_data.shape[0], -1)))
-        val = loss_func(reshaped_x)
+    def get_spectra_from_params(params, batch):
+        modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)  # , sas["weights"])
+        ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess_thry(
+            modlE, modlI, lamAxisE, lamAxisI, batch["amps"], live_TSinputs
+        )
 
-        return val
+        ThryE = ThryE + batch["noise_e"]
+        # ThryI = ThryI + batch["noise_i"]
 
-    return value, val_and_grad_loss, hess_func
+        return ThryE, ThryI, lamAxisE, lamAxisI
+
+    def calculate_spectra(weights, batch):
+        params = _get_params_.apply(weights, batch)
+        ThryE, ThryI, lamAxisE, lamAxisI = get_spectra_from_params(params, batch)
+        return ThryE, ThryI, lamAxisE, lamAxisI, params
+
+    config_for_params = copy.deepcopy(config)
+
+    def array_loss_fn(weights, batch):
+        ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
+
+        i_error = 0.0
+        e_error = 0.0
+
+        i_data = batch["data"][:, 1, :]
+        e_data = batch["data"][:, 0, :]
+        normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
+
+        if config["other"]["extraoptions"]["fit_IAW"]:
+            #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
+            i_error += jnp.square(i_data - ThryI) / jnp.square(i_norm)
+
+        if config["other"]["extraoptions"]["fit_EPWb"]:
+            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
+            _error_ = jnp.where(
+                (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
+                _error_,
+                0.0,
+            )
+
+            e_error += _error_
+
+        if config["other"]["extraoptions"]["fit_EPWr"]:
+            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
+            _error_ = jnp.where(
+                (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
+                _error_,
+                0.0,
+            )
+            e_error += _error_
+
+        return e_error, [ThryE, normed_e_data, params]
+
+    def loss_for_hess_fn(params, batch):
+        params = {**params, **initialize_rest_of_params(config)}
+        ThryE, ThryI, lamAxisE, lamAxisI = get_spectra_from_params(params, batch)
+        i_error = 0.0
+        e_error = 0.0
+
+        i_data = batch["data"][:, 1, :]
+        e_data = batch["data"][:, 0, :]
+
+        if config["other"]["extraoptions"]["fit_IAW"]:
+            i_error += jnp.mean(jnp.square(i_data - ThryI))
+
+        if config["other"]["extraoptions"]["fit_EPWb"]:
+            _error_ = jnp.square(e_data - ThryE)  # / jnp.square(e_norm)
+            _error_ = jnp.where(
+                (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
+                _error_,
+                0.0,
+            )
+
+            e_error += jnp.mean(_error_)
+
+        if config["other"]["extraoptions"]["fit_EPWr"]:
+            _error_ = jnp.square(e_data - ThryE)
+            _error_ = jnp.where(
+                (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
+                _error_,
+                0.0,
+            )
+            e_error += jnp.mean(_error_)
+
+        return i_error + e_error
+
+    def loss_fn(weights, batch):
+        ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
+        i_error = 0.0
+        e_error = 0.0
+
+        i_data = batch["data"][:, 1, :]
+        e_data = batch["data"][:, 0, :]
+        normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
+
+        if config["other"]["extraoptions"]["fit_IAW"]:
+            i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
+
+        if config["other"]["extraoptions"]["fit_EPWb"]:
+            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
+            _error_ = jnp.where(
+                (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
+                _error_,
+                0.0,
+            )
+
+            e_error += jnp.mean(_error_)
+
+        if config["other"]["extraoptions"]["fit_EPWr"]:
+            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
+            _error_ = jnp.where(
+                (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
+                _error_,
+                0.0,
+            )
+            e_error += jnp.mean(_error_)
+
+        return i_error + e_error, [ThryE, normed_e_data, params]
+
+    rng_key = jax.random.PRNGKey(42)
+    init_weights = _get_params_.init(rng_key, dummy_batch)
+    _v_func_ = jit(loss_fn)
+    _vg_func_ = jit(value_and_grad(loss_fn, argnums=0, has_aux=True))
+    _h_func_ = jit(jax.hessian(loss_for_hess_fn, argnums=0))
+
+    if config["optimizer"]["method"] == "adam":
+        vg_func = _vg_func_
+        get_params = _get_params_
+        h_func = _h_func_
+        loss_dict = dict(
+            vg_func=vg_func,
+            array_loss_fn=array_loss_fn,
+            init_weights=init_weights,
+            get_params=get_params,
+            h_func=h_func,
+        )
+    elif config["optimizer"]["method"] == "l-bfgs-b":
+        if config["nn"]["use"]:
+            init_weights = init_weights
+            flattened_weights, unravel_pytree = ravel_pytree(init_weights)
+            bounds = None
+        else:
+            lb, ub, init_weights = init_weights_and_bounds(
+                config, init_weights, num_slices=config["optimizer"]["batch_size"]
+            )
+            flattened_weights, unravel_pytree = ravel_pytree(init_weights)
+            flattened_lb, _ = ravel_pytree(lb)
+            flattened_ub, _ = ravel_pytree(ub)
+            bounds = zip(flattened_lb, flattened_ub)
+
+        def vg_func(weights: np.ndarray, batch):
+            """
+            Full batch training so dummy batch actually contains the whole batch
+
+            Args:
+                weights:
+                batch:
+
+            Returns:
+
+            """
+
+            pytree_weights = unravel_pytree(weights)
+            (value, aux), grad = _vg_func_(pytree_weights, batch)
+            temp_grad, _ = ravel_pytree(grad)
+            flattened_grads = np.array(temp_grad)
+            return value, flattened_grads
+
+        def v_func(weights: np.ndarray, batch):
+            """
+            Full batch training so dummy batch actually contains the whole batch
+
+            Args:
+                weights:
+                batch:
+
+            Returns:
+
+            """
+
+            pytree_weights = unravel_pytree(weights)
+            value, _ = _v_func_(pytree_weights, batch)
+            return value
+
+        h_func = _h_func_
+
+        def get_params(weights, batch):
+            pytree_weights = unravel_pytree(weights)
+            return _get_params_.apply(pytree_weights, batch)
+
+        loss_dict = dict(
+            vg_func=vg_func,
+            array_loss_fn=array_loss_fn,
+            pytree_weights=init_weights,
+            init_weights=flattened_weights,
+            get_params=get_params,
+            get_active_params=_get_active_params_.apply,
+            bounds=bounds,
+            unravel_pytree=unravel_pytree,
+            v_func=v_func,
+            h_func=h_func,
+        )
+
+    else:
+        raise NotImplementedError
+
+    return loss_dict
+
+
+def init_weights_and_bounds(config, init_weights, num_slices):
+    """
+    this dict form will be unpacked for scipy consumption, we assemble them all in the same way so that we can then
+    use ravel pytree from JAX utilities to unpack it
+    Args:
+        config:
+        init_weights:
+        num_slices:
+
+    Returns:
+
+    """
+    lb = {"ts_parameter_generator": {}}
+    ub = {"ts_parameter_generator": {}}
+    iw = {"ts_parameter_generator": {}}
+    for k, v in init_weights["ts_parameter_generator"].items():
+        lb["ts_parameter_generator"][k] = np.array([0 * config["units"]["lb"][k] for _ in range(num_slices)])
+        ub["ts_parameter_generator"][k] = np.array([1.0 + 0 * config["units"]["ub"][k] for _ in range(num_slices)])
+        iw["ts_parameter_generator"][k] = np.array([config["parameters"][k]["val"] for _ in range(num_slices)])[:, None]
+        iw["ts_parameter_generator"][k] = (iw["ts_parameter_generator"][k] - config["units"]["shifts"][k]) / config[
+            "units"
+        ]["norms"][k]
+
+    return lb, ub, iw
