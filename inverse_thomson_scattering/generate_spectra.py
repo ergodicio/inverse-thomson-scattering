@@ -24,14 +24,14 @@ def get_fit_model(config, sa, backend: str = "haiku"):
 
         # Add gradients to electron temperature and density just being applied to EPW
         cur_Te = jnp.linspace(
-            (1 - parameters["Te"]["gradient"] / 200) * parameters["Te"]["val"],
-            (1 + parameters["Te"]["gradient"] / 200) * parameters["Te"]["val"],
-            10,
+            (1 - parameters["Te_gradient"]["val"] / 200) * parameters["Te"]["val"],
+            (1 + parameters["Te_gradient"]["val"] / 200) * parameters["Te"]["val"],
+            parameters["Te_gradient"]["num_grad_points"]
         )
         cur_ne = jnp.linspace(
-            (1 - parameters["ne"]["gradient"] / 200) * parameters["ne"]["val"],
-            (1 + parameters["ne"]["gradient"] / 200) * parameters["ne"]["val"],
-            10,
+            (1 - parameters["ne_gradient"]["val"] / 200) * parameters["ne"]["val"],
+            (1 + parameters["ne_gradient"]["val"] / 200) * parameters["ne"]["val"],
+            parameters["Te_gradient"]["num_grad_points"]
         )
 
         fecur = jnp.exp(parameters["fe"]["val"])

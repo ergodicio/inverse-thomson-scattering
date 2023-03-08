@@ -115,7 +115,7 @@ def fit(config):
     }
 
     # prepare optimizer / solver
-
+    
     batch_indices = np.arange(len(all_data["data"]))
     num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
     mlflow.log_metrics({"setup_time": round(time.time() - t1, 2)})
@@ -277,7 +277,9 @@ def get_sigmas(keys, hess, batch_size):
         inv = np.linalg.inv(temp)
 
         for k1, param in enumerate(keys):
-            sigmas[i, k1] = np.sqrt(inv[k1, k1])
+            if inv[k1, k1] < 0:
+                print("Imaginary sigma for ", param, " in batch ",i)
+            sigmas[i, k1] = np.sign(inv[k1,k1])*np.sqrt(np.abs(inv[k1, k1]))
 
     return sigmas
 
@@ -309,7 +311,7 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, func_dict):
         mlflow.set_tag("status", "done plotting")
 
         # fit vs data storage and plot
-        coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", np.arange(fits.shape[1]))
+        coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", np.arange(fits.shape[1])) #replace with true wavelength axis
         dat = {"fit": fits, "data": all_data["data"][:, 0, :]}
         savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
         savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))

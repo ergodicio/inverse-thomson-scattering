@@ -27,10 +27,10 @@ if __name__ == "__main__":
     # for tend in np.arange(510, 560, 4):
     # for nn_reparam in [False, True]:
     nn_reparam = True
-    with open("tests/configs/defaults.yaml", "r") as fi:
+    with open("defaults.yaml", "r") as fi:
         defaults = yaml.safe_load(fi)
 
-    with open("tests/configs/inputs.yaml", "r") as fi:
+    with open("inputs.yaml", "r") as fi:
         inputs = yaml.safe_load(fi)
 
     defaults = flatten(defaults)
@@ -38,11 +38,11 @@ if __name__ == "__main__":
     config = unflatten(defaults)
     mlflow.set_experiment(config["mlflow"]["experiment"])
 
-    config["parameters"]["Te"]["val"] = 0.5
-    config["parameters"]["ne"]["val"] = 0.2  # 0.25
-    config["parameters"]["m"]["val"] = 3.0  # 2.2
+    config["parameters"]["Te"]["val"] = 1.0
+    config["parameters"]["ne"]["val"] = 0.5  # 0.25
+    config["parameters"]["m"]["val"] = 2.0  # 2.2
     config["data"]["lineouts"]["start"] = int(320)
-    config["data"]["lineouts"]["skip"] = int(1)
+    config["data"]["lineouts"]["skip"] = int(6)
     config["data"]["lineouts"]["end"] = int(680)
     config["optimizer"]["batch_size"] = int(4)
     # config["optimizer"]["method"] = "adam"

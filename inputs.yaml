@@ -2,13 +2,13 @@ parameters:
     amp1:
         val: 1.
         active: True
-        lb: 0.
-        ub: 10.
+        lb: 0.01
+        ub: 3.75
     amp2:
         val: 1.
         active: True
-        lb: 0.
-        ub: 10.
+        lb: 0.01
+        ub: 3.75
     amp3:
         val: 1.
         active: False
@@ -23,8 +23,13 @@ parameters:
         val: .5
         active: True
         lb: 0.01
-        ub: 3.
-        gradient: 0.
+        ub: 1.5
+    Te_gradient:
+        val: 0.
+        active: True
+        lb: 0.
+        ub: 10.
+        num_grad_points: 5
     Ti:
         val: .2
         active: False
@@ -42,8 +47,13 @@ parameters:
         val: 0.2
         active: True
         lb: .001
+        ub: 1.
+    ne_gradient:
+        val: 0.
+        active: True
+        lb: 0.
         ub: 10.
-        gradient: 0.
+        num_grad_points: 5
     m:
         val: 3.0
         active: True
