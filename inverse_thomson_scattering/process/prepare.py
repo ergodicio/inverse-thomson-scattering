@@ -32,6 +32,7 @@ def prepare_data(config: Dict) -> Dict:
     [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(
         config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
     )
+    all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI} 
 
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
     if not config["other"]["extraoptions"]["load_ion_spec"]:
@@ -95,4 +96,4 @@ def prepare_data(config: Dict) -> Dict:
     config["other"]["lamrangI"] = [axisyI[0], axisyI[-1]]
     config["other"]["npts"] = config["other"]["CCDsize"][0] * config["other"]["points_per_pixel"]
 
-    return all_data, sa
+    return all_data, sa, all_axes

@@ -42,7 +42,7 @@ if __name__ == "__main__":
     config["parameters"]["ne"]["val"] = 0.5  # 0.25
     config["parameters"]["m"]["val"] = 2.0  # 2.2
     config["data"]["lineouts"]["start"] = int(320)
-    config["data"]["lineouts"]["skip"] = int(6)
+    config["data"]["lineouts"]["skip"] = int(18)
     config["data"]["lineouts"]["end"] = int(680)
     config["optimizer"]["batch_size"] = int(4)
     # config["optimizer"]["method"] = "adam"

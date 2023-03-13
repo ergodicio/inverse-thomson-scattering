@@ -106,7 +106,7 @@ def fit(config):
     t1 = time.time()
     config = validate_inputs(config)
     # prepare data
-    all_data, sa = prepare.prepare_data(config)
+    all_data, sa, all_axes = prepare.prepare_data(config)
     all_batches = {
         "data": all_data["data"],
         "amps": all_data["amps"],
@@ -199,7 +199,7 @@ def fit(config):
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     t1 = time.time()
-    final_params = postprocess(config, batch_indices, all_data, best_weights, func_dict)
+    final_params = postprocess(config, batch_indices, all_data, all_axes, best_weights, func_dict)
     mlflow.log_metrics({"inference_time": round(time.time() - t1, 2)})
 
     return final_params
@@ -277,14 +277,16 @@ def get_sigmas(keys, hess, batch_size):
         inv = np.linalg.inv(temp)
 
         for k1, param in enumerate(keys):
-            if inv[k1, k1] < 0:
-                print("Imaginary sigma for ", param, " in batch ",i)
+            #if inv[k1, k1] < 0:
+            #    print("Imaginary sigma for ", param, " in batch ",i)
             sigmas[i, k1] = np.sign(inv[k1,k1])*np.sqrt(np.abs(inv[k1, k1]))
 
     return sigmas
 
 
-def postprocess(config, batch_indices, all_data: Dict, best_weights, func_dict):
+def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weights, func_dict):
+    t1 = time.time()
+    
     losses, fits, sigmas, all_params = recalculate_with_chosen_weights(
         config, batch_indices, all_data, best_weights, func_dict
     )
@@ -294,6 +296,8 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, func_dict):
     sorted_losses = losses[loss_inds]
     sorted_fits = fits[loss_inds]
     sorted_data = all_data["data"][loss_inds]
+    
+    mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
 
     num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
     with tempfile.TemporaryDirectory() as td:
@@ -303,15 +307,13 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, func_dict):
 
         plotters.model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds)
 
-        mlflow.log_metrics({"plot time": round(time.time() - t1, 2)})
-
         # store fitted parameters
         final_params = pandas.DataFrame(all_params)
         final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
         mlflow.set_tag("status", "done plotting")
 
         # fit vs data storage and plot
-        coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", np.arange(fits.shape[1])) #replace with true wavelength axis
+        coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", all_axes["epw_y"]) #replace with true wavelength axis
         dat = {"fit": fits, "data": all_data["data"][:, 0, :]}
         savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
         savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
@@ -322,15 +324,60 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, func_dict):
         savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
         fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
 
+        loss=0
+        used_points=0
+        if config["other"]["extraoptions"]["fit_EPWb"]:
+            sqdev = np.square(savedata["data"] - savedata["fit"])/savedata["data"]
+            sqdev = np.where(
+                (all_axes["epw_y"] > config["data"]["fit_rng"]["blue_min"]) & (all_axes["epw_y"] < config["data"]["fit_rng"]["blue_max"]),
+                sqdev,
+                0.0,
+            )
+            used_points += np.sum((all_axes["epw_y"] > config["data"]["fit_rng"]["blue_min"]) & (all_axes["epw_y"] < config["data"]["fit_rng"]["blue_max"]))
+            loss += np.sum(sqdev,axis = 1)
+
+        print(loss)
+        #print(used_points)
+        if config["other"]["extraoptions"]["fit_EPWr"]:
+            sqdev = np.square(savedata["data"] - savedata["fit"])/savedata["data"]
+            #print(savedata["data"][1,350:620])
+            #print(savedata["fit"][1,350:620])
+            #print(np.square(savedata["data"] - savedata["fit"][1,350:620]))
+            #print(sqdev[1,350:620])
+            sqdev = np.where(
+                (all_axes["epw_y"] > config["data"]["fit_rng"]["red_min"]) & (all_axes["epw_y"] < config["data"]["fit_rng"]["red_max"]),
+                sqdev,
+                0.0,
+            )
+            #print(sqdev[1,350:620])
+            used_points += np.sum((all_axes["epw_y"] > config["data"]["fit_rng"]["red_min"]) & (all_axes["epw_y"] < config["data"]["fit_rng"]["red_max"]))
+            loss += np.sum(sqdev,axis = 1)
+        
+        print(loss)
+        #print(used_points)
         # fig, ax = plt.subplots(1, 1, figsize=(10, 4))
-        lslc = slice(config["other"]["crop_window"], -config["other"]["crop_window"])
-        losses = np.mean((savedata["data"][:, lslc] - savedata["fit"][:, lslc]) ** 2.0, axis=-1) / np.square(
-            np.amax(savedata["data"])
-        )
+        #lslc = slice(config["other"]["crop_window"], -config["other"]["crop_window"])
+        #losses = np.mean((savedata["data"][:, lslc] - savedata["fit"][:, lslc]) ** 2.0, axis=-1) / np.square(
+        #    np.amax(savedata["data"])
+        #)
+        #np.set_printoptions(threshold=np.inf)
+        #print(np.shape(savedata["data"][:, lslc])[1])
+        #losses = np.sum((savedata["data"][:, lslc] - savedata["fit"][:, lslc]) ** 2.0 /
+        #    savedata["data"][:, lslc] , axis=1) #switched to a reduced chisq
+        red_losses = loss /(used_points - len(all_params))
+        print(red_losses)
+        #print(savedata["data"][-6, lslc])
+        #print(savedata["fit"][-6, lslc])
+        #print((savedata["data"][-6, lslc] - savedata["fit"][-6, lslc]) ** 2.0)
+        #print((savedata["data"][-6, lslc] - savedata["fit"][-6, lslc]) ** 2.0 /
+        #    savedata["data"][-6, lslc])
+        #print(np.sum((savedata["data"][-6, lslc] - savedata["fit"][-6, lslc]) ** 2.0 /
+        #    savedata["data"][-6, lslc]))
         fig, ax = plt.subplots(1, 1, figsize=(6, 4), tight_layout=True)
-        ax.hist(losses, 128)
+        ax.hist(red_losses, 128)
         ax.set_yscale("log")
-        ax.set_xlabel(r"$N^{-1}~ \sum~ (\hat{y} - y)^2 / y_{max}^2$")
+        #ax.set_xlabel(r"$N^{-1}~ \sum~ (\hat{y} - y)^2 / y_{max}^2$")
+        ax.set_xlabel("$\chi^2/DOF$")
         ax.set_ylabel("Counts")
         ax.set_title("Normalized $L^2$ Norm of the Error")
         ax.grid()
@@ -340,7 +387,36 @@ def postprocess(config, batch_indices, all_data: Dict, best_weights, func_dict):
             {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(all_params.keys())}
         )
         sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
+        
+        #print(final_params)
+        #print(sigmas_ds)
+        # ne, Te, m plots with errorbars
+        fig, ax = plt.subplots(1,3,figsize=(15,4))
+        lineouts = np.array(config["data"]["lineouts"]["val"]);
+        ax[0].plot(lineouts, final_params["ne"])
+        ax[0].fill_between(lineouts, (final_params["ne"]-3*sigmas_ds.ne), (final_params["ne"]+3*sigmas_ds.ne), color = 'b', alpha = 0.1)
+        ax[0].set_xlabel("lineout", fontsize=14)
+        ax[0].grid()
+        ax[0].set_ylim(0.8*np.min(final_params["ne"]), 1.2*0.8*np.max(final_params["ne"]))
+        ax[0].set_title("$n_e$(t)", fontsize=14)
 
+        ax[1].plot(lineouts, final_params["Te"])
+        ax[1].fill_between(lineouts, (final_params["Te"]-3*sigmas_ds.Te), (final_params["Te"]+3*sigmas_ds.Te), color = 'b', alpha = 0.1)
+        ax[1].set_xlabel("lineout", fontsize=14)
+        ax[1].grid()
+        ax[1].set_ylim(0.8*np.min(final_params["Te"]), 1.2*0.8*np.max(final_params["Te"]))
+        ax[1].set_title("$T_e$(t)", fontsize=14)
+        
+        ax[2].plot(lineouts, final_params["m"])
+        ax[2].fill_between(lineouts, (final_params["m"]-3*sigmas_ds.m), (final_params["m"]+3*sigmas_ds.m), color = 'b', alpha = 0.1)
+        ax[2].set_xlabel("lineout", fontsize=14)
+        ax[2].grid()
+        ax[2].set_ylim(0.8*np.min(final_params["m"]), 1.2*0.8*np.max(final_params["m"]))
+        ax[2].set_title("$m$(t)", fontsize=14)
+        
+        fig.savefig(os.path.join(td, "learned_parameters.png"), bbox_inches="tight")
+        
         mlflow.log_artifacts(td)
+        mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
 
     return final_params
