@@ -55,7 +55,7 @@ def prepare_data(config: Dict) -> Dict:
     # extract ARTS section
     if (config["data"]["lineouts"]["type"] == "range") & (config["other"]["extraoptions"]["spectype"] == "angular"):
         config["other"]["extraoptions"]["spectype"] = "angular_full"
-        config["other"]["PhysParams"]["amps"] = np.array([np.amax(elecData), 1])
+        #config["other"]["PhysParams"]["amps"] = np.array([np.amax(elecData), 1])
         sa["angAxis"] = axisxE
 
         if config["other"]["extraoptions"]["plot_raw_data"]:
@@ -70,11 +70,14 @@ def prepare_data(config: Dict) -> Dict:
             )
 
         # down sample image to resolution units by summation
-        ang_res_unit = 10  # in pixels
-        lam_res_unit = 5  # in pixels
+        ang_res_unit = config["other"]["ang_res_unit"]  # in pixels
+        lam_res_unit = config["other"]["lam_res_unit"]  # in pixels
 
         data_res_unit = np.array(
             [np.average(elecData[i : i + lam_res_unit, :], axis=0) for i in range(0, elecData.shape[0], lam_res_unit)]
+        )
+        bg_res_unit = np.array(
+            [np.average(BGele[i : i + lam_res_unit, :], axis=0) for i in range(0, BGele.shape[0], lam_res_unit)]
         )
         data_res_unit = np.array(
             [
@@ -82,9 +85,17 @@ def prepare_data(config: Dict) -> Dict:
                 for i in range(0, data_res_unit.shape[1], ang_res_unit)
             ]
         )
-        all_data = data_res_unit
+        bg_res_unit = np.array(
+            [
+                np.average(bg_res_unit[:, i : i + ang_res_unit], axis=1)
+                for i in range(0, bg_res_unit.shape[1], ang_res_unit)
+            ]
+        )
+        all_data = {"e_data": data_res_unit, "e_amps": np.amax(data_res_unit, axis = 1, keepdims = True)}
+        all_data["i_data"] = all_data["i_amps"] = np.zeros(len(data_res_unit))
         config["other"]["PhysParams"]["noiseI"] = 0
-        config["other"]["PhysParams"]["noiseE"] = BGele
+        config["other"]["PhysParams"]["noiseE"] = bg_res_unit
+        config["other"]["CCDsize"] = np.shape(data_res_unit)
 
     else:
         all_data = get_lineouts(
@@ -94,6 +105,6 @@ def prepare_data(config: Dict) -> Dict:
     config["other"]["PhysParams"]["widIRF"] = stddev
     config["other"]["lamrangE"] = [axisyE[0], axisyE[-1]]
     config["other"]["lamrangI"] = [axisyI[0], axisyI[-1]]
-    config["other"]["npts"] = config["other"]["CCDsize"][0] * config["other"]["points_per_pixel"]
-
+    config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
+    
     return all_data, sa, all_axes

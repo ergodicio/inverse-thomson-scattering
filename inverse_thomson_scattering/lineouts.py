@@ -25,6 +25,8 @@ def get_lineouts(
         BackgroundPixel = config["data"]["background"]["slice"]
     elif config["data"]["background"]["type"] == "auto":
         BackgroundPixel = LineoutPixelE + 100
+    else:
+        BackgroundPixel = []
 
     span = 2 * config["data"]["dpixel"] + 1  # (span must be odd)
 
@@ -135,23 +137,36 @@ def get_lineouts(
 
     all_data = defaultdict(list)
 
-    for i, _ in enumerate(config["data"]["lineouts"]["val"]):
-        # this probably needs to be done differently
-        if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
-            data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
-            amps = [ampE[i], ampI[i]]
-        elif config["other"]["extraoptions"]["load_ion_spec"]:
-            data = np.vstack((LineoutTSI_norm[i], LineoutTSI_norm[i]))
-            amps = [ampE, ampI[i]]
-        elif config["other"]["extraoptions"]["load_ele_spec"]:
-            data = np.vstack((LineoutTSE_norm[i], LineoutTSE_norm[i]))
-            amps = [ampE[i], ampI]
-        else:
-            raise NotImplementedError("This spectrum does not exist")
+    #for i, _ in enumerate(config["data"]["lineouts"]["val"]):
+    #    # this probably needs to be done differently
+    #    if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
+    #        data = np.vstack((LineoutTSE_norm[i], LineoutTSI_norm[i]))
+    #        amps = [ampE[i], ampI[i]]
+    #    elif config["other"]["extraoptions"]["load_ion_spec"]:
+    #        data = np.vstack((LineoutTSI_norm[i], LineoutTSI_norm[i]))
+    #        amps = [ampE, ampI[i]]
+    #    elif config["other"]["extraoptions"]["load_ele_spec"]:
+    #        data = np.vstack((LineoutTSE_norm[i], LineoutTSE_norm[i]))
+    #        amps = [ampE[i], ampI]
+    #    else:
+    #        raise NotImplementedError("This spectrum does not exist")
 
-        all_data["data"].append(data[None, :])
-        all_data["amps"].append(np.array(amps)[None, :])
+    #    all_data["data"].append(data[None, :])
+    #    all_data["amps"].append(np.array(amps)[None, :])
 
-    all_data = {k: np.concatenate(v) for k, v in all_data.items()}
+    #all_data = {k: np.concatenate(v) for k, v in all_data.items()}
+    
+    if config["other"]["extraoptions"]["load_ion_spec"]:
+        all_data["i_data"] = LineoutTSI_norm
+        all_data["i_amps"] = ampI
+    else:
+        all_data["i_data"] = all_data["i_amps"] = np.zeros(len(config["data"]["lineouts"]["val"]))
+    if config["other"]["extraoptions"]["load_ele_spec"]:
+        all_data["e_data"] = LineoutTSE_norm
+        all_data["e_amps"] = ampE
+    else:
+        all_data["e_data"] = all_data["e_amps"] = np.zeros(len(config["data"]["lineouts"]["val"]))
+    
+    #all_data = {k: np.concatenate(v) for k, v in all_data.items()}
 
     return all_data

@@ -27,6 +27,7 @@ def get_calibrations(shotNum,tstype,CCDsize):
         stddev["spect_stddev_ion"] = 1 #dummy
         magE = 1 #dummy
         stddev["spect_FWHM_ele"] = .9  # nominally this is ~.8 or .9 for h2
+        stddev["spect_stddev_ele"] = stddev["spect_FWHM_ele"]/2.3548 #dummy
         stddev["ang_FWHM_ele"] = 1  # see Joe's FDR slides ~1-1.2
         IAWtime = 0 # means nothing here just kept to allow one code to be used for both
 

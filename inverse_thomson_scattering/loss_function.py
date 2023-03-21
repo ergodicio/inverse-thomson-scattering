@@ -118,7 +118,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     @jit
     def postprocess_thry(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
         if config["other"]["extraoptions"]["load_ion_spec"]:
-            lamAxisI, lamAxisE, ThryI = irf.add_ion_IRF(config, lamAxisI, modlI, lamAxisE, amps, TSins)
+            lamAxisI, lamAxisE, ThryI = irf.add_ion_IRF(config, lamAxisI, modlI, lamAxisE, amps["i_amps"], TSins)
         else:
             lamAxisI = jnp.nan
             ThryI = jnp.nan
@@ -126,9 +126,9 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         if config["other"]["extraoptions"]["load_ele_spec"] & (
             config["other"]["extraoptions"]["spectype"] == "angular_full"
         ):
-            lamAxisE, ThryE = irf.add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam)
+            lamAxisE, ThryE = irf.add_ATS_IRF(config, sas, lamAxisE, modlE, amps["e_amps"], TSins, lam)
         elif config["other"]["extraoptions"]["load_ele_spec"]:
-            lamAxisE, ThryE = irf.add_electron_IRF(config, lamAxisE, modlE, amps, TSins, lam)
+            lamAxisE, ThryE = irf.add_electron_IRF(config, lamAxisE, modlE, amps["e_amps"], TSins, lam)
         else:
             lamAxisE = jnp.nan
             ThryE = jnp.nan
@@ -144,14 +144,14 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         vmap_postprocess_thry = vmap(postprocess_thry)
 
     if config["optimizer"]["y_norm"]:
-        i_norm = np.amax(dummy_batch["data"][:, 1, :])
-        e_norm = np.amax(dummy_batch["data"][:, 0, :])
+        i_norm = np.amax(dummy_batch["i_data"])
+        e_norm = np.amax(dummy_batch["e_data"])
     else:
         i_norm = e_norm = 1.0
 
     if config["optimizer"]["x_norm"] and config["nn"]["use"]:
-        i_input_norm = np.amax(dummy_batch["data"][:, 1, :])
-        e_input_norm = np.amax(dummy_batch["data"][:, 0, :])
+        i_input_norm = np.amax(dummy_batch["i_data"])
+        e_input_norm = np.amax(dummy_batch["e_data"])
     else:
         i_input_norm = e_input_norm = 1.0
 
@@ -260,24 +260,24 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         return these_params
 
-    def get_normed_e_and_i_data(batch):
-        i_data = batch["data"][:, 1, :]
-        e_data = batch["data"][:, 0, :]
+    #def get_normed_e_and_i_data(batch):
+    #    normed_i_data = batch["i_data"] / i_input_norm
+    #    normed_e_data = batch["e_data"] / e_input_norm
 
-        normed_i_data = i_data / i_input_norm
-        normed_e_data = e_data / e_input_norm
-
-        return normed_e_data, normed_i_data
+    #    return normed_e_data, normed_i_data
 
     def get_normed_batch(batch):
-        normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
-        normed_batch = jnp.concatenate([normed_e_data[:, None, :], normed_i_data[:, None, :]], axis=1)
+        normed_batch = copy.deepcopy(batch)
+        normed_batch["i_data"] = normed_batch["i_data"] / i_input_norm
+        normed_batch["e_data"] = normed_batch["e_data"] / e_input_norm
+        #normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
+        #normed_batch = jnp.concatenate([normed_e_data[:, None, :], normed_i_data[:, None, :]], axis=1)
         return normed_batch
 
     def __get_params__(batch):
         normed_batch = get_normed_batch(batch)
         spectrumator = TSParameterGenerator(config_for_params)
-        params = spectrumator({"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]})
+        params = spectrumator({"data": normed_batch, "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]}, "noise_e": batch["noise_e"]})
 
         return params
 
@@ -287,7 +287,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         normed_batch = get_normed_batch(batch)
         spectrumator = TSParameterGenerator(config_for_params)
         active_params = spectrumator.get_active_params(
-            {"data": normed_batch, "amps": batch["amps"], "noise_e": batch["noise_e"]}
+            {"data": normed_batch, "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]}, "noise_e": batch["noise_e"]}
         )
 
         return active_params
@@ -297,9 +297,12 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     def get_spectra_from_params(params, batch):
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)  # , sas["weights"])
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess_thry(
-            modlE, modlI, lamAxisE, lamAxisI, batch["amps"], live_TSinputs
+            modlE, modlI, lamAxisE, lamAxisI, {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]}, live_TSinputs
         )
-
+        
+        if config["other"]["extraoptions"]["spectype"] == "angular_full":
+            ThryE, lamAxisE = reduce_ATS_to_resunit(ThryE, lamAxisE, live_TSinputs, batch)
+        
         ThryE = ThryE + batch["noise_e"]
         # ThryI = ThryI + batch["noise_i"]
 
@@ -312,15 +315,40 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
     config_for_params = copy.deepcopy(config)
 
+    def reduce_ATS_to_resunit(ThryE, lamAxisE, TSins, batch):
+        # print("ThryE shape after amps", jnp.shape(ThryE))
+        lam_step = round(ThryE.shape[1] / batch["e_data"].shape[1])
+        ang_step = round(ThryE.shape[0] / batch["e_data"].shape[0])
+
+        ThryE = jnp.array([jnp.average(ThryE[:, i : i + lam_step], axis=1) for i in range(0, ThryE.shape[1], lam_step)])
+        # print("ThryE shape after 1 resize", jnp.shape(ThryE))
+        ThryE = jnp.array([jnp.average(ThryE[:, i : i + ang_step], axis=1) for i in range(0, ThryE.shape[1], ang_step)])
+        # print("ThryE shape after 2 resize", jnp.shape(ThryE))
+
+        # ThryE = ThryE.transpose()
+        #if config["other"]["PhysParams"]["norm"] == 0:
+        # lamAxisE = jnp.average(lamAxisE.reshape(data.shape[0], -1), axis=1)
+        lamAxisE = jnp.array(
+            [jnp.average(lamAxisE[i : i + lam_step], axis=0) for i in range(0, lamAxisE.shape[0], lam_step)]
+        )
+        ThryE = batch["e_amps"] * ThryE / jnp.amax(ThryE, keepdims = True)
+        ThryE = jnp.where(lamAxisE < lam, TSins["amp1"]["val"] * ThryE, TSins["amp2"]["val"] * ThryE)
+    # print("ThryE shape after norm ", jnp.shape(ThryE))
+    # ThryE = ThryE.transpose()
+        return ThryE, lamAxisE
+    
     def array_loss_fn(weights, batch):
         ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
+        #print("in array_loss_fn")
 
         i_error = 0.0
         e_error = 0.0
 
-        i_data = batch["data"][:, 1, :]
-        e_data = batch["data"][:, 0, :]
-        normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
+        i_data = batch["i_data"]
+        e_data = batch["e_data"]
+        normed_batch = get_normed_batch(batch)
+        normed_i_data = normed_batch["i_data"]
+        normed_e_data = normed_batch["e_data"]
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
@@ -353,8 +381,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         i_error = 0.0
         e_error = 0.0
 
-        i_data = batch["data"][:, 1, :]
-        e_data = batch["data"][:, 0, :]
+        i_data = batch["i_data"]
+        e_data = batch["e_data"]
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             i_error += jnp.mean(jnp.square(i_data - ThryI))
@@ -382,12 +410,15 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
     def loss_fn(weights, batch):
         ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
+        #print("in loss_fn")
         i_error = 0.0
         e_error = 0.0
 
-        i_data = batch["data"][:, 1, :]
-        e_data = batch["data"][:, 0, :]
-        normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
+        i_data = batch["i_data"]
+        e_data = batch["e_data"]
+        normed_batch = get_normed_batch(batch)
+        normed_i_data = normed_batch["i_data"]
+        normed_e_data = normed_batch["e_data"]
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
@@ -410,6 +441,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 0.0,
             )
             e_error += jnp.mean(_error_)
+        #print("done with loss_fn")
 
         return i_error + e_error, [ThryE, normed_e_data, params]
 
@@ -518,6 +550,7 @@ def init_weights_and_bounds(config, init_weights, num_slices):
     lb = {"ts_parameter_generator": {}}
     ub = {"ts_parameter_generator": {}}
     iw = {"ts_parameter_generator": {}}
+    
     for k, v in init_weights["ts_parameter_generator"].items():
         lb["ts_parameter_generator"][k] = np.array([0 * config["units"]["lb"][k] for _ in range(num_slices)])
         ub["ts_parameter_generator"][k] = np.array([1.0 + 0 * config["units"]["ub"][k] for _ in range(num_slices)])

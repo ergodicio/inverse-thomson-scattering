@@ -164,6 +164,7 @@ def get_lineout_bg(
 
                 noiseE_rescaled.append(scale.x * noiseE)
 
+            noiseE = np.array(noiseE_rescaled)
             # if config["data"]["background"]["show"]:
             #     plt.plot(bgfitx, noiseE[bgfitx])
             #     plt.plot(bgfitx, scale.x * noiseE[bgfitx])
@@ -173,7 +174,7 @@ def get_lineout_bg(
             #     plt.show()
 
         # constant addition to the background
-        noiseE = np.array(noiseE_rescaled) + config["other"]["flatbg"]
+        noiseE += config["other"]["flatbg"]
     else:
         noiseE = 0
     if config["other"]["extraoptions"]["load_ele_spec"]:

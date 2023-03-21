@@ -71,8 +71,8 @@ def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, confi
         )
         filename = f"loss={sorted_losses[i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[i]]}.png"
         fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-        ax.plot(np.squeeze(sorted_data[i, 0, 256:-256]), label="Data")
-        ax.plot(np.squeeze(sorted_fits[i, 256:-256]), label="Fit")
+        ax.plot(np.squeeze(sorted_data[i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Data")
+        ax.plot(np.squeeze(sorted_fits[i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Fit")
         ax.set_title(titlestr, fontsize=14)
         ax.legend(fontsize=14)
         ax.grid()
@@ -87,8 +87,8 @@ def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, confi
             f"loss={sorted_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
         )
         fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-        ax.plot(np.squeeze(sorted_data[-1 - i, 0, 256:-256]), label="Data")
-        ax.plot(np.squeeze(sorted_fits[-1 - i, 256:-256]), label="Fit")
+        ax.plot(np.squeeze(sorted_data[-1 - i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Data")
+        ax.plot(np.squeeze(sorted_fits[-1 - i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Fit")
         ax.set_title(titlestr, fontsize=14)
         ax.legend(fontsize=14)
         ax.grid()

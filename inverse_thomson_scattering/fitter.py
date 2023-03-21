@@ -107,16 +107,16 @@ def fit(config):
     config = validate_inputs(config)
     # prepare data
     all_data, sa, all_axes = prepare.prepare_data(config)
-    all_batches = {
-        "data": all_data["data"],
-        "amps": all_data["amps"],
-        "noise_e": config["other"]["PhysParams"]["noiseE"],
+    #all_batches = {
+    #    "data": all_data["data"],
+    #    "amps": all_data["amps"],
+    #    "noise_e": config["other"]["PhysParams"]["noiseE"],
         # "noise_i": config["other"]["PhysParams"]["noiseI"][: config["optimizer"]["batch_size"]],
-    }
+    #}
 
     # prepare optimizer / solver
     
-    batch_indices = np.arange(len(all_data["data"]))
+    batch_indices = np.arange(max(len(all_data["e_data"]),len(all_data["i_data"])))
     num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
     mlflow.log_metrics({"setup_time": round(time.time() - t1, 2)})
 
@@ -168,20 +168,12 @@ def fit(config):
 
     elif config["optimizer"]["method"] == "l-bfgs-b":
         best_weights = {}
-        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-
-        overall_loss = 0.0
-        with trange(num_batches, unit="batch") as tbatch:
-            for i_batch in tbatch:
-                inds = batch_indices[i_batch]
-                batch = {
-                    "data": all_data["data"][inds],
-                    "amps": all_data["amps"][inds],
-                    "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
-                }
-                func_dict = get_loss_function(config, sa, batch)
-
-                res = spopt.minimize(
+        if config["other"]["extraoptions"]["spectype"] == "angular_full":
+            config["optimizer"]["batch_size"] = 1
+            batch = all_data
+            batch["noise_e"] = config["other"]["PhysParams"]["noiseE"]
+            func_dict = get_loss_function(config, sa, batch)
+            res = spopt.minimize(
                     func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict["v_func"],
                     func_dict["init_weights"],
                     args=batch,
@@ -191,8 +183,36 @@ def fit(config):
                     bounds=func_dict["bounds"],
                     options={"disp": True},
                 )
-                best_weights[i_batch] = func_dict["unravel_pytree"](res["x"])
-                overall_loss += res["fun"]
+            best_weights = func_dict["unravel_pytree"](res["x"])
+            overall_loss = res["fun"]
+            
+        else:    
+            batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+            overall_loss = 0.0
+            with trange(num_batches, unit="batch") as tbatch:
+                for i_batch in tbatch:
+                    inds = batch_indices[i_batch]
+                    batch = {
+                        "e_data": all_data["e_data"][inds],
+                        "e_amps": all_data["e_amps"][inds],
+                        "i_data": all_data["i_data"][inds],
+                        "i_amps": all_data["i_amps"][inds],
+                        "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                    }
+                    func_dict = get_loss_function(config, sa, batch)
+
+                    res = spopt.minimize(
+                        func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict["v_func"],
+                        func_dict["init_weights"],
+                        args=batch,
+                        method=config["optimizer"]["method"],
+                        jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+                        # hess=hess_fn if config["optimizer"]["hessian"] else None,
+                        bounds=func_dict["bounds"],
+                        options={"disp": True},
+                    )
+                    best_weights[i_batch] = func_dict["unravel_pytree"](res["x"])
+                    overall_loss += res["fun"]
         mlflow.log_metrics({"overall loss": float(overall_loss / num_batches)})
     else:
         raise NotImplementedError
@@ -238,14 +258,20 @@ def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weight
     batch_indices.sort()
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
     losses = np.zeros_like(batch_indices, dtype=np.float64)
-    sigmas = np.zeros((all_data["data"].shape[0], len(all_params.keys())))
-    fits = np.zeros((all_data["data"].shape[0], all_data["data"].shape[2]))
+    
+    #This will need to be fixed to allow ion only fitting
+    #sigmas = np.zeros((max(all_data["e_data"].shape[0], all_data["i_data"].shape[0]), len(all_params.keys())))
+    sigmas = np.zeros((all_data["e_data"].shape[0], len(all_params.keys())))
+    #fits = np.zeros((max(all_data["e_data"].shape[0], all_data["i_data"].shape[0]), max(all_data["e_data"].shape[1], all_data["i_data"].shape[1])))
+    fits = np.zeros(all_data["e_data"].shape)
     for i_batch, inds in enumerate(batch_indices):
         batch = {
-            "data": all_data["data"][inds],
-            "amps": all_data["amps"][inds],
-            "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
-        }
+                    "e_data": all_data["e_data"][inds],
+                    "e_amps": all_data["e_amps"][inds],
+                    "i_data": all_data["i_data"][inds],
+                    "i_amps": all_data["i_amps"][inds],
+                    "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                }
         if not config["optimizer"]["method"] == "adam":
             these_weights = best_weights[i_batch]
         else:
@@ -291,11 +317,11 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
         config, batch_indices, all_data, best_weights, func_dict
     )
 
-    losses = losses.flatten() / np.amax(all_data["data"][:, 0, :], axis=-1)
+    losses = losses.flatten() / np.amax(all_data["e_data"], axis=-1)
     loss_inds = losses.argsort()[::-1]
     sorted_losses = losses[loss_inds]
     sorted_fits = fits[loss_inds]
-    sorted_data = all_data["data"][loss_inds]
+    sorted_data = all_data["e_data"][loss_inds]
     
     mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
 
@@ -314,7 +340,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
 
         # fit vs data storage and plot
         coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", all_axes["epw_y"]) #replace with true wavelength axis
-        dat = {"fit": fits, "data": all_data["data"][:, 0, :]}
+        dat = {"fit": fits, "data": all_data["e_data"]}
         savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
         savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
 
@@ -336,7 +362,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             used_points += np.sum((all_axes["epw_y"] > config["data"]["fit_rng"]["blue_min"]) & (all_axes["epw_y"] < config["data"]["fit_rng"]["blue_max"]))
             loss += np.sum(sqdev,axis = 1)
 
-        print(loss)
+        #print(loss)
         #print(used_points)
         if config["other"]["extraoptions"]["fit_EPWr"]:
             sqdev = np.square(savedata["data"] - savedata["fit"])/savedata["data"]
@@ -353,7 +379,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             used_points += np.sum((all_axes["epw_y"] > config["data"]["fit_rng"]["red_min"]) & (all_axes["epw_y"] < config["data"]["fit_rng"]["red_max"]))
             loss += np.sum(sqdev,axis = 1)
         
-        print(loss)
+        #print(loss)
         #print(used_points)
         # fig, ax = plt.subplots(1, 1, figsize=(10, 4))
         #lslc = slice(config["other"]["crop_window"], -config["other"]["crop_window"])
@@ -365,7 +391,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
         #losses = np.sum((savedata["data"][:, lslc] - savedata["fit"][:, lslc]) ** 2.0 /
         #    savedata["data"][:, lslc] , axis=1) #switched to a reduced chisq
         red_losses = loss /(used_points - len(all_params))
-        print(red_losses)
+        #print(red_losses)
         #print(savedata["data"][-6, lslc])
         #print(savedata["fit"][-6, lslc])
         #print((savedata["data"][-6, lslc] - savedata["fit"][-6, lslc]) ** 2.0)
@@ -397,21 +423,21 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
         ax[0].fill_between(lineouts, (final_params["ne"]-3*sigmas_ds.ne), (final_params["ne"]+3*sigmas_ds.ne), color = 'b', alpha = 0.1)
         ax[0].set_xlabel("lineout", fontsize=14)
         ax[0].grid()
-        ax[0].set_ylim(0.8*np.min(final_params["ne"]), 1.2*0.8*np.max(final_params["ne"]))
+        ax[0].set_ylim(0.8*np.min(final_params["ne"]), 1.2*np.max(final_params["ne"]))
         ax[0].set_title("$n_e$(t)", fontsize=14)
 
         ax[1].plot(lineouts, final_params["Te"])
         ax[1].fill_between(lineouts, (final_params["Te"]-3*sigmas_ds.Te), (final_params["Te"]+3*sigmas_ds.Te), color = 'b', alpha = 0.1)
         ax[1].set_xlabel("lineout", fontsize=14)
         ax[1].grid()
-        ax[1].set_ylim(0.8*np.min(final_params["Te"]), 1.2*0.8*np.max(final_params["Te"]))
+        ax[1].set_ylim(0.8*np.min(final_params["Te"]), 1.2*np.max(final_params["Te"]))
         ax[1].set_title("$T_e$(t)", fontsize=14)
         
         ax[2].plot(lineouts, final_params["m"])
         ax[2].fill_between(lineouts, (final_params["m"]-3*sigmas_ds.m), (final_params["m"]+3*sigmas_ds.m), color = 'b', alpha = 0.1)
         ax[2].set_xlabel("lineout", fontsize=14)
         ax[2].grid()
-        ax[2].set_ylim(0.8*np.min(final_params["m"]), 1.2*0.8*np.max(final_params["m"]))
+        ax[2].set_ylim(0.8*np.min(final_params["m"]), 1.2*np.max(final_params["m"]))
         ax[2].set_title("$m$(t)", fontsize=14)
         
         fig.savefig(os.path.join(td, "learned_parameters.png"), bbox_inches="tight")
