@@ -264,10 +264,12 @@ def get_sigmas(keys, hess, batch_size):
             for k2, param2 in enumerate(keys):
                 temp[k1, k2] = np.squeeze(hess[param][param2])[i, i]
 
-        inv = np.linalg.inv(temp)
-
-        for k1, param in enumerate(keys):
-            sigmas[i, k1] = np.sqrt(inv[k1, k1])
+        try:
+            inv = np.linalg.inv(temp)
+            for k1, param in enumerate(keys):
+                sigmas[i, k1] = np.sqrt(inv[k1, k1])
+        except:
+            print("Error during hessian call")
 
     return sigmas
 
