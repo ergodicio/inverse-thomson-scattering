@@ -25,11 +25,11 @@ parameters:
         lb: 0.01
         ub: 1.5
     Te_gradient:
-        val: 0.
+        val: 5.
         active: False
         lb: 0.
         ub: 10.
-        num_grad_points: 1
+        num_grad_points: 10
     Ti:
         val: .2
         active: False
@@ -49,11 +49,11 @@ parameters:
         lb: .001
         ub: 1.
     ne_gradient:
-        val: 0.
+        val: 12.
         active: False
         lb: 0.
-        ub: 10.
-        num_grad_points: 1
+        ub: 15.
+        num_grad_points: 10
     m:
         val: 3.0
         active: True

@@ -15,6 +15,11 @@ import numpy as np
 from inverse_thomson_scattering.generate_spectra import get_fit_model
 from inverse_thomson_scattering.process import irf
 
+#from jax.config import config
+#import time
+
+#config.update('jax_disable_jit', True)
+
 
 class NNReparameterizer(hk.Module):
     def __init__(self, cfg, num_spectra):
@@ -111,7 +116,10 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     Returns:
 
     """
+    #t0 = time.time()
+    #print("Staritng get_loss_function ", round(time.time() - t0, 2))
     forward_pass = get_fit_model(config, sas, backend="jax")
+    #print("got fit model ", round(time.time() - t0, 2))
     lam = config["parameters"]["lam"]["val"]
     vmap = jax.vmap
 
@@ -295,12 +303,16 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     _get_active_params_ = hk.without_apply_rng(hk.transform(__get_active_params__))
 
     def get_spectra_from_params(params, batch):
+        #print("Staritng get_spectra_from_params ", round(time.time() - t0, 2))
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)  # , sas["weights"])
+        #print("completed forwardpass ", round(time.time() - t0, 2))
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess_thry(
             modlE, modlI, lamAxisE, lamAxisI, {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]}, live_TSinputs
         )
-        
+        #print("completed postprocess ", round(time.time() - t0, 2))
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
+            #print(jnp.shape(ThryE))
+            #print(jnp.shape(lamAxisE))
             ThryE, lamAxisE = reduce_ATS_to_resunit(ThryE, lamAxisE, live_TSinputs, batch)
         
         ThryE = ThryE + batch["noise_e"]
@@ -309,29 +321,39 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         return ThryE, ThryI, lamAxisE, lamAxisI
 
     def calculate_spectra(weights, batch):
+        #print("Staritng calculate_spectra ", round(time.time() - t0, 2))
         params = _get_params_.apply(weights, batch)
+        #print("params reshaped ", round(time.time() - t0, 2))
         ThryE, ThryI, lamAxisE, lamAxisI = get_spectra_from_params(params, batch)
+        #print("Finished calculate_spectra ", round(time.time() - t0, 2))
         return ThryE, ThryI, lamAxisE, lamAxisI, params
 
     config_for_params = copy.deepcopy(config)
 
     def reduce_ATS_to_resunit(ThryE, lamAxisE, TSins, batch):
-        # print("ThryE shape after amps", jnp.shape(ThryE))
+        #print("ThryE shape after amps", jnp.shape(ThryE))
         lam_step = round(ThryE.shape[1] / batch["e_data"].shape[1])
-        ang_step = round(ThryE.shape[0] / batch["e_data"].shape[0])
+        #ang_step = round(ThryE.shape[0] / batch["e_data"].shape[0])
+        ang_step = round(ThryE.shape[0] / config["other"]["CCDsize"][0])
 
         ThryE = jnp.array([jnp.average(ThryE[:, i : i + lam_step], axis=1) for i in range(0, ThryE.shape[1], lam_step)])
-        # print("ThryE shape after 1 resize", jnp.shape(ThryE))
+        #print("ThryE shape after 1 resize", jnp.shape(ThryE))
         ThryE = jnp.array([jnp.average(ThryE[:, i : i + ang_step], axis=1) for i in range(0, ThryE.shape[1], ang_step)])
-        # print("ThryE shape after 2 resize", jnp.shape(ThryE))
+        #print("ThryE shape after 2 resize", jnp.shape(ThryE))
 
         # ThryE = ThryE.transpose()
         #if config["other"]["PhysParams"]["norm"] == 0:
         # lamAxisE = jnp.average(lamAxisE.reshape(data.shape[0], -1), axis=1)
+        #print(jnp.shape(lamAxisE))
+        #print(lam_step)
         lamAxisE = jnp.array(
             [jnp.average(lamAxisE[i : i + lam_step], axis=0) for i in range(0, lamAxisE.shape[0], lam_step)]
         )
-        ThryE = batch["e_amps"] * ThryE / jnp.amax(ThryE, keepdims = True)
+        #print(jnp.shape(lamAxisE))
+        #print(jnp.shape(batch["e_amps"]))
+        #print(jnp.shape(jnp.amax(ThryE, axis = 1, keepdims = True)))
+        ThryE = ThryE[config["data"]["lineouts"]["start"]:config["data"]["lineouts"]["end"],:]
+        ThryE = batch["e_amps"] * ThryE / jnp.amax(ThryE, axis = 1, keepdims = True)
         ThryE = jnp.where(lamAxisE < lam, TSins["amp1"]["val"] * ThryE, TSins["amp2"]["val"] * ThryE)
     # print("ThryE shape after norm ", jnp.shape(ThryE))
     # ThryE = ThryE.transpose()
@@ -409,6 +431,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         return i_error + e_error
 
     def loss_fn(weights, batch):
+        #print("Staritng loss_fn ", round(time.time() - t0, 2))
         ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
         #print("in loss_fn")
         i_error = 0.0

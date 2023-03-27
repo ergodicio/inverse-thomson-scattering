@@ -40,9 +40,10 @@ if __name__ == "__main__":
     config["data"]["shotnum"] = 94475
     config["other"]["crop_window"] = 1
 
+    config["parameters"]["lam"]["val"] = 524.5
     config["parameters"]["Te"]["val"] = 1.0
     config["parameters"]["ne"]["val"] = 0.5  # 0.25
-    config["parameters"]["m"]["val"] = 2.0  # 2.2
+    config["parameters"]["m"]["val"] = 4.0  # 2.2
     
     config["data"]["lineouts"]["type"] = "range"
     config["data"]["lineouts"]["start"] = 90

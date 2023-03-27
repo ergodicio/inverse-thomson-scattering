@@ -96,6 +96,8 @@ def prepare_data(config: Dict) -> Dict:
         config["other"]["PhysParams"]["noiseI"] = 0
         config["other"]["PhysParams"]["noiseE"] = bg_res_unit
         config["other"]["CCDsize"] = np.shape(data_res_unit)
+        config["data"]["lineouts"]["start"] = int(config["data"]["lineouts"]["start"]/ ang_res_unit)
+        config["data"]["lineouts"]["end"] = int(config["data"]["lineouts"]["end"]/ ang_res_unit)
 
     else:
         all_data = get_lineouts(
