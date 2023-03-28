@@ -195,11 +195,14 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         def _init_params_(self):
             these_params = dict()
+            print("in _init_params_")
             for param_name, param_config in self.cfg["parameters"].items():
                 if param_config["active"]:
+                    #print(param_name)
+                    #print(jnp.shape(param_config["val"]))
                     these_params[param_name] = hk.get_parameter(
                         param_name,
-                        shape=[self.batch_size, 1],
+                        shape=[self.batch_size, param_config["length"] if param_name == "fe" else 1],
                         init=hk.initializers.RandomUniform(minval=0, maxval=1),
                     )
                 else:
@@ -210,6 +213,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             return these_params
 
         def get_active_params(self, batch):
+            print("in get_active_params")
             if self.cfg["nn"]["use"]:
                 all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
                 these_params = defaultdict(list)
@@ -242,6 +246,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             return these_params
 
         def __call__(self, batch):
+            print("in __call__")
             if self.cfg["nn"]["use"]:
                 these_params = self._init_nn_params_(batch)
             else:
@@ -254,9 +259,11 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                         + self.cfg["units"]["shifts"][param_name]
                     )
 
+            print(jnp.shape(these_params["fe"]))
             return these_params
 
     def initialize_rest_of_params(config):
+        print("in initialize_rest_of_params")
         these_params = dict()
         for param_name, param_config in config["parameters"].items():
             if param_config["active"]:

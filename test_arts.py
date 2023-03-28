@@ -45,6 +45,11 @@ if __name__ == "__main__":
     config["parameters"]["ne"]["val"] = 0.5  # 0.25
     config["parameters"]["m"]["val"] = 4.0  # 2.2
     
+    config["parameters"]["m"]["active"] = False
+    config["parameters"]["fe"]["active"] = True
+    config["parameters"]["fe"]["length"] = 20
+    
+    
     config["data"]["lineouts"]["type"] = "range"
     config["data"]["lineouts"]["start"] = 90
     config["data"]["lineouts"]["end"] = 1015

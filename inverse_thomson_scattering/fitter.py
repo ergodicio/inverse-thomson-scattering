@@ -178,6 +178,9 @@ def fit(config):
                     "noise_e": config["other"]["PhysParams"]["noiseE"][config["data"]["lineouts"]["start"]:config["data"]["lineouts"]["end"],:],
                     }
             func_dict = get_loss_function(config, sa, batch)
+            print(config["parameters"]["fe"]["val"])
+            print(np.shape(config["parameters"]["fe"]["val"]))
+            print(func_dict["init_weights"])
             res = spopt.minimize(
                     func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict["v_func"],
                     func_dict["init_weights"],
