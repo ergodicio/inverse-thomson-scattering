@@ -7,6 +7,7 @@ import numpy as np
 from jax import config
 
 config.update("jax_enable_x64", True)
+config.update("jax_disable_jit", True)
 
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
@@ -44,29 +45,26 @@ if __name__ == "__main__":
     config["parameters"]["Te"]["val"] = 1.0
     config["parameters"]["ne"]["val"] = 0.5  # 0.25
     config["parameters"]["m"]["val"] = 4.0  # 2.2
-    
+
     config["parameters"]["m"]["active"] = False
     config["parameters"]["fe"]["active"] = True
     config["parameters"]["fe"]["length"] = 20
-    
-    
+
     config["data"]["lineouts"]["type"] = "range"
     config["data"]["lineouts"]["start"] = 90
     config["data"]["lineouts"]["end"] = 1015
-    
+
     config["data"]["background"]["type"] = "Fit"
-    config["data"]["background"]["slice"] = 94477 
-    
-    #config["data"]["lineouts"]["start"] = int(320)
-    #config["data"]["lineouts"]["skip"] = int(18)
-    #config["data"]["lineouts"]["end"] = int(680)
-    config["optimizer"]["batch_size"] = int(925) #this should be automatic
+    config["data"]["background"]["slice"] = 94477
+
+    # config["data"]["lineouts"]["start"] = int(320)
+    # config["data"]["lineouts"]["skip"] = int(18)
+    # config["data"]["lineouts"]["end"] = int(680)
+    config["optimizer"]["batch_size"] = int(925)  # this should be automatic
     # config["optimizer"]["method"] = "adam"
     config["nn"]["use"] = False
     # config["optimizer"]["grad_method"] = str(dd)
-    config["mlflow"][
-        "run"
-    ] = f"lbfgs-{nn_reparam=}-tstart={config['data']['lineouts']['start']}-tskip={config['data']['lineouts']['skip']}-tend={config['data']['lineouts']['end']}"
+    config["mlflow"]["run"] = f"test_arts"
     one_run(config)
 
     # raise ValueError
