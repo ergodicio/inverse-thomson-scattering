@@ -7,7 +7,7 @@ import numpy as np
 from jax import config
 
 config.update("jax_enable_x64", True)
-config.update("jax_disable_jit", True)
+#config.update("jax_disable_jit", True)
 
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
@@ -44,11 +44,13 @@ if __name__ == "__main__":
     config["parameters"]["lam"]["val"] = 524.5
     config["parameters"]["Te"]["val"] = 1.0
     config["parameters"]["ne"]["val"] = 0.5  # 0.25
-    config["parameters"]["m"]["val"] = 4.0  # 2.2
+    config["parameters"]["m"]["val"] = 3.5  # 2.2
 
     config["parameters"]["m"]["active"] = False
     config["parameters"]["fe"]["active"] = True
-    config["parameters"]["fe"]["length"] = 20
+    config["parameters"]["fe"]["ub"] = 0.45
+    config["parameters"]["fe"]["lb"] = 1e-10
+    config["parameters"]["fe"]["length"] = 160
 
     config["data"]["lineouts"]["type"] = "range"
     config["data"]["lineouts"]["start"] = 90
@@ -64,7 +66,7 @@ if __name__ == "__main__":
     # config["optimizer"]["method"] = "adam"
     config["nn"]["use"] = False
     # config["optimizer"]["grad_method"] = str(dd)
-    config["mlflow"]["run"] = f"test_arts"
+    config["mlflow"]["run"] = f"test_arts_160pts"
     one_run(config)
 
     # raise ValueError

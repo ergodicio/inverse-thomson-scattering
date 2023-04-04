@@ -142,7 +142,7 @@ optimizer:
     batch_size: 2
     num_epochs: 200
     learning_rate: 1.0e-4
-    parameter_norm: True
+    parameter_norm: False
 
 nn:
     use: false

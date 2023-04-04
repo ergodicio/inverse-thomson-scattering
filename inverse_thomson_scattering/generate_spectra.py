@@ -4,6 +4,7 @@ from inverse_thomson_scattering.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 from jax import numpy as jnp
+from jax import debug as dbg
 
 
 def get_fit_model(config, sa, backend: str = "haiku"):
@@ -17,6 +18,9 @@ def get_fit_model(config, sa, backend: str = "haiku"):
             # if parameters[key]["active"]:
             parameters[key]["val"] = jnp.squeeze(fitted_params[key])
 
+        #dbg.print(parameters)
+        #dbg.print("fe: {}", parameters["fe"]["val"])
+        #dbg.print("fitted_params: {}", fitted_params)
         # if parameters["fe"]["active"]:
         #     parameters["fe"]["val"] = fitted_params[-parameters["fe"]["length"] : :]
         if parameters["m"]["active"]:
@@ -34,7 +38,8 @@ def get_fit_model(config, sa, backend: str = "haiku"):
             parameters["Te_gradient"]["num_grad_points"]
         )
 
-        fecur = jnp.exp(parameters["fe"]["val"])
+        #fecur = jnp.exp(parameters["fe"]["val"])
+        fecur = parameters["fe"]["val"]
         lam = parameters["lam"]["val"]
 
         if config["other"]["extraoptions"]["load_ion_spec"]:

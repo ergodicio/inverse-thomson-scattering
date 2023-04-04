@@ -56,7 +56,8 @@ def validate_inputs(config):
 
     # create fes
     NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
-    config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+    #config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+    config["parameters"]["fe"]["val"] = NumDistFunc(config["parameters"]["m"]["val"])
     config["parameters"]["fe"]["lb"] = np.multiply(
         config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
     )
@@ -186,7 +187,7 @@ def fit(config):
             func_dict = get_loss_function(config, sa, batch)
             # print(config["parameters"]["fe"]["val"])
             # print(np.shape(config["parameters"]["fe"]["val"]))
-            # print(func_dict["init_weights"])
+            print(func_dict["init_weights"])
             res = spopt.minimize(
                 func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict["v_func"],
                 func_dict["init_weights"],
@@ -199,6 +200,7 @@ def fit(config):
             )
             best_weights = func_dict["unravel_pytree"](res["x"])
             overall_loss = res["fun"]
+            print(best_weights)
 
         else:
             batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
@@ -291,7 +293,7 @@ def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weight
         }
         these_weights = best_weights
         loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
-        these_params = func_dict["get_active_params"](these_weights, batch)
+        #these_params = func_dict["get_active_params"](these_weights, batch)
         # hess = func_dict["h_func"](these_params, batch)
         # losses = np.mean(loss, axis=1)
 
@@ -367,6 +369,9 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
     if config["other"]["extraoptions"]["spectype"] == "angular_full":
         with tempfile.TemporaryDirectory() as td:
             t1 = time.time()
+            #print(all_params)
+            for key in all_params.keys():
+                all_params[key]=pandas.Series(all_params[key])
             final_params = pandas.DataFrame(all_params)
             final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
 
@@ -379,10 +384,33 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
 
             fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-            clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 11)
-            savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
-            savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
+            clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 21)
+            ax[0].imshow(savedata["fit"].T, cmap="gist_ncar", vmin=np.amin(savedata["data"]), vmax=np.amax(savedata["data"]), aspect = 'auto')
+            ax[1].imshow(savedata["data"].T, cmap="gist_ncar", vmin=np.amin(savedata["data"]), vmax=np.amax(savedata["data"]), aspect = 'auto')
+            #savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
+            #savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
             fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
+            
+            fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+            #lineouts = np.array(config["data"]["lineouts"]["val"])
+            ax[0].plot(final_params["fe"])
+            #ax.fill_between(
+            #lineouts,
+            #(final_params["ne"] - 3 * sigmas_ds.ne),
+            #(final_params["ne"] + 3 * sigmas_ds.ne),
+            #color="b",
+            #alpha=0.1,
+            #)
+            ax[0].set_xlabel("v/vth (points)", fontsize=14)
+            ax[0].set_ylabel("f_e (ln)")
+            ax[0].grid()
+            #ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
+            ax[0].set_title("$f_e$", fontsize=14)
+            ax[1].plot(np.exp(final_params["fe"]))
+            ax[1].set_xlabel("v/vth (points)", fontsize=14)
+            ax[1].set_ylabel("f_e")
+            ax[1].grid()
+            fig.savefig(os.path.join(td, "fe_final.png"), bbox_inches="tight")
 
             mlflow.log_artifacts(td)
             mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
@@ -410,7 +438,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
 
             fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-            clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 21)
+            clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 11)
             savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
             savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
             fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
