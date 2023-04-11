@@ -38,8 +38,8 @@ def get_fit_model(config, sa, backend: str = "haiku"):
             parameters["Te_gradient"]["num_grad_points"]
         )
 
-        #fecur = jnp.exp(parameters["fe"]["val"])
-        fecur = parameters["fe"]["val"]
+        fecur = jnp.exp(parameters["fe"]["val"])
+        #fecur = parameters["fe"]["val"]
         lam = parameters["lam"]["val"]
 
         if config["other"]["extraoptions"]["load_ion_spec"]:

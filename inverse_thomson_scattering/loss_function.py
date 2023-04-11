@@ -508,7 +508,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             get_params=get_params,
             h_func=h_func,
         )
-    elif config["optimizer"]["method"] == "l-bfgs-b":
+    else:
         if config["nn"]["use"]:
             init_weights = init_weights
             flattened_weights, unravel_pytree = ravel_pytree(init_weights)
@@ -575,8 +575,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             h_func=h_func,
         )
 
-    else:
-        raise NotImplementedError
+    #else:
+    #    raise NotImplementedError
 
     return loss_dict
 

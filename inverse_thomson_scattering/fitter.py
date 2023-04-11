@@ -1,6 +1,7 @@
 from collections import defaultdict
 from typing import Dict
 import time, os, tempfile
+import copy
 
 from jax.flatten_util import ravel_pytree
 import numpy as np
@@ -56,8 +57,10 @@ def validate_inputs(config):
 
     # create fes
     NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
-    #config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
-    config["parameters"]["fe"]["val"] = NumDistFunc(config["parameters"]["m"]["val"])
+    if not config["parameters"]["fe"]["val"]:
+        config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+        #config["parameters"]["fe"]["val"] = NumDistFunc(config["parameters"]["m"]["val"])
+    
     config["parameters"]["fe"]["lb"] = np.multiply(
         config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
     )
@@ -167,7 +170,7 @@ def fit(config):
                 mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
             batch_indices = batch_indices.flatten()
 
-    elif config["optimizer"]["method"] == "l-bfgs-b":
+    else:
         best_weights = {}
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
             config["optimizer"]["batch_size"] = 1
@@ -184,15 +187,47 @@ def fit(config):
                     config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
                 ],
             }
+            
             func_dict = get_loss_function(config, sa, batch)
-            # print(config["parameters"]["fe"]["val"])
-            # print(np.shape(config["parameters"]["fe"]["val"]))
-            print(func_dict["init_weights"])
             res = spopt.minimize(
                 func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict["v_func"],
                 func_dict["init_weights"],
                 args=batch,
                 method=config["optimizer"]["method"],
+                jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+                # hess=hess_fn if config["optimizer"]["hessian"] else None,
+                bounds=func_dict["bounds"],
+                options={"disp": True},
+            )
+            
+            best_weights = func_dict["get_params"](res["x"],batch)
+            config["parameters"]["fe"]["length"] = 2*config["parameters"]["fe"]["length"]
+            refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+            refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(best_weights["fe"]))
+            
+            config["parameters"]["fe"]["val"] = refined_fe.reshape((1,-1))
+            config["velocity"] = refined_v
+            config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
+            config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
+            
+            #print(best_weights)
+            
+            config["parameters"]["fe"]["ub"] = -0.5
+            config["parameters"]["fe"]["lb"] = -50
+            config["parameters"]["fe"]["lb"] = np.multiply(
+                config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
+            )
+            config["parameters"]["fe"]["ub"] = np.multiply(
+                config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
+            )
+            config["units"] = init_param_norm_and_shift(config)
+            
+            func_dict = get_loss_function(config, sa, batch)
+            res = spopt.minimize(
+                func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict_2["v_func"],
+                func_dict["init_weights"],
+                args=batch,
+                method="L-BFGS-B",
                 jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                 # hess=hess_fn if config["optimizer"]["hessian"] else None,
                 bounds=func_dict["bounds"],
@@ -230,8 +265,8 @@ def fit(config):
                     best_weights[i_batch] = func_dict["unravel_pytree"](res["x"])
                     overall_loss += res["fun"]
         mlflow.log_metrics({"overall loss": float(overall_loss)})
-    else:
-        raise NotImplementedError
+    #else:
+    #    raise NotImplementedError
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     t1 = time.time()
@@ -391,7 +426,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             #savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
             fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
             
-            fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+            fig, ax = plt.subplots(1, 3, figsize=(15, 5))
             #lineouts = np.array(config["data"]["lineouts"]["val"])
             ax[0].plot(final_params["fe"])
             #ax.fill_between(
@@ -406,10 +441,16 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             ax[0].grid()
             #ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
             ax[0].set_title("$f_e$", fontsize=14)
-            ax[1].plot(np.exp(final_params["fe"]))
+            ax[1].plot(np.log10(np.exp(final_params["fe"])))
             ax[1].set_xlabel("v/vth (points)", fontsize=14)
-            ax[1].set_ylabel("f_e")
+            ax[1].set_ylabel("f_e (log)")
             ax[1].grid()
+            ax[1].set_ylim(-5,0)
+            ax[1].set_title("$f_e$", fontsize=14)
+            ax[2].plot(np.exp(final_params["fe"]))
+            ax[2].set_xlabel("v/vth (points)", fontsize=14)
+            ax[2].set_ylabel("f_e")
+            ax[2].grid()
             fig.savefig(os.path.join(td, "fe_final.png"), bbox_inches="tight")
 
             mlflow.log_artifacts(td)

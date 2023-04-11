@@ -18,6 +18,12 @@ def one_run(config):
         utils.log_params(config)
         t0 = time.time()
         fit_results = fitter.fit(config=config)
+        #config["parameters"]["fe"]["val"] = fit_results["fe"]
+        #config["parameters"]["fe"]["length"] = 2*config["parameters"]["fe"]["length"]
+        #refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+        #refined_fe = np.interp(config["velocity"], refined_v, config["parameters"]["fe"]["val"])    
+        #config["parameters"]["fe"]["val"] = refined_fe
+        #config["velocity"] = refined_v
         metrics_dict = {"fit_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
         mlflow.log_metrics(metrics=metrics_dict)
         mlflow.set_tag("status", "completed")
@@ -48,9 +54,9 @@ if __name__ == "__main__":
 
     config["parameters"]["m"]["active"] = False
     config["parameters"]["fe"]["active"] = True
-    config["parameters"]["fe"]["ub"] = 0.45
-    config["parameters"]["fe"]["lb"] = 1e-10
-    config["parameters"]["fe"]["length"] = 160
+    config["parameters"]["fe"]["ub"] = -0.5
+    config["parameters"]["fe"]["lb"] = -50
+    config["parameters"]["fe"]["length"] = 80
 
     config["data"]["lineouts"]["type"] = "range"
     config["data"]["lineouts"]["start"] = 90
@@ -63,10 +69,10 @@ if __name__ == "__main__":
     # config["data"]["lineouts"]["skip"] = int(18)
     # config["data"]["lineouts"]["end"] = int(680)
     config["optimizer"]["batch_size"] = int(925)  # this should be automatic
-    # config["optimizer"]["method"] = "adam"
+    config["optimizer"]["method"] = "TNC"
     config["nn"]["use"] = False
     # config["optimizer"]["grad_method"] = str(dd)
-    config["mlflow"]["run"] = f"test_arts_160pts"
+    config["mlflow"]["run"] = f"arts_160pts_normed_2fit_TNC-LBFGSB_refine"
     one_run(config)
 
     # raise ValueError
