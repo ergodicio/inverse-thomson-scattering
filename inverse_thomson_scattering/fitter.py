@@ -428,7 +428,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             
             fig, ax = plt.subplots(1, 3, figsize=(15, 5))
             #lineouts = np.array(config["data"]["lineouts"]["val"])
-            ax[0].plot(final_params["fe"])
+            ax[0].plot(config["velocity"], final_params["fe"])
             #ax.fill_between(
             #lineouts,
             #(final_params["ne"] - 3 * sigmas_ds.ne),
@@ -441,13 +441,14 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             ax[0].grid()
             #ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
             ax[0].set_title("$f_e$", fontsize=14)
-            ax[1].plot(np.log10(np.exp(final_params["fe"])))
+            ax[1].plot(config["velocity"], np.log10(np.exp(final_params["fe"])))
             ax[1].set_xlabel("v/vth (points)", fontsize=14)
             ax[1].set_ylabel("f_e (log)")
             ax[1].grid()
             ax[1].set_ylim(-5,0)
+            ax[1].set_xlim(-5, 5)
             ax[1].set_title("$f_e$", fontsize=14)
-            ax[2].plot(np.exp(final_params["fe"]))
+            ax[2].plot(config["velocity"], np.exp(final_params["fe"]))
             ax[2].set_xlabel("v/vth (points)", fontsize=14)
             ax[2].set_ylabel("f_e")
             ax[2].grid()

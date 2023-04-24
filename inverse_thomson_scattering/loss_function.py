@@ -489,7 +489,13 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             e_error += jnp.mean(_error_)
         # print("done with loss_fn")
 
-        return i_error + e_error, [ThryE, normed_e_data, params]
+        dv = config["velocity"][1] - config["velocity"][0]
+        density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
+        temperature_loss = jnp.mean(
+            jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
+        )
+
+        return i_error + e_error + density_loss + temperature_loss, [ThryE, normed_e_data, params]
 
     rng_key = jax.random.PRNGKey(42)
     init_weights = _get_params_.init(rng_key, dummy_batch)
@@ -575,7 +581,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             h_func=h_func,
         )
 
-    #else:
+    # else:
     #    raise NotImplementedError
 
     return loss_dict
