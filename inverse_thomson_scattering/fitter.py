@@ -59,8 +59,8 @@ def validate_inputs(config):
     NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
     if not config["parameters"]["fe"]["val"]:
         config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
-        #config["parameters"]["fe"]["val"] = NumDistFunc(config["parameters"]["m"]["val"])
-    
+        # config["parameters"]["fe"]["val"] = NumDistFunc(config["parameters"]["m"]["val"])
+
     config["parameters"]["fe"]["lb"] = np.multiply(
         config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
     )
@@ -121,54 +121,102 @@ def fit(config):
     # prepare optimizer / solver
 
     batch_indices = np.arange(max(len(all_data["e_data"]), len(all_data["i_data"])))
-    num_batches = len(batch_indices) // config["optimizer"]["batch_size"]
+    num_batches = len(batch_indices) // config["optimizer"]["batch_size"] or 1
     mlflow.log_metrics({"setup_time": round(time.time() - t1, 2)})
 
     t1 = time.time()
     if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
-        test_batch = {k: v[config["optimizer"]["batch_size"]] for k, v in all_batches.items()}
-        loss_dict = get_loss_function(config, sa, test_batch)
-        jaxopt_kwargs = dict(
-            fun=loss_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
-        )
-        opt = optax.adam(config["optimizer"]["learning_rate"])
-        solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
+        if config["other"]["extraoptions"]["spectype"] == "angular_full":
+            config["optimizer"]["batch_size"] = 1
+            test_batch = {
+                "e_data": all_data["e_data"][
+                    config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+                ],
+                "e_amps": all_data["e_amps"][
+                    config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+                ],
+                "i_data": all_data["i_data"],
+                "i_amps": all_data["i_amps"],
+                "noise_e": config["other"]["PhysParams"]["noiseE"][
+                    config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+                ],
+            }
+            loss_dict = get_loss_function(config, sa, test_batch)
+            jaxopt_kwargs = dict(
+                fun=loss_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+            )
+            opt = optax.adam(config["optimizer"]["learning_rate"])
+            solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
 
-        weights = loss_dict["init_weights"]
-        opt_state = solver.init_state(weights, batch=test_batch)
+            weights = loss_dict["init_weights"]
+            opt_state = solver.init_state(weights, batch=test_batch)
 
-        # start train loop
-        t1 = time.time()
-        print("minimizing")
-        mlflow.set_tag("status", "minimizing")
+            # start train loop
+            t1 = time.time()
+            print("minimizing")
+            mlflow.set_tag("status", "minimizing")
 
-        epoch_loss = 1e19
-        best_loss = 1e16
-        for i_epoch in range(config["optimizer"]["num_epochs"]):
-            if config["nn"]["use"]:
-                np.random.shuffle(batch_indices)
-            batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-            with trange(num_batches, unit="batch") as tbatch:
-                tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
+            best_loss = 1e16
+            for i_epoch in (pbar:= trange(config["optimizer"]["num_epochs"])):
+                if config["nn"]["use"]:
+                    np.random.shuffle(batch_indices)
+                    # tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
                 epoch_loss = 0.0
-                for i_batch in tbatch:
-                    inds = batch_indices[i_batch]
-                    batch = {
-                        "data": all_data["data"][inds],
-                        "amps": all_data["amps"][inds],
-                        "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
-                    }
-                    weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
-                    epoch_loss += opt_state.value
-                    tbatch.set_postfix({"Prev Batch Loss": opt_state.value})
+                weights, opt_state = solver.update(params=weights, state=opt_state, batch=test_batch)
+                epoch_loss += opt_state.value
+                pbar.set_description(f"Loss {epoch_loss:.2e}")
 
-                epoch_loss /= num_batches
+                # epoch_loss /= num_batches
                 if epoch_loss < best_loss:
                     best_loss = epoch_loss
                     best_weights = weights
 
                 mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
-            batch_indices = batch_indices.flatten()
+
+        else:
+            test_batch = {k: v[config["optimizer"]["batch_size"]] for k, v in all_batches.items()}
+            loss_dict = get_loss_function(config, sa, test_batch)
+            jaxopt_kwargs = dict(
+                fun=loss_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+            )
+            opt = optax.adam(config["optimizer"]["learning_rate"])
+            solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
+
+            weights = loss_dict["init_weights"]
+            opt_state = solver.init_state(weights, batch=test_batch)
+
+            # start train loop
+            t1 = time.time()
+            print("minimizing")
+            mlflow.set_tag("status", "minimizing")
+
+            epoch_loss = 1e19
+            best_loss = 1e16
+            for i_epoch in range(config["optimizer"]["num_epochs"]):
+                if config["nn"]["use"]:
+                    np.random.shuffle(batch_indices)
+                batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+                with trange(num_batches, unit="batch") as tbatch:
+                    tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
+                    epoch_loss = 0.0
+                    for i_batch in tbatch:
+                        inds = batch_indices[i_batch]
+                        batch = {
+                            "data": all_data["data"][inds],
+                            "amps": all_data["amps"][inds],
+                            "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                        }
+                        weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
+                        epoch_loss += opt_state.value
+                        tbatch.set_postfix({"Prev Batch Loss": opt_state.value})
+
+                    epoch_loss /= num_batches
+                    if epoch_loss < best_loss:
+                        best_loss = epoch_loss
+                        best_weights = weights
+
+                    mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
+                batch_indices = batch_indices.flatten()
 
     else:
         best_weights = {}
@@ -187,7 +235,7 @@ def fit(config):
                     config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
                 ],
             }
-            
+
             func_dict = get_loss_function(config, sa, batch)
             res = spopt.minimize(
                 func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict["v_func"],
@@ -199,19 +247,19 @@ def fit(config):
                 bounds=func_dict["bounds"],
                 options={"disp": True},
             )
-            
-            best_weights = func_dict["get_params"](res["x"],batch)
-            config["parameters"]["fe"]["length"] = 2*config["parameters"]["fe"]["length"]
+
+            best_weights = func_dict["get_params"](res["x"], batch)
+            config["parameters"]["fe"]["length"] = 2 * config["parameters"]["fe"]["length"]
             refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
             refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(best_weights["fe"]))
-            
-            config["parameters"]["fe"]["val"] = refined_fe.reshape((1,-1))
+
+            config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
             config["velocity"] = refined_v
             config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
             config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
-            
-            #print(best_weights)
-            
+
+            # print(best_weights)
+
             config["parameters"]["fe"]["ub"] = -0.5
             config["parameters"]["fe"]["lb"] = -50
             config["parameters"]["fe"]["lb"] = np.multiply(
@@ -221,7 +269,7 @@ def fit(config):
                 config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
             )
             config["units"] = init_param_norm_and_shift(config)
-            
+
             func_dict = get_loss_function(config, sa, batch)
             res = spopt.minimize(
                 func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict_2["v_func"],
@@ -265,7 +313,7 @@ def fit(config):
                     best_weights[i_batch] = func_dict["unravel_pytree"](res["x"])
                     overall_loss += res["fun"]
         mlflow.log_metrics({"overall loss": float(overall_loss)})
-    #else:
+    # else:
     #    raise NotImplementedError
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
@@ -328,7 +376,7 @@ def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weight
         }
         these_weights = best_weights
         loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
-        #these_params = func_dict["get_active_params"](these_weights, batch)
+        # these_params = func_dict["get_active_params"](these_weights, batch)
         # hess = func_dict["h_func"](these_params, batch)
         # losses = np.mean(loss, axis=1)
 
@@ -404,9 +452,9 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
     if config["other"]["extraoptions"]["spectype"] == "angular_full":
         with tempfile.TemporaryDirectory() as td:
             t1 = time.time()
-            #print(all_params)
+            # print(all_params)
             for key in all_params.keys():
-                all_params[key]=pandas.Series(all_params[key])
+                all_params[key] = pandas.Series(all_params[key])
             final_params = pandas.DataFrame(all_params)
             final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
 
@@ -420,32 +468,44 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
 
             fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
             clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 21)
-            ax[0].imshow(savedata["fit"].T, cmap="gist_ncar", vmin=np.amin(savedata["data"]), vmax=np.amax(savedata["data"]), aspect = 'auto')
-            ax[1].imshow(savedata["data"].T, cmap="gist_ncar", vmin=np.amin(savedata["data"]), vmax=np.amax(savedata["data"]), aspect = 'auto')
-            #savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
-            #savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
+            ax[0].imshow(
+                savedata["fit"].T,
+                cmap="gist_ncar",
+                vmin=np.amin(savedata["data"]),
+                vmax=np.amax(savedata["data"]),
+                aspect="auto",
+            )
+            ax[1].imshow(
+                savedata["data"].T,
+                cmap="gist_ncar",
+                vmin=np.amin(savedata["data"]),
+                vmax=np.amax(savedata["data"]),
+                aspect="auto",
+            )
+            # savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
+            # savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
             fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
-            
+
             fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-            #lineouts = np.array(config["data"]["lineouts"]["val"])
+            # lineouts = np.array(config["data"]["lineouts"]["val"])
             ax[0].plot(config["velocity"], final_params["fe"])
-            #ax.fill_between(
-            #lineouts,
-            #(final_params["ne"] - 3 * sigmas_ds.ne),
-            #(final_params["ne"] + 3 * sigmas_ds.ne),
-            #color="b",
-            #alpha=0.1,
-            #)
+            # ax.fill_between(
+            # lineouts,
+            # (final_params["ne"] - 3 * sigmas_ds.ne),
+            # (final_params["ne"] + 3 * sigmas_ds.ne),
+            # color="b",
+            # alpha=0.1,
+            # )
             ax[0].set_xlabel("v/vth (points)", fontsize=14)
             ax[0].set_ylabel("f_e (ln)")
             ax[0].grid()
-            #ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
+            # ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
             ax[0].set_title("$f_e$", fontsize=14)
             ax[1].plot(config["velocity"], np.log10(np.exp(final_params["fe"])))
             ax[1].set_xlabel("v/vth (points)", fontsize=14)
             ax[1].set_ylabel("f_e (log)")
             ax[1].grid()
-            ax[1].set_ylim(-5,0)
+            ax[1].set_ylim(-5, 0)
             ax[1].set_xlim(-5, 5)
             ax[1].set_title("$f_e$", fontsize=14)
             ax[2].plot(config["velocity"], np.exp(final_params["fe"]))
