@@ -1,14 +1,15 @@
 import copy
 from typing import Dict
 from collections import defaultdict
-from jax import config
+from jax import config as jax_config
 
-config.update("jax_enable_x64", True)
+jax_config.update("jax_enable_x64", True)
 import jax
 from jax import numpy as jnp
 
 
 from jax import jit, value_and_grad
+from jax.lax import scan
 from jax.flatten_util import ravel_pytree
 import haiku as hk
 import numpy as np
@@ -18,7 +19,29 @@ from inverse_thomson_scattering.process import irf
 # from jax.config import config
 # import time
 
+
 # config.update('jax_disable_jit', True)
+def compute_primes(last_primes, x):
+    last_cp, last_dp = last_primes
+    a, b, c, d = x
+    cp = c / (b - a * last_cp)
+    dp = (d - a * last_dp) / (b - a * last_cp)
+    new_primes = jnp.stack((cp, dp))
+    return new_primes, new_primes
+
+
+def backsubstitution(last_x, x):
+    """
+    This function is a single iteration of the backward pass in the non-in-place Thomas
+    tridiagonal algorithm
+
+    :param last_x:
+    :param x:
+    :return:
+    """
+    cp, dp = x
+    new_x = dp - cp * last_x
+    return new_x, new_x
 
 
 class NNReparameterizer(hk.Module):
@@ -343,10 +366,29 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
+    dv = config["velocity"][1] - config["velocity"][0]
+
+    def perform_fp(distribution):
+        v0t_sq = 1.0
+        nu = 1e-5
+        dt = 1e-1
+        ones = jnp.ones((1, config["velocity"].size))
+
+        a = nu * dt * (-v0t_sq / dv**2.0 + jnp.roll(config["velocity"], 1)[None, :] / 2 / dv)
+        b = 1.0 + nu * dt * ones * (2.0 * v0t_sq / dv**2.0)
+        c = nu * dt * (-v0t_sq / dv**2.0 - jnp.roll(config["velocity"], -1)[None, :] / 2 / dv)
+
+        diags_stacked = jnp.stack([arr.transpose((1, 0)) for arr in (a, b, c, distribution)], axis=1)
+        _, primes = scan(compute_primes, jnp.zeros((2, *a.shape[:-1])), diags_stacked, unroll=16)
+        _, sol = scan(backsubstitution, jnp.zeros(a.shape[:-1]), primes[::-1], unroll=16)
+        return sol[::-1].transpose((1, 0))
+
     def calculate_spectra(weights, batch):
         # print("Staritng calculate_spectra ", round(time.time() - t0, 2))
         params = _get_params_.apply(weights, batch)
         # print("params reshaped ", round(time.time() - t0, 2))
+        for i in range(1):
+            params["fe"] = jnp.log(perform_fp(jnp.exp(params["fe"])))
         ThryE, ThryI, lamAxisE, lamAxisI = get_spectra_from_params(params, batch)
         # print("Finished calculate_spectra ", round(time.time() - t0, 2))
         return ThryE, ThryI, lamAxisE, lamAxisI, params
