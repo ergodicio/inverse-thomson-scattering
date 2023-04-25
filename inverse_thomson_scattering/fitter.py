@@ -141,14 +141,14 @@ def fit(config):
                     config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
                 ],
             }
-            loss_dict = get_loss_function(config, sa, test_batch)
+            func_dict = get_loss_function(config, sa, test_batch)
             jaxopt_kwargs = dict(
-                fun=loss_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+                fun=func_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
             )
             opt = optax.adam(config["optimizer"]["learning_rate"])
             solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
 
-            weights = loss_dict["init_weights"]
+            weights = func_dict["init_weights"]
             opt_state = solver.init_state(weights, batch=test_batch)
 
             # start train loop
@@ -175,14 +175,14 @@ def fit(config):
 
         else:
             test_batch = {k: v[config["optimizer"]["batch_size"]] for k, v in all_batches.items()}
-            loss_dict = get_loss_function(config, sa, test_batch)
+            func_dict = get_loss_function(config, sa, test_batch)
             jaxopt_kwargs = dict(
-                fun=loss_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+                fun=func_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
             )
             opt = optax.adam(config["optimizer"]["learning_rate"])
             solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
 
-            weights = loss_dict["init_weights"]
+            weights = func_dict["init_weights"]
             opt_state = solver.init_state(weights, batch=test_batch)
 
             # start train loop
