@@ -157,7 +157,7 @@ def fit(config):
             mlflow.set_tag("status", "minimizing")
 
             best_loss = 1e16
-            for i_epoch in (pbar:= trange(config["optimizer"]["num_epochs"])):
+            for i_epoch in (pbar := trange(config["optimizer"]["num_epochs"])):
                 if config["nn"]["use"]:
                     np.random.shuffle(batch_indices)
                     # tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
@@ -218,6 +218,7 @@ def fit(config):
                     mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
                 batch_indices = batch_indices.flatten()
 
+        raw_weights = best_weights
     else:
         best_weights = {}
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
@@ -249,41 +250,41 @@ def fit(config):
             )
 
             best_weights = func_dict["get_params"](res["x"], batch)
-            config["parameters"]["fe"]["length"] = 2 * config["parameters"]["fe"]["length"]
-            refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-            refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(best_weights["fe"]))
-
-            config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
-            config["velocity"] = refined_v
-            config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
-            config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
-
+            # config["parameters"]["fe"]["length"] = 2 * config["parameters"]["fe"]["length"]
+            # refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+            # refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(best_weights["fe"]))
+            #
+            # config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
+            # config["velocity"] = refined_v
+            # config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
+            # config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
+            #
             # print(best_weights)
-
-            config["parameters"]["fe"]["ub"] = -0.5
-            config["parameters"]["fe"]["lb"] = -50
-            config["parameters"]["fe"]["lb"] = np.multiply(
-                config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
-            )
-            config["parameters"]["fe"]["ub"] = np.multiply(
-                config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
-            )
-            config["units"] = init_param_norm_and_shift(config)
-
-            func_dict = get_loss_function(config, sa, batch)
-            res = spopt.minimize(
-                func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict_2["v_func"],
-                func_dict["init_weights"],
-                args=batch,
-                method="L-BFGS-B",
-                jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-                # hess=hess_fn if config["optimizer"]["hessian"] else None,
-                bounds=func_dict["bounds"],
-                options={"disp": True},
-            )
-            best_weights = func_dict["unravel_pytree"](res["x"])
+            #
+            # config["parameters"]["fe"]["ub"] = -0.5
+            # config["parameters"]["fe"]["lb"] = -50
+            # config["parameters"]["fe"]["lb"] = np.multiply(
+            #     config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
+            # )
+            # config["parameters"]["fe"]["ub"] = np.multiply(
+            #     config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
+            # )
+            # config["units"] = init_param_norm_and_shift(config)
+            #
+            # func_dict = get_loss_function(config, sa, batch)
+            # res = spopt.minimize(
+            #     func_dict["vg_func"] if config["optimizer"]["grad_method"] == "AD" else func_dict_2["v_func"],
+            #     func_dict["init_weights"],
+            #     args=batch,
+            #     method="L-BFGS-B",
+            #     jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+            #     # hess=hess_fn if config["optimizer"]["hessian"] else None,
+            #     bounds=func_dict["bounds"],
+            #     options={"disp": True},
+            # )
+            raw_weights = func_dict["unravel_pytree"](res["x"])
             overall_loss = res["fun"]
-            print(best_weights)
+            # print(best_weights)
 
         else:
             batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
@@ -318,13 +319,13 @@ def fit(config):
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
 
     t1 = time.time()
-    final_params = postprocess(config, batch_indices, all_data, all_axes, best_weights, func_dict)
+    final_params = postprocess(config, batch_indices, all_data, all_axes, best_weights, func_dict, raw_weights)
     mlflow.log_metrics({"inference_time": round(time.time() - t1, 2)})
 
     return final_params
 
 
-def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weights, func_dict):
+def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weights, func_dict, raw_weights=None):
     """
     Gets parameters and the result of the full forward pass i.e. fits
 
@@ -374,8 +375,7 @@ def recalculate_with_chosen_weights(config, batch_indices, all_data, best_weight
                 config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
             ],
         }
-        these_weights = best_weights
-        loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
+        ThryE, ThryI, lamAxisE, lamAxisI, params = func_dict["calculate_spectra"](raw_weights, batch)
         # these_params = func_dict["get_active_params"](these_weights, batch)
         # hess = func_dict["h_func"](these_params, batch)
         # losses = np.mean(loss, axis=1)
@@ -434,11 +434,11 @@ def get_sigmas(keys, hess, batch_size):
     return sigmas
 
 
-def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weights, func_dict):
+def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weights, func_dict, raw_weights=None):
     t1 = time.time()
 
     losses, fits, sigmas, all_params = recalculate_with_chosen_weights(
-        config, batch_indices, all_data, best_weights, func_dict
+        config, batch_indices, all_data, best_weights, func_dict, raw_weights
     )
 
     losses = losses.flatten() / np.amax(all_data["e_data"], axis=-1)

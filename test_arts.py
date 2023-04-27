@@ -7,7 +7,7 @@ import numpy as np
 from jax import config
 
 config.update("jax_enable_x64", True)
-# config.update("jax_disable_jit", True)
+config.update("jax_disable_jit", True)
 
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # config["optimizer"]["method"] = "adam"
     config["nn"]["use"] = False
     # config["optimizer"]["grad_method"] = str(dd)
-    config["mlflow"]["run"] = f"arts_160pts_normed_2fit_TNC-LBFGSB_refine"
+    config["mlflow"]["run"] = f"test"
     one_run(config)
 
     # raise ValueError

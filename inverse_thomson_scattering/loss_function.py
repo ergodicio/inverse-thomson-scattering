@@ -16,33 +16,6 @@ import numpy as np
 from inverse_thomson_scattering.generate_spectra import get_fit_model
 from inverse_thomson_scattering.process import irf
 
-# from jax.config import config
-# import time
-
-
-# config.update('jax_disable_jit', True)
-def compute_primes(last_primes, x):
-    last_cp, last_dp = last_primes
-    a, b, c, d = x
-    cp = c / (b - a * last_cp)
-    dp = (d - a * last_dp) / (b - a * last_cp)
-    new_primes = jnp.stack((cp, dp))
-    return new_primes, new_primes
-
-
-def backsubstitution(last_x, x):
-    """
-    This function is a single iteration of the backward pass in the non-in-place Thomas
-    tridiagonal algorithm
-
-    :param last_x:
-    :param x:
-    :return:
-    """
-    cp, dp = x
-    new_x = dp - cp * last_x
-    return new_x, new_x
-
 
 class NNReparameterizer(hk.Module):
     def __init__(self, cfg, num_spectra):
@@ -139,10 +112,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     Returns:
 
     """
-    # t0 = time.time()
-    # print("Staritng get_loss_function ", round(time.time() - t0, 2))
     forward_pass = get_fit_model(config, sas, backend="jax")
-    # print("got fit model ", round(time.time() - t0, 2))
     lam = config["parameters"]["lam"]["val"]
     vmap = jax.vmap
 
@@ -196,6 +166,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 self.nn_reparameterizer = NNReparameterizer(cfg, num_spectra)
 
             self.crop_window = cfg["other"]["crop_window"]
+            self.smooth_window_len = 10
+            self.w = jnp.hamming(self.smooth_window_len)
 
         def _init_nn_params_(self, batch):
             all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
@@ -218,11 +190,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         def _init_params_(self):
             these_params = dict()
-            # print("in _init_params_")
             for param_name, param_config in self.cfg["parameters"].items():
                 if param_config["active"]:
-                    # print(param_name)
-                    # print(jnp.shape(param_config["val"]))
                     if param_name == "fe":
                         these_params[param_name] = hk.get_parameter(
                             param_name,
@@ -275,8 +244,17 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
             return these_params
 
+        def smooth(self, distribution):
+            s = jnp.r_[
+                distribution[self.smooth_window_len - 1 : 0 : -1],
+                distribution,
+                distribution[-2 : -self.smooth_window_len - 1 : -1],
+            ]
+            return jnp.convolve(self.w / self.w.sum(), s, mode="same")[
+                self.smooth_window_len - 1 : -(self.smooth_window_len - 1)
+            ]
+
         def __call__(self, batch):
-            # print("in __call__")
             if self.cfg["nn"]["use"]:
                 these_params = self._init_nn_params_(batch)
             else:
@@ -288,6 +266,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                         these_params[param_name] * self.cfg["units"]["norms"][param_name]
                         + self.cfg["units"]["shifts"][param_name]
                     )
+
+            these_params["fe"] = self.smooth(these_params["fe"][0])[None, :]
 
             return these_params
 
@@ -349,16 +329,11 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     _get_active_params_ = hk.without_apply_rng(hk.transform(__get_active_params__))
 
     def get_spectra_from_params(params, batch):
-        # print("Staritng get_spectra_from_params ", round(time.time() - t0, 2))
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = vmap_forward_pass(params)  # , sas["weights"])
-        # print("completed forwardpass ", round(time.time() - t0, 2))
         ThryE, ThryI, lamAxisE, lamAxisI = vmap_postprocess_thry(
             modlE, modlI, lamAxisE, lamAxisI, {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]}, live_TSinputs
         )
-        # print("completed postprocess ", round(time.time() - t0, 2))
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
-            # print(jnp.shape(ThryE))
-            # print(jnp.shape(lamAxisE))
             ThryE, lamAxisE = reduce_ATS_to_resunit(ThryE, lamAxisE, live_TSinputs, batch)
 
         ThryE = ThryE + batch["noise_e"]
@@ -368,60 +343,26 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
     dv = config["velocity"][1] - config["velocity"][0]
 
-    def perform_fp(distribution):
-        v0t_sq = 1.0
-        nu = 1e-5
-        dt = 1e-1
-        ones = jnp.ones((1, config["velocity"].size))
-
-        a = nu * dt * (-v0t_sq / dv**2.0 + jnp.roll(config["velocity"], 1)[None, :] / 2 / dv)
-        b = 1.0 + nu * dt * ones * (2.0 * v0t_sq / dv**2.0)
-        c = nu * dt * (-v0t_sq / dv**2.0 - jnp.roll(config["velocity"], -1)[None, :] / 2 / dv)
-
-        diags_stacked = jnp.stack([arr.transpose((1, 0)) for arr in (a, b, c, distribution)], axis=1)
-        _, primes = scan(compute_primes, jnp.zeros((2, *a.shape[:-1])), diags_stacked, unroll=16)
-        _, sol = scan(backsubstitution, jnp.zeros(a.shape[:-1]), primes[::-1], unroll=16)
-        return sol[::-1].transpose((1, 0))
-
     def calculate_spectra(weights, batch):
-        # print("Staritng calculate_spectra ", round(time.time() - t0, 2))
         params = _get_params_.apply(weights, batch)
-        # print("params reshaped ", round(time.time() - t0, 2))
-        for i in range(1):
-            params["fe"] = jnp.log(perform_fp(jnp.exp(params["fe"])))
         ThryE, ThryI, lamAxisE, lamAxisI = get_spectra_from_params(params, batch)
-        # print("Finished calculate_spectra ", round(time.time() - t0, 2))
         return ThryE, ThryI, lamAxisE, lamAxisI, params
 
     config_for_params = copy.deepcopy(config)
 
     def reduce_ATS_to_resunit(ThryE, lamAxisE, TSins, batch):
-        # print("ThryE shape after amps", jnp.shape(ThryE))
         lam_step = round(ThryE.shape[1] / batch["e_data"].shape[1])
-        # ang_step = round(ThryE.shape[0] / batch["e_data"].shape[0])
         ang_step = round(ThryE.shape[0] / config["other"]["CCDsize"][0])
 
         ThryE = jnp.array([jnp.average(ThryE[:, i : i + lam_step], axis=1) for i in range(0, ThryE.shape[1], lam_step)])
-        # print("ThryE shape after 1 resize", jnp.shape(ThryE))
         ThryE = jnp.array([jnp.average(ThryE[:, i : i + ang_step], axis=1) for i in range(0, ThryE.shape[1], ang_step)])
-        # print("ThryE shape after 2 resize", jnp.shape(ThryE))
 
-        # ThryE = ThryE.transpose()
-        # if config["other"]["PhysParams"]["norm"] == 0:
-        # lamAxisE = jnp.average(lamAxisE.reshape(data.shape[0], -1), axis=1)
-        # print(jnp.shape(lamAxisE))
-        # print(lam_step)
         lamAxisE = jnp.array(
             [jnp.average(lamAxisE[i : i + lam_step], axis=0) for i in range(0, lamAxisE.shape[0], lam_step)]
         )
-        # print(jnp.shape(lamAxisE))
-        # print(jnp.shape(batch["e_amps"]))
-        # print(jnp.shape(jnp.amax(ThryE, axis = 1, keepdims = True)))
         ThryE = ThryE[config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :]
         ThryE = batch["e_amps"] * ThryE / jnp.amax(ThryE, axis=1, keepdims=True)
         ThryE = jnp.where(lamAxisE < lam, TSins["amp1"]["val"] * ThryE, TSins["amp2"]["val"] * ThryE)
-        # print("ThryE shape after norm ", jnp.shape(ThryE))
-        # ThryE = ThryE.transpose()
         return ThryE, lamAxisE
 
     def array_loss_fn(weights, batch):
@@ -496,9 +437,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         return i_error + e_error
 
     def loss_fn(weights, batch):
-        # print("Staritng loss_fn ", round(time.time() - t0, 2))
         ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
-        # print("in loss_fn")
         i_error = 0.0
         e_error = 0.0
 
@@ -529,9 +468,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 0.0,
             )
             e_error += jnp.mean(_error_)
-        # print("done with loss_fn")
 
-        dv = config["velocity"][1] - config["velocity"][0]
         density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
         temperature_loss = jnp.mean(
             jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
@@ -621,10 +558,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             unravel_pytree=unravel_pytree,
             v_func=v_func,
             h_func=h_func,
+            calculate_spectra=calculate_spectra,
         )
-
-    # else:
-    #    raise NotImplementedError
 
     return loss_dict
 

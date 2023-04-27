@@ -1,5 +1,4 @@
 from jax import numpy as jnp
-from inverse_thomson_scattering.process.convolve import fftconvolve
 
 
 def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam):
@@ -17,9 +16,9 @@ def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam):
         * jnp.exp(-((sas["angAxis"] - origin_ang) ** 2.0) / (2.0 * (stddev_ang) ** 2.0))
     )  # Gaussian
     ThryE = jnp.array([jnp.convolve(modlE[:, i], inst_func_ang, "same") for i in range(modlE.shape[1])])
-    #ThryE = jnp.array([fftconvolve(modlE[:, i], inst_func_ang, "same") for i in range(modlE.shape[1])])
+    # ThryE = jnp.array([fftconvolve(modlE[:, i], inst_func_ang, "same") for i in range(modlE.shape[1])])
     ThryE = jnp.array([jnp.convolve(ThryE[:, i], inst_func_lam, "same") for i in range(ThryE.shape[1])])
-    #ThryE = jnp.array([fftconvolve(ThryE[:, i], inst_func_lam, "same") for i in range(ThryE.shape[1])])
+    # ThryE = jnp.array([fftconvolve(ThryE[:, i], inst_func_lam, "same") for i in range(ThryE.shape[1])])
 
     ThryE = jnp.amax(modlE, axis=1, keepdims=True) / jnp.amax(ThryE, axis=1, keepdims=True) * ThryE
 
