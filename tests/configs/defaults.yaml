@@ -121,7 +121,7 @@ data:
         type:
             pixel
         start: 500
-        end: 502
+        end: 510
         skip: 1
     background:
         type:
@@ -146,8 +146,8 @@ optimizer:
 
 nn:
     use: false
-    conv_filters: 32|16|16 #|32|32
-    linear_widths: 32|16
+    conv_filters: 32|32|16
+    linear_widths: 16|8
 
 
 mlflow:

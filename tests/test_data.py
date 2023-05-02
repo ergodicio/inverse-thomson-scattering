@@ -55,4 +55,4 @@ def test_data(nn):
 
 
 if __name__ == "__main__":
-    test_data()
+    test_data(True)
