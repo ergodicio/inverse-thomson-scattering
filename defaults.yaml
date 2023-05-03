@@ -140,8 +140,8 @@ optimizer:
     x_norm: False
     grad_method: AD
     batch_size: 2
-    num_epochs: 200
-    learning_rate: 1.0e-4
+    num_epochs: 1000
+    learning_rate: 1.0e-2
     parameter_norm: True
 
 nn:
@@ -151,5 +151,5 @@ nn:
 
 
 mlflow:
-    experiment: inverse-thomson-scattering
+    experiment: arts-adam
     run: base

@@ -166,7 +166,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 self.nn_reparameterizer = NNReparameterizer(cfg, num_spectra)
 
             self.crop_window = cfg["other"]["crop_window"]
-            self.smooth_window_len = 10
+            self.smooth_window_len = round(cfg["velocity"].size / 10) * 2
             self.w = jnp.hamming(self.smooth_window_len)
 
         def _init_nn_params_(self, batch):
@@ -267,7 +267,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                         + self.cfg["units"]["shifts"][param_name]
                     )
 
-            these_params["fe"] = self.smooth(these_params["fe"][0])[None, :]
+            these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"][0]))[None, :])
 
             return these_params
 

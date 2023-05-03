@@ -246,7 +246,7 @@ def fit(config):
                 jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                 # hess=hess_fn if config["optimizer"]["hessian"] else None,
                 bounds=func_dict["bounds"],
-                options={"disp": True, "maxiter": 1},
+                options={"disp": True, "maxiter": 4000},
             )
 
             best_weights = func_dict["get_params"](res["x"], batch)

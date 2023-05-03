@@ -1,11 +1,11 @@
 parameters:
     amp1:
-        val: 1.
+        val: 1.0
         active: True
         lb: 0.01
         ub: 3.75
     amp2:
-        val: 1.
+        val: 1.0
         active: True
         lb: 0.01
         ub: 3.75
@@ -20,7 +20,7 @@ parameters:
         lb: 523.
         ub: 528.
     Te:
-        val: .5
+        val: .25
         active: True
         lb: 0.01
         ub: 1.5
@@ -44,7 +44,7 @@ parameters:
         val: 40
         active: False
     ne:
-        val: 0.2
+        val: 0.4
         active: True
         lb: .001
         ub: 1.
@@ -92,4 +92,4 @@ other:
         plot_raw_data: True
 
 mlflow:
-    experiment: inverse-thomson-scattering
+    experiment: arts-smoothing
