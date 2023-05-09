@@ -378,8 +378,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         #Used for postprocessing
         ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
 
-        i_error = 0.0
-        e_error = 0.0
+        used_points = 0
+        loss = 0
 
         i_data = batch["i_data"]
         e_data = batch["e_data"]
@@ -389,28 +389,38 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-            i_error += jnp.square(i_data - ThryI) / jnp.square(i_norm)
+            sqdev_i = jnp.square(i_data - ThryI) / jnp.square(i_norm)
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
-            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
-            _error_ = jnp.where(
+            sqdev_e_b = jnp.square(e_data - ThryE) / jnp.abs(e_data)#jnp.square(e_norm)
+            sqdev_e_b = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
-                _error_,
+                sqdev_e_b,
                 0.0,
             )
+            used_points += jnp.sum(
+                    (lamAxisE > config["data"]["fit_rng"]["blue_min"])
+                    & (lamAxisE < config["data"]["fit_rng"]["blue_max"]))
 
-            e_error += _error_
+            loss += jnp.sum(sqdev_e_b, axis=1)
 
         if config["other"]["extraoptions"]["fit_EPWr"]:
-            _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)
-            _error_ = jnp.where(
+            sqdev_e_r = jnp.square(e_data - ThryE) / jnp.abs(e_data)#jnp.square(e_norm)
+            sqdev_e_r = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
-                _error_,
+                sqdev_e_r,
                 0.0,
             )
-            e_error += _error_
+            used_points += jnp.sum(
+                    (lamAxisE > config["data"]["fit_rng"]["red_min"])
+                    & (lamAxisE < config["data"]["fit_rng"]["red_max"]))
 
-        return e_error, [ThryE, normed_e_data, params]
+            loss += jnp.sum(sqdev_e_b, axis=1)
+
+        sqdev_e_tot = sqdev_e_b + sqdev_e_r
+        loss = loss*e_norm
+
+        return loss, sqdev_e_tot, used_points, [ThryE, normed_e_data, params]
 
     def loss_for_hess_fn(params, batch):
         params = {**params, **initialize_rest_of_params(config)}
@@ -425,23 +435,23 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             i_error += jnp.mean(jnp.square(i_data - ThryI))
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
-            _error_ = jnp.square(e_data - ThryE)  # / jnp.square(e_norm)
+            _error_ = jnp.square(e_data - ThryE)/ (jnp.abs(e_data) + 1e-10)
             _error_ = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
                 _error_,
                 0.0,
             )
 
-            e_error += jnp.mean(_error_)
+            e_error += jnp.sum(_error_)
 
         if config["other"]["extraoptions"]["fit_EPWr"]:
-            _error_ = jnp.square(e_data - ThryE)
+            _error_ = jnp.square(e_data - ThryE)/ (jnp.abs(e_data) + 1e-10)
             _error_ = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
                 _error_,
                 0.0,
             )
-            e_error += jnp.mean(_error_)
+            e_error += jnp.sum(_error_)
 
         return i_error + e_error
 
@@ -478,10 +488,18 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             )
             e_error += jnp.mean(_error_)
 
+        dv = config["velocity"][1] - config["velocity"][0]
         density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
         temperature_loss = jnp.mean(
             jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
         )
+
+        if config["parameters"]["fe"]["fe_decrease_strict"]:
+            gradfe = jnp.sign(config["velocity"][1:]) * jnp.diff(params["fe"].squeeze())
+            vals = jnp.where(gradfe > 0, gradfe, 0).sum()
+            fe_penalty = jnp.tan(jnp.amin(jnp.array([vals, jnp.pi/2])))
+        else:
+            fe_penalty = 0
 
         return i_error + e_error + density_loss + temperature_loss, [ThryE, normed_e_data, params]
 

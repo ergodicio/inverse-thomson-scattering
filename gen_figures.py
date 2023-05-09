@@ -42,7 +42,7 @@ if __name__ == "__main__":
     config["parameters"]["ne"]["val"] = 0.5  # 0.25
     config["parameters"]["m"]["val"] = 2.0  # 2.2
     config["data"]["lineouts"]["start"] = int(320)
-    config["data"]["lineouts"]["skip"] = int(1)
+    config["data"]["lineouts"]["skip"] = int(9)
     config["data"]["lineouts"]["end"] = int(680)
     config["optimizer"]["batch_size"] = int(4)
     # config["optimizer"]["method"] = "adam"
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     # config["optimizer"]["grad_method"] = str(dd)
     config["mlflow"][
         "run"
-    ] = f"lbfgs-{nn_reparam=}-tstart={config['data']['lineouts']['start']}-tskip={config['data']['lineouts']['skip']}-tend={config['data']['lineouts']['end']}"
+    ] = f"testing_iaw_fits"
     one_run(config)
 
     # raise ValueError
