@@ -62,20 +62,24 @@ def plotinput(config, sa):
     return
 
 
-def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds):
+def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds, yaxis, sorted_sqdev, sorted_red_losses):
     # make plots
     for i in range(num_plots):
         # plot model vs actual
         titlestr = (
             r"|Error|$^2$" + f" = {sorted_losses[i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[i]]}"
         )
-        filename = f"loss={sorted_losses[i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[i]]}.png"
-        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-        ax.plot(np.squeeze(sorted_data[i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Data")
-        ax.plot(np.squeeze(sorted_fits[i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Fit")
-        ax.set_title(titlestr, fontsize=14)
-        ax.legend(fontsize=14)
-        ax.grid()
+        filename = f"loss={sorted_losses[i]:.2e}-reduced_loss={sorted_red_losses[i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
+        fig, ax = plt.subplots(2, 1, figsize=(10, 8), tight_layout=True, sharex = True)
+        ax[0].plot(yaxis[config["other"]["crop_window"]:-config["other"]["crop_window"]], np.squeeze(sorted_data[i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Data")
+        ax[0].plot(yaxis[config["other"]["crop_window"]:-config["other"]["crop_window"]], np.squeeze(sorted_fits[i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Fit")
+        ax[0].set_title(titlestr, fontsize=14)
+        ax[0].set_ylabel("Amp (arb. units)")
+        ax[0].legend(fontsize=14)
+        ax[0].grid()
+        ax[1].plot(yaxis[config["other"]["crop_window"]:-config["other"]["crop_window"]], np.squeeze(sorted_sqdev[i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Residual")
+        ax[1].set_xlabel("Wavelength (nm)")
+        ax[1].set_ylabel("$\chi_i^2$")
         fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
         plt.close(fig)
 
@@ -83,17 +87,20 @@ def model_v_actual(sorted_losses, sorted_data, sorted_fits, num_plots, td, confi
             r"|Error|$^2$"
             + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
         )
-        filename = (
-            f"loss={sorted_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
-        )
-        fig, ax = plt.subplots(1, 1, figsize=(10, 4), tight_layout=True)
-        ax.plot(np.squeeze(sorted_data[-1 - i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Data")
-        ax.plot(np.squeeze(sorted_fits[-1 - i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Fit")
-        ax.set_title(titlestr, fontsize=14)
-        ax.legend(fontsize=14)
-        ax.grid()
+        filename = f"loss={sorted_losses[-1 - i]:.2e}-reduced_loss={sorted_red_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
+        fig, ax = plt.subplots(2, 1, figsize=(10, 8), tight_layout=True, sharex = True)
+        ax[0].plot(yaxis[config["other"]["crop_window"]:-config["other"]["crop_window"]], np.squeeze(sorted_data[-1 - i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Data")
+        ax[0].plot(yaxis[config["other"]["crop_window"]:-config["other"]["crop_window"]], np.squeeze(sorted_fits[-1 - i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Fit")
+        ax[0].set_title(titlestr, fontsize=14)
+        ax[0].set_ylabel("Amp (arb. units)")
+        ax[0].legend(fontsize=14)
+        ax[0].grid()
+        ax[1].plot(yaxis[config["other"]["crop_window"]:-config["other"]["crop_window"]], np.squeeze(sorted_sqdev[-1 - i, config["other"]["crop_window"]:-config["other"]["crop_window"]]), label="Residual")
+        ax[1].set_xlabel("Wavelength (nm)")
+        ax[1].set_ylabel("$\chi_i^2$")
         fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
         plt.close(fig)
+
 
 
 def LinePlots(

@@ -91,6 +91,10 @@ def prepare_data(config: Dict) -> Dict:
                 for i in range(0, bg_res_unit.shape[1], ang_res_unit)
             ]
         )
+
+        axisyE = np.array(
+            [np.average(axisyE[i : i + lam_res_unit], axis=0) for i in range(0, axisyE.shape[0], lam_res_unit)])
+        all_axes["epw_y"] = axisyE.reshape((-1,1))
         all_data = {"e_data": data_res_unit, "e_amps": np.amax(data_res_unit, axis = 1, keepdims = True)}
         all_data["i_data"] = all_data["i_amps"] = np.zeros(len(data_res_unit))
         config["other"]["PhysParams"]["noiseI"] = 0

@@ -57,7 +57,6 @@ def add_electron_IRF(config, lamAxisE, modlE, amps, TSins, lam):
         (1.0 / (stddevE * jnp.sqrt(2.0 * jnp.pi))) * jnp.exp(-((lamAxisE - originE) ** 2.0) / (2.0 * (stddevE) ** 2.0))
     )  # Gaussian
     ThryE = jnp.convolve(modlE, inst_funcE, "same")
-    ThryE = jnp.array([jnp.convolve(modlE[:, i], inst_func_ang, "same") for i in range(modlE.shape[1])])
     ThryE = (jnp.amax(modlE) / jnp.amax(ThryE)) * ThryE
 
     if config["other"]["PhysParams"]["norm"] > 0:

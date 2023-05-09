@@ -33,7 +33,7 @@ def get_lineouts(
     # extract lineouts
     if config["other"]["extraoptions"]["load_ele_spec"]:
         LineoutTSE = [
-            np.mean(elecData[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1)
+            np.sum(elecData[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1)
             for a in LineoutPixelE
         ]
         LineoutTSE_smooth = [
