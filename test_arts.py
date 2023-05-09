@@ -68,6 +68,8 @@ if __name__ == "__main__":
     # config["data"]["lineouts"]["start"] = int(320)
     # config["data"]["lineouts"]["skip"] = int(18)
     # config["data"]["lineouts"]["end"] = int(680)
+    config["optimizer"]["refine_factor"] = 2
+    config["optimizer"]["num_mins"] = 1
     config["optimizer"]["batch_size"] = int(925)  # this should be automatic
     # config["optimizer"]["method"] = "adam"
     config["nn"]["use"] = False

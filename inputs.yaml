@@ -92,4 +92,4 @@ other:
         plot_raw_data: True
 
 mlflow:
-    experiment: arts-smoothing
+    experiment: inverse-thomson-scattering

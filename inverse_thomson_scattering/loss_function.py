@@ -121,8 +121,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         if config["other"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, lamAxisE, ThryI = irf.add_ion_IRF(config, lamAxisI, modlI, lamAxisE, amps["i_amps"], TSins)
         else:
-            lamAxisI = jnp.nan
-            ThryI = jnp.nan
+            #lamAxisI = jnp.nan
+            ThryI = modlI#jnp.nan
 
         if config["other"]["extraoptions"]["load_ele_spec"] & (
             config["other"]["extraoptions"]["spectype"] == "angular_full"
@@ -131,13 +131,14 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         elif config["other"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = irf.add_electron_IRF(config, lamAxisE, modlE, amps["e_amps"], TSins, lam)
         else:
-            lamAxisE = jnp.nan
-            ThryE = jnp.nan
+            #lamAxisE = jnp.nan
+            ThryE = modlE#jnp.nan
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
-    if config["other"]["extraoptions"]["spectype"] == "angular_full":
-        # ATS data can't be vmaped
+    if (config["other"]["extraoptions"]["spectype"] == "angular_full" or
+        max(dummy_batch["e_data"].shape[0],dummy_batch["i_data"].shape[0]) <=1):
+        # ATS data can't be vmaped and single lineouts cant be vmapped
         vmap_forward_pass = forward_pass
         vmap_postprocess_thry = postprocess_thry
     else:
@@ -167,7 +168,15 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
             self.crop_window = cfg["other"]["crop_window"]
             self.smooth_window_len = round(cfg["velocity"].size / 10) * 2
-            self.w = jnp.hamming(self.smooth_window_len)
+
+            if cfg["dist_fit"]["window"]["type"] == "hamming":
+                self.w = jnp.hamming(self.smooth_window_len)
+            elif cfg["dist_fit"]["window"]["type"] == "hann":
+                self.w = jnp.hanning(self.smooth_window_len)
+            elif cfg["dist_fit"]["window"]["type"] == "bartlett":
+                self.w = jnp.bartlett(self.smooth_window_len)
+            else:
+                raise NotImplementedError
 
         def _init_nn_params_(self, batch):
             all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
@@ -212,7 +221,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             return these_params
 
         def get_active_params(self, batch):
-            print("in get_active_params")
+            #print("in get_active_params")
             if self.cfg["nn"]["use"]:
                 all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
                 these_params = defaultdict(list)
@@ -272,7 +281,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             return these_params
 
     def initialize_rest_of_params(config):
-        print("in initialize_rest_of_params")
+        #print("in initialize_rest_of_params")
         these_params = dict()
         for param_name, param_config in config["parameters"].items():
             if param_config["active"]:
@@ -366,8 +375,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         return ThryE, lamAxisE
 
     def array_loss_fn(weights, batch):
+        #Used for postprocessing
         ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
-        # print("in array_loss_fn")
 
         i_error = 0.0
         e_error = 0.0
