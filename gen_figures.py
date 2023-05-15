@@ -38,12 +38,12 @@ if __name__ == "__main__":
     config = unflatten(defaults)
     mlflow.set_experiment(config["mlflow"]["experiment"])
 
-    config["parameters"]["Te"]["val"] = 1.0
-    config["parameters"]["ne"]["val"] = 0.5  # 0.25
-    config["parameters"]["m"]["val"] = 2.0  # 2.2
-    config["data"]["lineouts"]["start"] = int(320)
-    config["data"]["lineouts"]["skip"] = int(9)
-    config["data"]["lineouts"]["end"] = int(680)
+    #config["parameters"]["Te"]["val"] = 1.0
+    #config["parameters"]["ne"]["val"] = 0.5  # 0.25
+    #config["parameters"]["m"]["val"] = 2.0  # 2.2
+    config["data"]["lineouts"]["start"] = int(300)
+    config["data"]["lineouts"]["skip"] = int(10)
+    config["data"]["lineouts"]["end"] = int(700)
     config["optimizer"]["batch_size"] = int(4)
     # config["optimizer"]["method"] = "adam"
     config["nn"]["use"] = False

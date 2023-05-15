@@ -31,7 +31,7 @@ def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam):
     return lamAxisE, ThryE
 
 
-def add_ion_IRF(config, lamAxisI, modlI, lamAxisE, amps, TSins):
+def add_ion_IRF(config, lamAxisI, modlI, amps, TSins):
     stddevI = config["other"]["PhysParams"]["widIRF"]["spect_stddev_ion"]
     originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
     inst_funcI = jnp.squeeze(
@@ -44,9 +44,9 @@ def add_ion_IRF(config, lamAxisI, modlI, lamAxisE, amps, TSins):
     if config["other"]["PhysParams"]["norm"] == 0:
         lamAxisI = jnp.average(lamAxisI.reshape(1024, -1), axis=1)
         ThryI = TSins["amp3"]["val"] * amps * ThryI / jnp.amax(ThryI)
-        lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
+        #lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
 
-    return lamAxisI, lamAxisE, ThryI
+    return lamAxisI, ThryI
 
 
 def add_electron_IRF(config, lamAxisE, modlE, amps, TSins, lam):

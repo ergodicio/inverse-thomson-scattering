@@ -58,6 +58,7 @@ def prepare_data(config: Dict) -> Dict:
         #config["other"]["PhysParams"]["amps"] = np.array([np.amax(elecData), 1])
         sa["angAxis"] = axisxE
 
+        #this currently does nothing since the figure is not logged
         if config["other"]["extraoptions"]["plot_raw_data"]:
             plotters.ColorPlots(
                 axisxE,

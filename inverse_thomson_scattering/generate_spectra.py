@@ -4,7 +4,6 @@ from inverse_thomson_scattering.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 from jax import numpy as jnp
-from jax import debug as dbg
 
 
 def get_fit_model(config, sa, backend: str = "haiku"):
@@ -18,9 +17,6 @@ def get_fit_model(config, sa, backend: str = "haiku"):
             # if parameters[key]["active"]:
             parameters[key]["val"] = jnp.squeeze(fitted_params[key])
 
-        #dbg.print(parameters)
-        #dbg.print("fe: {}", parameters["fe"]["val"])
-        #dbg.print("fitted_params: {}", fitted_params)
         # if parameters["fe"]["active"]:
         #     parameters["fe"]["val"] = fitted_params[-parameters["fe"]["length"] : :]
         if parameters["m"]["active"]:
@@ -54,7 +50,7 @@ def get_fit_model(config, sa, backend: str = "haiku"):
                 parameters["ud"]["val"],
                 sa["sa"],
                 (fecur, config["velocity"]),
-                526.5,  # TODO hardcoded
+                lam,
             )
 
             # remove extra dimensions and rescale to nm
@@ -113,16 +109,6 @@ def get_fit_model(config, sa, backend: str = "haiku"):
                 filterr = config["other"]["iawfilter"][3] + config["other"]["iawfilter"][2] / 2
 
                 if config["other"]["lamrangE"][0] < filterr and config["other"]["lamrangE"][1] > filterb:
-                    # TODO unused
-                    # if config["other"]["lamrangE"][0] < filterb:
-                    #     lamleft = jnp.argmin(jnp.abs(lamAxisE - filterb))
-                    # else:
-                    #     lamleft = 0
-                    #
-                    # if config["other"]["lamrangE"][1] > filterr:
-                    #     lamright = jnp.argmin(jnp.abs(lamAxisE - filterr))
-                    # else:
-                    #     lamright = lamAxisE.size
                     indices = (filterb < lamAxisE) & (filterr > lamAxisE)
                     modlE = jnp.where(indices, modlE * 10 ** (-config["other"]["iawfilter"][1]), modlE)
         else:

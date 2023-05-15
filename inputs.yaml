@@ -1,26 +1,26 @@
 parameters:
     amp1:
         val: 1.0
-        active: True
+        active: False
         lb: 0.01
         ub: 3.75
     amp2:
         val: 1.0
-        active: True
+        active: False
         lb: 0.01
         ub: 3.75
     amp3:
         val: 1.
-        active: False
+        active: True
         lb: 0.
         ub: 10.
     lam:
-        val: 524.5
-        active: True
+        val: 526.5
+        active: False
         lb: 523.
         ub: 528.
     Te:
-        val: .25
+        val: .10
         active: True
         lb: 0.01
         ub: 1.5
@@ -31,21 +31,31 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: .2
-        active: False
-        lb: 0.01
+        val: .01
+        active: True
+        lb: 0.001
         ub: 3.
     Z:
-        val: 8.
-        active: False
+        val: 6.
+        active: True
         lb: 1.
         ub: 25.
     A:
-        val: 40
+        val: 14.
         active: False
+    ud:
+        val: 0.0
+        active: True
+        lb: -2.0
+        ub: 2.0
+    Va:
+        val: 0.0
+        active: True
+        lb: -2.0
+        ub: 2.0
     ne:
         val: 0.4
-        active: True
+        active: False
         lb: .001
         ub: 1.
     ne_gradient:
@@ -55,8 +65,8 @@ parameters:
         ub: 15.
         num_grad_points: 1
     m:
-        val: 3.0
-        active: True
+        val: 2.0
+        active: False
         lb: 2.
         ub: 5.
     fe:
@@ -82,13 +92,16 @@ parameters:
         val: []
         active: False
 
+data:
+    shotnum: 108135
+
 other:
     extraoptions:
-        load_ion_spec: False
-        load_ele_spec: True
-        fit_IAW: False
-        fit_EPWb: True
-        fit_EPWr: True
+        load_ion_spec: True
+        load_ele_spec: False
+        fit_IAW: True
+        fit_EPWb: False
+        fit_EPWr: False
         plot_raw_data: True
 
 mlflow:

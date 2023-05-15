@@ -119,7 +119,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
     @jit
     def postprocess_thry(modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
         if config["other"]["extraoptions"]["load_ion_spec"]:
-            lamAxisI, lamAxisE, ThryI = irf.add_ion_IRF(config, lamAxisI, modlI, lamAxisE, amps["i_amps"], TSins)
+            lamAxisI, ThryI = irf.add_ion_IRF(config, lamAxisI, modlI, amps["i_amps"], TSins)
         else:
             #lamAxisI = jnp.nan
             ThryI = modlI#jnp.nan
@@ -314,7 +314,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             {
                 "data": normed_batch,
                 "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]},
-                "noise_e": batch["noise_e"],
+                "noise_e": batch["noise_e"], "noise_i": batch["noise_i"],
             }
         )
 
@@ -329,7 +329,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             {
                 "data": normed_batch,
                 "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]},
-                "noise_e": batch["noise_e"],
+                "noise_e": batch["noise_e"], "noise_i": batch["noise_i"],
             }
         )
 
@@ -346,7 +346,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             ThryE, lamAxisE = reduce_ATS_to_resunit(ThryE, lamAxisE, live_TSinputs, batch)
 
         ThryE = ThryE + batch["noise_e"]
-        # ThryI = ThryI + batch["noise_i"]
+        ThryI = ThryI + batch["noise_i"]
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
@@ -383,13 +383,24 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         i_data = batch["i_data"]
         e_data = batch["e_data"]
-        normed_batch = get_normed_batch(batch)
-        normed_i_data = normed_batch["i_data"]
-        normed_e_data = normed_batch["e_data"]
+        #normed_batch = get_normed_batch(batch)
+        #normed_i_data = normed_batch["i_data"]
+        #normed_e_data = normed_batch["e_data"]
+        sqdev = {"ele": jnp.zeros(e_data.shape), "ion": jnp.zeros(i_data.shape)}
+        print(i_norm)
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-            sqdev_i = jnp.square(i_data - ThryI) / jnp.square(i_norm)
+            sqdev["ion"] = jnp.square(i_data - ThryI) / (jnp.abs(i_data) + 1e-1)
+            sqdev["ion"] = jnp.where(
+                (lamAxisI > config["data"]["fit_rng"]["iaw_min"]) & (lamAxisI < config["data"]["fit_rng"]["iaw_max"]),
+                sqdev["ion"],
+                0.0,
+            )
+            loss += jnp.sum(sqdev["ion"], axis=1)
+            used_points += jnp.sum(
+                    (lamAxisI > config["data"]["fit_rng"]["iaw_min"])
+                    & (lamAxisI < config["data"]["fit_rng"]["iaw_max"]))
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
             sqdev_e_b = jnp.square(e_data - ThryE) / jnp.abs(e_data)#jnp.square(e_norm)
@@ -403,6 +414,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                     & (lamAxisE < config["data"]["fit_rng"]["blue_max"]))
 
             loss += jnp.sum(sqdev_e_b, axis=1)
+            sqdev["ele"] += sqdev_e_b
 
         if config["other"]["extraoptions"]["fit_EPWr"]:
             sqdev_e_r = jnp.square(e_data - ThryE) / jnp.abs(e_data)#jnp.square(e_norm)
@@ -415,12 +427,12 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                     (lamAxisE > config["data"]["fit_rng"]["red_min"])
                     & (lamAxisE < config["data"]["fit_rng"]["red_max"]))
 
-            loss += jnp.sum(sqdev_e_b, axis=1)
+            loss += jnp.sum(sqdev_e_r, axis=1)
+            sqdev["ele"] += sqdev_e_r
 
-        sqdev_e_tot = sqdev_e_b + sqdev_e_r
-        loss = loss*e_norm
+        loss = loss#*e_norm
 
-        return loss, sqdev_e_tot, used_points, [ThryE, normed_e_data, params]
+        return loss, sqdev, used_points, [ThryE, ThryI, params]
 
     def loss_for_hess_fn(params, batch):
         params = {**params, **initialize_rest_of_params(config)}
@@ -432,7 +444,13 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         e_data = batch["e_data"]
 
         if config["other"]["extraoptions"]["fit_IAW"]:
-            i_error += jnp.mean(jnp.square(i_data - ThryI))
+            _error_ = jnp.square(i_data - ThryI)/ (jnp.abs(i_data) + 1e-10)
+            _error_ = jnp.where(
+                (lamAxisI > config["data"]["fit_rng"]["iaw_min"]) & (lamAxisI < config["data"]["fit_rng"]["iaw_max"]),
+                _error_,
+                0.0,
+            )
+            i_error += jnp.sum(_error_)
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
             _error_ = jnp.square(e_data - ThryE)/ (jnp.abs(e_data) + 1e-10)
@@ -467,7 +485,14 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         normed_e_data = normed_batch["e_data"]
 
         if config["other"]["extraoptions"]["fit_IAW"]:
-            i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
+            #i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
+            _error_ = jnp.square(i_data - ThryI) / jnp.square(i_norm)
+            _error_ = jnp.where(
+                (lamAxisI > config["data"]["fit_rng"]["iaw_min"]) & (lamAxisI < config["data"]["fit_rng"]["iaw_max"]),
+                _error_,
+                0.0,
+            )
+            i_error += jnp.mean(_error_)
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
             _error_ = jnp.square(e_data - ThryE) / jnp.square(e_norm)

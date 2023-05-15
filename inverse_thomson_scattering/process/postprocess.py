@@ -37,14 +37,19 @@ def recalculate_with_chosen_weights(
     batch_indices.sort()
     losses = np.zeros(batch_indices.flatten()[-1] + 1, dtype=np.float64)
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-    # losses = np.zeros_like(batch_indices, dtype=np.float64)
 
-    # This will need to be fixed to allow ion only fitting
-    # sigmas = np.zeros((max(all_data["e_data"].shape[0], all_data["i_data"].shape[0]), len(all_params.keys())))
-    sigmas = np.zeros((all_data["e_data"].shape[0], len(all_params.keys())))
-    # fits = np.zeros((max(all_data["e_data"].shape[0], all_data["i_data"].shape[0]), max(all_data["e_data"].shape[1], all_data["i_data"].shape[1])))
-    fits = np.zeros(all_data["e_data"].shape)
-    sqdevs = np.zeros(all_data["e_data"].shape)
+    fits = {}
+    sqdevs = {}
+    fits["ion"] = np.zeros(all_data["i_data"].shape)
+    sqdevs["ion"] = np.zeros(all_data["i_data"].shape)
+    fits["ele"] = np.zeros(all_data["e_data"].shape)
+    sqdevs["ele"] = np.zeros(all_data["e_data"].shape)
+    
+    if config["other"]["extraoptions"]["load_ion_spec"]:
+        sigmas = np.zeros((all_data["i_data"].shape[0], len(all_params.keys())))
+    
+    if config["other"]["extraoptions"]["load_ele_spec"]:
+        sigmas = np.zeros((all_data["e_data"].shape[0], len(all_params.keys())))
 
     if config["other"]["extraoptions"]["spectype"] == "angular_full":
         batch = {
@@ -55,17 +60,20 @@ def recalculate_with_chosen_weights(
             "noise_e": config["other"]["PhysParams"]["noiseE"][
                 config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
             ],
+            "noise_i": config["other"]["PhysParams"]["noiseI"][
+                config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+            ],
         }
         these_weights = best_weights
         # loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
-        losses, sqdevs, used_points, [ThryE, _, params] = func_dict["array_loss_fn"](raw_weights, batch)
+        losses, sqdevs["ele"], used_points, [ThryE, _, params] = func_dict["array_loss_fn"](raw_weights, batch)
         ThryE, ThryI, lamAxisE, lamAxisI, params = func_dict["calculate_spectra"](raw_weights, batch)
         # these_params = func_dict["get_active_params"](these_weights, batch)
         # hess = func_dict["h_func"](these_params, batch)
         # losses = np.mean(loss, axis=1)
 
         # sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-        fits = ThryE
+        fits["ele"] = ThryE
 
         for k in all_params.keys():
             all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
@@ -78,6 +86,7 @@ def recalculate_with_chosen_weights(
                 "i_data": all_data["i_data"][inds],
                 "i_amps": all_data["i_amps"][inds],
                 "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
             }
 
             if config["optimizer"]["method"] == "adam":
@@ -85,17 +94,19 @@ def recalculate_with_chosen_weights(
             else:
                 these_weights = best_weights[i_batch]
 
-            loss, sqds, used_points, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
+            loss, sqds, used_points, [ThryE, ThryI, params] = func_dict["array_loss_fn"](these_weights, batch)
             these_params = func_dict["get_active_params"](these_weights, batch)
             if calc_sigma:
                 hess = func_dict["h_func"](these_params, batch)
             # print(hess)
 
             losses[inds] = loss
-            sqdevs[inds] = sqds
+            sqdevs["ele"][inds] = sqds["ele"]
+            sqdevs["ion"][inds] = sqds["ion"]
             if calc_sigma:
                 sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-            fits[inds] = ThryE
+            fits["ele"][inds] = ThryE
+            fits["ion"][inds] = ThryI
 
             for k in all_params.keys():
                 all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
@@ -126,7 +137,7 @@ def get_sigmas(keys, hess, batch_size):
 def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weights, func_dict, sa, raw_weights=None):
     t1 = time.time()
 
-    if config["other"]["extraoptions"]["spectype"] != "angular_full":
+    if config["other"]["extraoptions"]["spectype"] != "angular_full" and config["other"]["refit"]:
         losses_init, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
             config, batch_indices, all_data, best_weights, func_dict, calc_sigma=False, raw_weights=raw_weights
         )
@@ -146,6 +157,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
                 "i_data": np.reshape(all_data["i_data"][i], (1, -1)),
                 "i_amps": np.reshape(all_data["i_amps"][i], (1, -1)),
                 "noise_e": np.reshape(config["other"]["PhysParams"]["noiseE"][i], (1, -1)),
+                "noise_i": np.reshape(config["other"]["PhysParams"]["noiseI"][i], (1, -1)),
             }
 
             func_dict_refit = get_loss_function(config, sa, batch)
@@ -231,7 +243,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             
             used_points = used_points * sqdevs.shape[1]
             red_losses = np.sum(losses) / (1.1 * (used_points - len(all_params)))
-            mlflow.log_metrics({"Total reduced loss": float(red_losses)})
+            mlflow.log_metrics({"Totgit ced loss": float(red_losses)})
 
             # Create lineout images
             os.makedirs(os.path.join(td, "lineouts"))
@@ -290,29 +302,50 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             final_params = pandas.DataFrame(all_params)
             final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
 
+            losses[losses>1e10]=1e10
+            red_losses = losses / (1.1 * (used_points - len(all_params)))
+            loss_inds = losses.flatten().argsort()[::-1]
+            sorted_losses = losses[loss_inds]
+            sorted_redchi = red_losses[loss_inds]
+            
+            #this wont work for ion+electron fitting (just electrons will be plotted)
+            if config["other"]["extraoptions"]["load_ion_spec"]:
+                coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), (
+                    "Wavelength",
+                    all_axes["iaw_y"],
+                )
+                dat = {"fit": fits["ion"], "data": all_data["i_data"]}
+                sorted_fits = fits["ion"][loss_inds]
+                sorted_data = all_data["i_data"][loss_inds]
+                sorted_sqdev = sqdevs["ion"][loss_inds]
+                y_axis = all_axes["iaw_y"]
+            if config["other"]["extraoptions"]["load_ele_spec"]:
+                coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), (
+                    "Wavelength",
+                    all_axes["epw_y"],
+                ) 
+                dat = {"fit": fits["ele"], "data": all_data["e_data"]}
+                sorted_fits = fits["ele"][loss_inds]
+                sorted_data = all_data["e_data"][loss_inds]
+                sorted_sqdev = sqdevs["ele"][loss_inds]
+                y_axis = all_axes["epw_y"]
+                
             # fit vs data storage and plot
-            coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), (
-                "Wavelength",
-                all_axes["epw_y"],
-            )  # replace with true wavelength axis
-            dat = {"fit": fits, "data": all_data["e_data"]}
             savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
             savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
 
             fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-            clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 11)
+            #clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 11)
+            clevs = np.linspace(0, 300, 11)
             savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
             savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
             fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
             
-            red_losses = losses / (1.1 * (used_points - len(all_params)))
-
-            # print(loss)
-            # print(used_points)
-            # print(len(all_params))
-            # print(red_losses)
 
             fig, ax = plt.subplots(1, 2, figsize=(12, 4), tight_layout=True)
+            if "red_losses_init" not in locals():
+                red_losses_init = red_losses
+                losses_init = losses
             ax[0].hist([red_losses_init, red_losses], 40)
             # ax[0].hist(red_losses, 128)
             ax[0].set_yscale("log")
@@ -329,13 +362,6 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             ax[1].grid()
             fig.savefig(os.path.join(td, "error_hist.png"), bbox_inches="tight")
 
-            loss_inds = losses.flatten().argsort()[::-1]
-            sorted_losses = losses[loss_inds]
-            sorted_fits = fits[loss_inds]
-            sorted_data = all_data["e_data"][loss_inds]
-            sorted_sqdev = sqdevs[loss_inds]
-            sorted_redchi = red_losses[loss_inds]
-
             os.makedirs(os.path.join(td, "worst"))
             os.makedirs(os.path.join(td, "best"))
 
@@ -347,7 +373,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
                 td,
                 config,
                 loss_inds,
-                all_axes["epw_y"],
+                y_axis,
                 sorted_sqdev,
                 sorted_redchi,
             )
@@ -357,79 +383,79 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             )
             sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
 
-            ne_vals = pandas.Series(final_params["ne"])
-            ne_std = ne_vals.rolling(5, min_periods=1, center=True).std()
-            Te_vals = pandas.Series(final_params["Te"])
-            Te_std = Te_vals.rolling(5, min_periods=1, center=True).std()
-            m_vals = pandas.Series(final_params["m"])
-            m_std = m_vals.rolling(5, min_periods=1, center=True).std()
+#             ne_vals = pandas.Series(final_params["ne"])
+#             ne_std = ne_vals.rolling(5, min_periods=1, center=True).std()
+#             Te_vals = pandas.Series(final_params["Te"])
+#             Te_std = Te_vals.rolling(5, min_periods=1, center=True).std()
+#             m_vals = pandas.Series(final_params["m"])
+#             m_std = m_vals.rolling(5, min_periods=1, center=True).std()
 
-            # print(final_params)
-            # print(sigmas_ds)
-            # ne, Te, m plots with errorbars
-            fig, ax = plt.subplots(1, 3, figsize=(15, 4))
-            lineouts = np.array(config["data"]["lineouts"]["val"])
-            ax[0].plot(lineouts, final_params["ne"])
-            ax[0].fill_between(
-                lineouts,
-                (final_params["ne"] - 3 * sigmas_ds.ne),
-                (final_params["ne"] + 3 * sigmas_ds.ne),
-                color="b",
-                alpha=0.1,
-            )
-            ax[0].fill_between(
-                lineouts,
-                (final_params["ne"] - 3 * ne_std.values),
-                (final_params["ne"] + 3 * ne_std.values),
-                color="r",
-                alpha=0.1,
-            )
-            ax[0].set_xlabel("lineout", fontsize=14)
-            ax[0].grid()
-            ax[0].set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
-            ax[0].set_title("$n_e$(t)", fontsize=14)
+#             # print(final_params)
+#             # print(sigmas_ds)
+#             # ne, Te, m plots with errorbars
+#             fig, ax = plt.subplots(1, 3, figsize=(15, 4))
+#             lineouts = np.array(config["data"]["lineouts"]["val"])
+#             ax[0].plot(lineouts, final_params["ne"])
+#             ax[0].fill_between(
+#                 lineouts,
+#                 (final_params["ne"] - 3 * sigmas_ds.ne),
+#                 (final_params["ne"] + 3 * sigmas_ds.ne),
+#                 color="b",
+#                 alpha=0.1,
+#             )
+#             ax[0].fill_between(
+#                 lineouts,
+#                 (final_params["ne"] - 3 * ne_std.values),
+#                 (final_params["ne"] + 3 * ne_std.values),
+#                 color="r",
+#                 alpha=0.1,
+#             )
+#             ax[0].set_xlabel("lineout", fontsize=14)
+#             ax[0].grid()
+#             ax[0].set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
+#             ax[0].set_title("$n_e$(t)", fontsize=14)
 
-            ax[1].plot(lineouts, final_params["Te"])
-            ax[1].fill_between(
-                lineouts,
-                (final_params["Te"] - 3 * sigmas_ds.Te),
-                (final_params["Te"] + 3 * sigmas_ds.Te),
-                color="b",
-                alpha=0.1,
-            )
-            ax[1].fill_between(
-                lineouts,
-                (final_params["Te"] - 3 * Te_std.values),
-                (final_params["Te"] + 3 * Te_std.values),
-                color="r",
-                alpha=0.1,
-            )
-            ax[1].set_xlabel("lineout", fontsize=14)
-            ax[1].grid()
-            ax[1].set_ylim(0.8 * np.min(final_params["Te"]), 1.2 * np.max(final_params["Te"]))
-            ax[1].set_title("$T_e$(t)", fontsize=14)
+#             ax[1].plot(lineouts, final_params["Te"])
+#             ax[1].fill_between(
+#                 lineouts,
+#                 (final_params["Te"] - 3 * sigmas_ds.Te),
+#                 (final_params["Te"] + 3 * sigmas_ds.Te),
+#                 color="b",
+#                 alpha=0.1,
+#             )
+#             ax[1].fill_between(
+#                 lineouts,
+#                 (final_params["Te"] - 3 * Te_std.values),
+#                 (final_params["Te"] + 3 * Te_std.values),
+#                 color="r",
+#                 alpha=0.1,
+#             )
+#             ax[1].set_xlabel("lineout", fontsize=14)
+#             ax[1].grid()
+#             ax[1].set_ylim(0.8 * np.min(final_params["Te"]), 1.2 * np.max(final_params["Te"]))
+#             ax[1].set_title("$T_e$(t)", fontsize=14)
 
-            ax[2].plot(lineouts, final_params["m"])
-            ax[2].fill_between(
-                lineouts,
-                (final_params["m"] - 3 * sigmas_ds.m),
-                (final_params["m"] + 3 * sigmas_ds.m),
-                color="b",
-                alpha=0.1,
-            )
-            ax[2].fill_between(
-                lineouts,
-                (final_params["m"] - 3 * m_std.values),
-                (final_params["m"] + 3 * m_std.values),
-                color="r",
-                alpha=0.1,
-            )
-            ax[2].set_xlabel("lineout", fontsize=14)
-            ax[2].grid()
-            ax[2].set_ylim(0.8 * np.min(final_params["m"]), 1.2 * np.max(final_params["m"]))
-            ax[2].set_title("$m$(t)", fontsize=14)
+#             ax[2].plot(lineouts, final_params["m"])
+#             ax[2].fill_between(
+#                 lineouts,
+#                 (final_params["m"] - 3 * sigmas_ds.m),
+#                 (final_params["m"] + 3 * sigmas_ds.m),
+#                 color="b",
+#                 alpha=0.1,
+#             )
+#             ax[2].fill_between(
+#                 lineouts,
+#                 (final_params["m"] - 3 * m_std.values),
+#                 (final_params["m"] + 3 * m_std.values),
+#                 color="r",
+#                 alpha=0.1,
+#             )
+#             ax[2].set_xlabel("lineout", fontsize=14)
+#             ax[2].grid()
+#             ax[2].set_ylim(0.8 * np.min(final_params["m"]), 1.2 * np.max(final_params["m"]))
+#             ax[2].set_title("$m$(t)", fontsize=14)
 
-            fig.savefig(os.path.join(td, "learned_parameters.png"), bbox_inches="tight")
+#             fig.savefig(os.path.join(td, "learned_parameters.png"), bbox_inches="tight")
 
             mlflow.log_artifacts(td)
             mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})

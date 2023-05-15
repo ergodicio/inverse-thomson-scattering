@@ -127,6 +127,9 @@ def fit(config):
                 "noise_e": config["other"]["PhysParams"]["noiseE"][
                     config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
                 ],
+                "noise_i": config["other"]["PhysParams"]["noiseI"][
+                    config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+                ],
             }
             func_dict = get_loss_function(config, sa, test_batch)
             jaxopt_kwargs = dict(
@@ -192,6 +195,7 @@ def fit(config):
                             "data": all_data["data"][inds],
                             "amps": all_data["amps"][inds],
                             "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                            "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
                         }
                         weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
                         epoch_loss += opt_state.value
@@ -220,6 +224,9 @@ def fit(config):
                 "i_data": all_data["i_data"],
                 "i_amps": all_data["i_amps"],
                 "noise_e": config["other"]["PhysParams"]["noiseE"][
+                    config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+                ],
+                "noise_i": config["other"]["PhysParams"]["noiseI"][
                     config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
                 ],
             }
@@ -275,6 +282,7 @@ def fit(config):
                         "i_data": all_data["i_data"][inds],
                         "i_amps": all_data["i_amps"][inds],
                         "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                        "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
                     }
                     func_dict = get_loss_function(config, sa, batch)
 
@@ -286,10 +294,11 @@ def fit(config):
                         jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                         # hess=hess_fn if config["optimizer"]["hessian"] else None,
                         bounds=func_dict["bounds"],
-                        options={"disp": True},
+                        options={"disp": True, "maxiter": 100},
                     )
                     best_weights[i_batch] = func_dict["unravel_pytree"](res["x"])
                     overall_loss += res["fun"]
+                raw_weights = best_weights
         mlflow.log_metrics({"overall loss": float(overall_loss)})
 
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
