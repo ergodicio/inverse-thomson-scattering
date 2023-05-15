@@ -243,7 +243,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             
             used_points = used_points * sqdevs.shape[1]
             red_losses = np.sum(losses) / (1.1 * (used_points - len(all_params)))
-            mlflow.log_metrics({"Totgit ced loss": float(red_losses)})
+            mlflow.log_metrics({"Total reduced loss": float(red_losses)})
 
             # Create lineout images
             os.makedirs(os.path.join(td, "lineouts"))
