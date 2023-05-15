@@ -203,60 +203,32 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
             savedata["data"] = savedata["data"].T
             savedata["fit"] = savedata["fit"].T
-
+            
+            angs, wavs = np.meshgrid(all_axes["epw_x"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"]], all_axes["epw_y"])
+            
             # Create fit and data image
             fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
             clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 21)
-            ax[0].imshow(
+            ax[0].pcolormesh(angs, wavs,
                 savedata["fit"],
+                shading = 'nearest',
                 cmap="gist_ncar",
                 vmin=np.amin(savedata["data"]),
                 vmax=np.amax(savedata["data"]),
-                aspect="auto",
             )
-            ax[1].imshow(
+            ax[0].set_xlabel("Angle (degrees)")
+            ax[0].set_ylabel("Wavelength (nm)")
+            ax[1].pcolormesh(angs, wavs,
                 savedata["data"],
+                shading = 'nearest',
                 cmap="gist_ncar",
                 vmin=np.amin(savedata["data"]),
                 vmax=np.amax(savedata["data"]),
-                aspect="auto",
             )
+            ax[1].set_xlabel("Angle (degrees)")
+            ax[1].set_ylabel("Wavelength (nm)")
             fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
-
-            #             #Recalculate loss
-            #             loss = 0
-            #             used_points = 0
-
-            #             if config["other"]["extraoptions"]["fit_EPWb"]:
-            #                 sqdevb = np.square(savedata["data"] - savedata["fit"]) / np.abs(savedata["data"])
-            #                 sqdevb = np.where(
-            #                     (all_axes["epw_y"] > config["data"]["fit_rng"]["blue_min"])
-            #                     & (all_axes["epw_y"] < config["data"]["fit_rng"]["blue_max"]),
-            #                     sqdevb,
-            #                     0.0,
-            #                 )
-            #                 used_points += np.sum(
-            #                     (all_axes["epw_y"] > config["data"]["fit_rng"]["blue_min"])
-            #                     & (all_axes["epw_y"] < config["data"]["fit_rng"]["blue_max"])
-            #                 )
-            #                 loss += np.sum(sqdevb, axis=1)
-
-            #             if config["other"]["extraoptions"]["fit_EPWr"]:
-            #                 sqdevr = np.square(savedata["data"] - savedata["fit"]) / np.abs(savedata["data"])
-            #                 sqdevr = np.where(
-            #                     (all_axes["epw_y"] > config["data"]["fit_rng"]["red_min"])
-            #                     & (all_axes["epw_y"] < config["data"]["fit_rng"]["red_max"]),
-            #                     sqdevr,
-            #                     0.0,
-            #                 )
-            #                 # print(sqdev[1,350:620])
-            #                 used_points += np.sum(
-            #                     (all_axes["epw_y"] > config["data"]["fit_rng"]["red_min"])
-            #                     & (all_axes["epw_y"] < config["data"]["fit_rng"]["red_max"])
-            #                 )
-            #                 loss += np.sum(sqdevr, axis=1)
-
-            #             sqdev = sqdevb+sqdevr
+            
             used_points = used_points * sqdevs.shape[1]
             red_losses = np.sum(losses) / (1.1 * (used_points - len(all_params)))
             mlflow.log_metrics({"Total reduced loss": float(red_losses)})
@@ -271,9 +243,12 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
                 ax[0].plot(all_axes["epw_y"], np.squeeze(savedata["data"][:, i]), label="Data")
                 ax[0].plot(all_axes["epw_y"], np.squeeze(savedata["fit"][:, i]), label="Fit")
                 ax[0].set_title(titlestr, fontsize=14)
+                ax[0].set_ylabel("Amplitude (arb. units)")
                 ax[0].legend(fontsize=14)
                 ax[0].grid()
                 ax[1].plot(all_axes["epw_y"], np.squeeze(sqdevs[i, :]), label="Residual")
+                ax[1].set_ylabel("$\chi^2_i$")
+                ax[1].set_xlabel("Wavelength (nm)")
                 ax[1].grid()
                 fig.savefig(os.path.join(td, "lineouts", filename), bbox_inches="tight")
                 plt.close(fig)
@@ -329,40 +304,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
             savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
             fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
-
-            #             loss = 0
-            #             used_points = 0
-
-            #             if config["other"]["extraoptions"]["fit_EPWb"]:
-            #                 sqdevb = np.square(savedata["data"] - savedata["fit"]) / np.abs(savedata["data"])
-            #                 sqdevb = np.where(
-            #                     (all_axes["epw_y"] > config["data"]["fit_rng"]["blue_min"])
-            #                     & (all_axes["epw_y"] < config["data"]["fit_rng"]["blue_max"]),
-            #                     sqdevb,
-            #                     0.0,
-            #                 )
-            #                 used_points += np.sum(
-            #                     (all_axes["epw_y"] > config["data"]["fit_rng"]["blue_min"])
-            #                     & (all_axes["epw_y"] < config["data"]["fit_rng"]["blue_max"])
-            #                 )
-            #                 loss += np.sum(sqdevb, axis=1)
-
-            #             if config["other"]["extraoptions"]["fit_EPWr"]:
-            #                 sqdevr = np.square(savedata["data"] - savedata["fit"]) / np.abs(savedata["data"])
-            #                 sqdevr = np.where(
-            #                     (all_axes["epw_y"] > config["data"]["fit_rng"]["red_min"])
-            #                     & (all_axes["epw_y"] < config["data"]["fit_rng"]["red_max"]),
-            #                     sqdevr,
-            #                     0.0,
-            #                 )
-            #                 # print(sqdev[1,350:620])
-            #                 used_points += np.sum(
-            #                     (all_axes["epw_y"] > config["data"]["fit_rng"]["red_min"])
-            #                     & (all_axes["epw_y"] < config["data"]["fit_rng"]["red_max"])
-            #                 )
-            #                 loss += np.sum(sqdevr, axis=1)
-
-            #             sqdev = sqdevb+sqdevr
+            
             red_losses = losses / (1.1 * (used_points - len(all_params)))
 
             # print(loss)

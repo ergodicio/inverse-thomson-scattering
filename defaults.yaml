@@ -112,8 +112,8 @@ data:
     fit_rng:
         blue_min: 450
         blue_max: 510
-        red_min: 540
-        red_max: 625
+        red_min: 545
+        red_max: 650
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1

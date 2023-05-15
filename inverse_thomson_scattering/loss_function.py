@@ -167,7 +167,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 self.nn_reparameterizer = NNReparameterizer(cfg, num_spectra)
 
             self.crop_window = cfg["other"]["crop_window"]
-            self.smooth_window_len = round(cfg["velocity"].size / 10) * 2
+            self.smooth_window_len = round(round(cfg["velocity"].size / 10) * 1.5)
 
             if cfg["dist_fit"]["window"]["type"] == "hamming":
                 self.w = jnp.hamming(self.smooth_window_len)
@@ -275,8 +275,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                         these_params[param_name] * self.cfg["units"]["norms"][param_name]
                         + self.cfg["units"]["shifts"][param_name]
                     )
-
-            these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"][0]))[None, :])
+                    if param_name == "fe":
+                        these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"][0]))[None, :])
 
             return these_params
 

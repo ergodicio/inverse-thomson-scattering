@@ -50,17 +50,17 @@ if __name__ == "__main__":
     config["parameters"]["lam"]["val"] = 524.5
     config["parameters"]["Te"]["val"] = 1.0
     config["parameters"]["ne"]["val"] = 0.5  # 0.25
-    config["parameters"]["m"]["val"] = 3.5  # 2.2
+    config["parameters"]["m"]["val"] = 4.0  # 2.2
 
     config["parameters"]["m"]["active"] = False
     config["parameters"]["fe"]["active"] = True
     config["parameters"]["fe"]["ub"] = -0.5
     config["parameters"]["fe"]["lb"] = -50
-    config["parameters"]["fe"]["length"] = 256
+    config["parameters"]["fe"]["length"] = 64
 
     config["data"]["lineouts"]["type"] = "range"
     config["data"]["lineouts"]["start"] = 90
-    config["data"]["lineouts"]["end"] = 1015
+    config["data"]["lineouts"]["end"] = 950
 
     config["data"]["background"]["type"] = "Fit"
     config["data"]["background"]["slice"] = 94477
@@ -69,12 +69,12 @@ if __name__ == "__main__":
     # config["data"]["lineouts"]["skip"] = int(18)
     # config["data"]["lineouts"]["end"] = int(680)
     config["optimizer"]["refine_factor"] = 2
-    config["optimizer"]["num_mins"] = 1
-    config["optimizer"]["batch_size"] = int(925)  # this should be automatic
+    config["optimizer"]["num_mins"] = 3
+    config["optimizer"]["batch_size"] = int(config["data"]["lineouts"]["end"]-config["data"]["lineouts"]["start"])  # this should be automatic
     # config["optimizer"]["method"] = "adam"
     config["nn"]["use"] = False
     # config["optimizer"]["grad_method"] = str(dd)
-    config["mlflow"]["run"] = f"hamming-natural-nv256"
+    config["mlflow"]["run"] = f"256pts_3min_refine2_modified_red-range_1.5-smoothing-window"
     one_run(config)
 
     # raise ValueError
