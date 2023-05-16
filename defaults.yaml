@@ -100,12 +100,12 @@ other:
     iawfilter: [1, 4, 24, 528]
     CCDsize: [1024, 1024]
     flatbg: 0
-    gain: 1
+    gain: 135
     points_per_pixel: 2
     ang_res_unit: 10
     lam_res_unit: 5
     refit: True
-    refit_thresh: 25
+    refit_thresh: 0.25
 
 data:
     shotnum: 101675
@@ -114,7 +114,7 @@ data:
         blue_min: 450
         blue_max: 510
         red_min: 545
-        red_max: 650
+        red_max: 600
         iaw_min: 526
         iaw_max: 527
     bgscaleE: 1.0

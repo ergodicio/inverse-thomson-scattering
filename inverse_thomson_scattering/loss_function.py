@@ -410,8 +410,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 0.0,
             )
             used_points += jnp.sum(
-                    (lamAxisE > config["data"]["fit_rng"]["blue_min"])
-                    & (lamAxisE < config["data"]["fit_rng"]["blue_max"]))
+                    (lamAxisE[0,:] > config["data"]["fit_rng"]["blue_min"])
+                    & (lamAxisE[0,:] < config["data"]["fit_rng"]["blue_max"]))
 
             loss += jnp.sum(sqdev_e_b, axis=1)
             sqdev["ele"] += sqdev_e_b
@@ -424,13 +424,14 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 0.0,
             )
             used_points += jnp.sum(
-                    (lamAxisE > config["data"]["fit_rng"]["red_min"])
-                    & (lamAxisE < config["data"]["fit_rng"]["red_max"]))
+                    (lamAxisE[0,:] > config["data"]["fit_rng"]["red_min"])
+                    & (lamAxisE[0,:] < config["data"]["fit_rng"]["red_max"]))
 
             loss += jnp.sum(sqdev_e_r, axis=1)
             sqdev["ele"] += sqdev_e_r
 
         loss = loss#*e_norm
+        print(lamAxisE.shape)
 
         return loss, sqdev, used_points, [ThryE, ThryI, params]
 

@@ -1,26 +1,26 @@
 parameters:
     amp1:
         val: 1.0
-        active: False
+        active: True
         lb: 0.01
         ub: 3.75
     amp2:
         val: 1.0
-        active: False
+        active: True
         lb: 0.01
         ub: 3.75
     amp3:
         val: 1.
-        active: True
+        active: False
         lb: 0.
         ub: 10.
     lam:
-        val: 526.5
-        active: False
+        val: 524.5
+        active: True
         lb: 523.
         ub: 528.
     Te:
-        val: .10
+        val: 1.0
         active: True
         lb: 0.01
         ub: 1.5
@@ -31,13 +31,13 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: .01
-        active: True
+        val: .2
+        active: False
         lb: 0.001
         ub: 3.
     Z:
         val: 6.
-        active: True
+        active: False
         lb: 1.
         ub: 25.
     A:
@@ -45,17 +45,17 @@ parameters:
         active: False
     ud:
         val: 0.0
-        active: True
+        active: False
         lb: -2.0
         ub: 2.0
     Va:
         val: 0.0
-        active: True
+        active: False
         lb: -2.0
         ub: 2.0
     ne:
-        val: 0.4
-        active: False
+        val: 0.5
+        active: True
         lb: .001
         ub: 1.
     ne_gradient:
@@ -66,7 +66,7 @@ parameters:
         num_grad_points: 1
     m:
         val: 2.0
-        active: False
+        active: True
         lb: 2.
         ub: 5.
     fe:
@@ -77,7 +77,7 @@ parameters:
             DLM:
         lb: -100.
         ub: -0.5
-        fe_decrease_strict: True
+        fe_decrease_strict: False
     blur:
         val: []
         active: False
@@ -93,16 +93,16 @@ parameters:
         active: False
 
 data:
-    shotnum: 108135
+    shotnum: 101675
 
 other:
     extraoptions:
-        load_ion_spec: True
-        load_ele_spec: False
-        fit_IAW: True
-        fit_EPWb: False
-        fit_EPWr: False
+        load_ion_spec: False
+        load_ele_spec: True
+        fit_IAW: False
+        fit_EPWb: True
+        fit_EPWr: True
         plot_raw_data: True
 
 mlflow:
-    experiment: inverse-thomson-scattering
+    experiment: ts-batch_size-scaling

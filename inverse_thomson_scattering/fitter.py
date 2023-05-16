@@ -294,7 +294,7 @@ def fit(config):
                         jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                         # hess=hess_fn if config["optimizer"]["hessian"] else None,
                         bounds=func_dict["bounds"],
-                        options={"disp": True, "maxiter": 100},
+                        options={"disp": True},
                     )
                     best_weights[i_batch] = func_dict["unravel_pytree"](res["x"])
                     overall_loss += res["fun"]

@@ -146,6 +146,8 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
         red_losses_init = losses_init / (1.1 * (used_points - len(all_params)))
         true_batch_size = config["optimizer"]["batch_size"]
         config["optimizer"]["batch_size"] = 1
+        mlflow.log_metrics({"number of fits": len(batch_indices.flatten())})
+        mlflow.log_metrics({"number of refits": int(np.sum(red_losses_init > config["other"]["refit_thresh"]))})
 
         for i in batch_indices.flatten()[red_losses_init > config["other"]["refit_thresh"]]:
             if i == 0:
@@ -190,10 +192,13 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
 
         config["optimizer"]["batch_size"] = true_batch_size
 
+    
+    mlflow.log_metrics({"refitting time": round(time.time() - t1, 2)})
     losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
         config, batch_indices, all_data, best_weights, func_dict, calc_sigma=True, raw_weights=raw_weights
     )
 
+    
     mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
     mlflow.set_tag("status", "plotting")
     t1 = time.time()
@@ -307,6 +312,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             loss_inds = losses.flatten().argsort()[::-1]
             sorted_losses = losses[loss_inds]
             sorted_redchi = red_losses[loss_inds]
+            mlflow.log_metrics({"number of fits above threshold after refit": int(np.sum(red_losses > config["other"]["refit_thresh"]))})
             
             #this wont work for ion+electron fitting (just electrons will be plotted)
             if config["other"]["extraoptions"]["load_ion_spec"]:
@@ -335,8 +341,8 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
 
             fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-            #clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 11)
-            clevs = np.linspace(0, 300, 11)
+            clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 11)
+            #clevs = np.linspace(0, 300, 11)
             savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
             savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
             fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
@@ -362,6 +368,9 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             ax[1].grid()
             fig.savefig(os.path.join(td, "error_hist.png"), bbox_inches="tight")
 
+            losses_ds = pandas.DataFrame({"initial_losses": losses_init, "losses": losses, "initial_reduced_losses": red_losses_init, "reduced_losses": red_losses})
+            losses_ds.to_csv(os.path.join(td, "losses.csv"))
+            
             os.makedirs(os.path.join(td, "worst"))
             os.makedirs(os.path.join(td, "best"))
 
@@ -383,16 +392,16 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             )
             sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
 
-#             ne_vals = pandas.Series(final_params["ne"])
-#             ne_std = ne_vals.rolling(5, min_periods=1, center=True).std()
-#             Te_vals = pandas.Series(final_params["Te"])
-#             Te_std = Te_vals.rolling(5, min_periods=1, center=True).std()
-#             m_vals = pandas.Series(final_params["m"])
-#             m_std = m_vals.rolling(5, min_periods=1, center=True).std()
+            # ne_vals = pandas.Series(final_params["ne"])
+            # ne_std = ne_vals.rolling(5, min_periods=1, center=True).std()
+            # Te_vals = pandas.Series(final_params["Te"])
+            # Te_std = Te_vals.rolling(5, min_periods=1, center=True).std()
+            # m_vals = pandas.Series(final_params["m"])
+            # m_std = m_vals.rolling(5, min_periods=1, center=True).std()
 
-#             # print(final_params)
-#             # print(sigmas_ds)
-#             # ne, Te, m plots with errorbars
+            # print(final_params)
+            # print(sigmas_ds)
+            # ne, Te, m plots with errorbars
 #             fig, ax = plt.subplots(1, 3, figsize=(15, 4))
 #             lineouts = np.array(config["data"]["lineouts"]["val"])
 #             ax[0].plot(lineouts, final_params["ne"])
