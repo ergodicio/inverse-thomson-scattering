@@ -25,6 +25,12 @@
 	watch -n1 nvidia-smi
 ```
 
+## Input deck
+
+This code utilizes 2 input deck called `inputs.yaml` and `defaults.yaml`. The primary input deck `inputs.yaml` contains all the commonly altered options, things like which parameters are going to be fit, the initial values, the shotnumber and the lineouts you want to fit. The secondary input deck `defaults.yaml` contains additional options that rarely need to be altered and default values for all options.
+
+All fitting parameters are found in the `parameters:` section of the input deck. Each parameter has at last 4 atributes. `val` is the intial value used as a starting condition for the minimizer. `active` is a boolean determining if a papeter is to be fit, i.e `active: True` means a parameter with be fit and `active: True` means a parameter with be held constant at `val`. `lb` and `ub` are upper and lower bounds respectively for the parameters.
+
 ## Best practices for fitting
 
 It is generarly recommended start fitting data with a coarse resolution in order to identify the rough plasma conditions. These conditions can then be used as the initial conditions for a fine resolution fit.
