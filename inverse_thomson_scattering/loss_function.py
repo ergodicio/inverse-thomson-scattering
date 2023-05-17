@@ -387,7 +387,6 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         #normed_i_data = normed_batch["i_data"]
         #normed_e_data = normed_batch["e_data"]
         sqdev = {"ele": jnp.zeros(e_data.shape), "ion": jnp.zeros(i_data.shape)}
-        print(i_norm)
 
         if config["other"]["extraoptions"]["fit_IAW"]:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
@@ -431,7 +430,6 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             sqdev["ele"] += sqdev_e_r
 
         loss = loss#*e_norm
-        print(lamAxisE.shape)
 
         return loss, sqdev, used_points, [ThryE, ThryI, params]
 
