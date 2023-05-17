@@ -101,6 +101,7 @@ def fit(config):
 
     """
     t1 = time.time()
+    mlflow.set_tag("status", "preprocessing")
     config = validate_inputs(config)
     # prepare data
     all_data, sa, all_axes = prepare.prepare_data(config)
@@ -112,6 +113,7 @@ def fit(config):
     mlflow.log_metrics({"setup_time": round(time.time() - t1, 2)})
 
     t1 = time.time()
+    mlflow.set_tag("status", "minimizing")
     if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
             config["optimizer"]["batch_size"] = 1
