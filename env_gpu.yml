@@ -9,7 +9,7 @@ dependencies:
   - ipykernel
   - cuda-nvcc
   - cudatoolkit==11.7.0
-  - pip==22.3.1
+  - pip
   - pip:
       # works for regular pip packages
       - --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html

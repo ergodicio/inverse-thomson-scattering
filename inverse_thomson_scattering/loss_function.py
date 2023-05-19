@@ -223,7 +223,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         def get_active_params(self, batch):
             #print("in get_active_params")
             if self.cfg["nn"]["use"]:
-                all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
+                all_params = self.nn_reparameterizer(batch["data"][:, :, self.crop_window : -self.crop_window])
                 these_params = defaultdict(list)
                 for i_slice in range(self.batch_size):
                     # unpack all params which is an array that came out of the NN and into a dictionary that contains
@@ -265,7 +265,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         def __call__(self, batch):
             if self.cfg["nn"]["use"]:
-                these_params = self._init_nn_params_(batch)
+                these_params = self._init_nn_params_(batch["data"])
             else:
                 these_params = self._init_params_()
 
