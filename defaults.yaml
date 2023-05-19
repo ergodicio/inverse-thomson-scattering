@@ -93,6 +93,7 @@ other:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
+        plot_raw_data: False
     PhysParams:
         background: [0, 0]
         norm: 0
@@ -143,7 +144,7 @@ optimizer:
     y_norm: True
     x_norm: False
     grad_method: AD
-    batch_size: 2
+    batch_size: 4
     num_epochs: 200
     learning_rate: 1.0e-4
     parameter_norm: True
