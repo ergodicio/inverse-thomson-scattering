@@ -83,11 +83,9 @@ parameters:
 
 other:
     crop_window: 256
-    active: False
-    bgscaleE: 1.0
-    bgscaleI: 0.1
-    bgshotmult: 1
-    CCDsize: [1024, 1024]
+    BinWidth: 10
+    NumBinInRng: 0
+    TotalNumBin: 1023
     expandedions: False
     extraoptions:
         load_ion_spec: False
@@ -95,49 +93,71 @@ other:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
-    flatbg: 0
-    fit_rng:
-        blue_min: 450
-        blue_max: 510
-        red_min: 540
-        red_max: 625
-    gain: 1
     PhysParams:
         background: [0, 0]
         norm: 0
     iawoff: 0
     iawfilter: [1, 4, 24, 528]
-    points_per_pixel: 5
-    shotDay: 0
-
+    CCDsize: [1024, 1024]
+    flatbg: 0
+    gain: 135
+    points_per_pixel: 2
+    ang_res_unit: 10
+    lam_res_unit: 5
+    refit: True
+    refit_thresh: 0.25
 
 data:
+    shotnum: 101675
+    shotDay: False
+    fit_rng:
+        blue_min: 450
+        blue_max: 510
+        red_min: 545
+        red_max: 600
+        iaw_min: 526
+        iaw_max: 527
+    bgscaleE: 1.0
+    bgscaleI: 0.1
+    bgshotmult: 1
+    dpixel: 2
     lineouts:
-        type: pixel
-        start: 450
-        end: 650
+        type:
+            pixel
+        start: 500
+        end: 502
         skip: 1
     background:
-        type: pixel
+        type:
+            pixel
         slice: 900
 
 
+    
 optimizer:
-    method: L-BFGS-B
+    # use adam for nn / stochastic gradient descent
+    # use L-BFGS-B for full batch / parameter learning
+    # although adam will work here too
+    method: l-bfgs-b
     hessian: False
-    y_norm: False
-    x_norm: True
+    y_norm: True
+    x_norm: False
     grad_method: AD
     batch_size: 2
-    num_epochs: 100
-    learning_rate: 1.0e-3
-
+    num_epochs: 200
+    learning_rate: 1.0e-4
+    parameter_norm: True
 
 nn:
-    use: True
-    conv_filters: 64|64|64|64|64
-    linear_widths: 16|8
+    use: false
+    conv_filters: 32|16|16 #|32|32
+    linear_widths: 32|16
 
+dist_fit:
+    window:
+        len: 256 #should be even
+        type: hamming # one of [hamming, hann, bartlett]
 
 mlflow:
     experiment: inverse-thomson-scattering
+    run: base

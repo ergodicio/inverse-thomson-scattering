@@ -24,17 +24,18 @@ def get_fit_model(config, sa, backend: str = "haiku"):
 
         # Add gradients to electron temperature and density just being applied to EPW
         cur_Te = jnp.linspace(
-            (1 - parameters["Te"]["gradient"] / 200) * parameters["Te"]["val"],
-            (1 + parameters["Te"]["gradient"] / 200) * parameters["Te"]["val"],
-            10,
+            (1 - parameters["Te_gradient"]["val"] / 200) * parameters["Te"]["val"],
+            (1 + parameters["Te_gradient"]["val"] / 200) * parameters["Te"]["val"],
+            parameters["Te_gradient"]["num_grad_points"]
         )
         cur_ne = jnp.linspace(
-            (1 - parameters["ne"]["gradient"] / 200) * parameters["ne"]["val"],
-            (1 + parameters["ne"]["gradient"] / 200) * parameters["ne"]["val"],
-            10,
+            (1 - parameters["ne_gradient"]["val"] / 200) * parameters["ne"]["val"],
+            (1 + parameters["ne_gradient"]["val"] / 200) * parameters["ne"]["val"],
+            parameters["Te_gradient"]["num_grad_points"]
         )
 
         fecur = jnp.exp(parameters["fe"]["val"])
+        #fecur = parameters["fe"]["val"]
         lam = parameters["lam"]["val"]
 
         if config["other"]["extraoptions"]["load_ion_spec"]:
@@ -49,7 +50,7 @@ def get_fit_model(config, sa, backend: str = "haiku"):
                 parameters["ud"]["val"],
                 sa["sa"],
                 (fecur, config["velocity"]),
-                526.5,  # TODO hardcoded
+                lam,
             )
 
             # remove extra dimensions and rescale to nm
@@ -108,16 +109,6 @@ def get_fit_model(config, sa, backend: str = "haiku"):
                 filterr = config["other"]["iawfilter"][3] + config["other"]["iawfilter"][2] / 2
 
                 if config["other"]["lamrangE"][0] < filterr and config["other"]["lamrangE"][1] > filterb:
-                    # TODO unused
-                    # if config["other"]["lamrangE"][0] < filterb:
-                    #     lamleft = jnp.argmin(jnp.abs(lamAxisE - filterb))
-                    # else:
-                    #     lamleft = 0
-                    #
-                    # if config["other"]["lamrangE"][1] > filterr:
-                    #     lamright = jnp.argmin(jnp.abs(lamAxisE - filterr))
-                    # else:
-                    #     lamright = lamAxisE.size
                     indices = (filterb < lamAxisE) & (filterr > lamAxisE)
                     modlE = jnp.where(indices, modlE * 10 ** (-config["other"]["iawfilter"][1]), modlE)
         else:
