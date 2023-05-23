@@ -108,6 +108,13 @@ other:
     refit: True
     refit_thresh: 0.25
 
+plotting:
+    n_sigmas: 3
+    rolling_std_width: 5
+    data_cbar_u: data
+    data_cbar_l: data
+    
+
 data:
     shotnum: 101675
     shotDay: False

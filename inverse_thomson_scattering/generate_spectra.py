@@ -40,12 +40,12 @@ def get_fit_model(config, sa, backend: str = "haiku"):
 
         if config["other"]["extraoptions"]["load_ion_spec"]:
             ThryI, lamAxisI = nonMaxwThomsonI_jax(
-                parameters["Te"]["val"],
+                cur_Te,
                 parameters["Ti"]["val"],
                 parameters["Z"]["val"],
                 parameters["A"]["val"],
                 parameters["fract"]["val"],
-                parameters["ne"]["val"] * jnp.array([1e20]),  # TODO hardcoded
+                cur_ne * jnp.array([1e20]),  # TODO hardcoded
                 parameters["Va"]["val"],
                 parameters["ud"]["val"],
                 sa["sa"],

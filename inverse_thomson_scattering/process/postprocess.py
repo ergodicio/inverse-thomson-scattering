@@ -341,7 +341,10 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
 
             fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-            clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 11)
+            clevs = np.linspace(
+                np.amin(savedata["data"]) if config["plotting"]["data_cbar_l"]=="data" else config["plotting"]["data_cbar_l"],
+                np.amax(savedata["data"]) if config["plotting"]["data_cbar_u"]=="data" else config["plotting"]["data_cbar_u"],
+                11)
             #clevs = np.linspace(0, 300, 11)
             savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
             savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
@@ -392,6 +395,32 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             )
             sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
 
+            
+            for param in all_params.keys():
+                vals = pandas.Series(final_params[param])
+                std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
+                fig, ax = plt.subplots(1, 1, figsize = (4,4))
+                lineouts = np.array(config["data"]["lineouts"]["val"])
+                ax.plot(lineouts, final_params[param])
+                ax.fill_between(
+                    lineouts,
+                    (final_params[param] - config["plotting"]["n_sigmas"] * sigmas_ds[param]),
+                    (final_params[param] + config["plotting"]["n_sigmas"] * sigmas_ds[param]),
+                    color="b",
+                    alpha=0.1,
+                )
+                ax.fill_between(
+                    lineouts,
+                    (final_params[param] - config["plotting"]["n_sigmas"] * std.values),
+                    (final_params[param] + config["plotting"]["n_sigmas"] * std.values),
+                    color="r",
+                    alpha=0.1,
+                )
+                ax.set_xlabel("lineout", fontsize=14)
+                ax.grid()
+                ax.set_ylim(0.8 * np.min(final_params[param]), 1.2 * np.max(final_params[param]))
+                ax.set_ylabel(param, fontsize=14)
+                fig.savefig(os.path.join(td, "learned_"+param+".png"), bbox_inches="tight")
             # ne_vals = pandas.Series(final_params["ne"])
             # ne_std = ne_vals.rolling(5, min_periods=1, center=True).std()
             # Te_vals = pandas.Series(final_params["Te"])
