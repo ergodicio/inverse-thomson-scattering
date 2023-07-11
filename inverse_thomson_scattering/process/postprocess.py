@@ -104,7 +104,11 @@ def recalculate_with_chosen_weights(
             sqdevs["ele"][inds] = sqds["ele"]
             sqdevs["ion"][inds] = sqds["ion"]
             if calc_sigma:
-                sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
+                try:
+                    sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
+                except:
+                    print("Unable to calculate sigmas from Hessian, fits likely did not converge")
+                    calc_sigma = False
             fits["ele"][inds] = ThryE
             fits["ion"][inds] = ThryI
 
@@ -195,7 +199,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
     
     mlflow.log_metrics({"refitting time": round(time.time() - t1, 2)})
     losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
-        config, batch_indices, all_data, best_weights, func_dict, calc_sigma=True, raw_weights=raw_weights
+        config, batch_indices, all_data, best_weights, func_dict, calc_sigma=config["other"]["calc_sigmas"], raw_weights=raw_weights
     )
 
     
@@ -316,7 +320,10 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             
             #this wont work for ion+electron fitting (just electrons will be plotted)
             if config["other"]["extraoptions"]["load_ion_spec"]:
-                coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), (
+                coords = (
+                    all_axes["x_label"], 
+                    np.array(all_axes["iaw_x"][config["data"]["lineouts"]["val"]])), 
+                (
                     "Wavelength",
                     all_axes["iaw_y"],
                 )
@@ -326,7 +333,8 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
                 sorted_sqdev = sqdevs["ion"][loss_inds]
                 y_axis = all_axes["iaw_y"]
             if config["other"]["extraoptions"]["load_ele_spec"]:
-                coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), (
+                coords = (all_axes["x_label"], 
+                    np.array(all_axes["epw_x"][config["data"]["lineouts"]["val"]])), (
                     "Wavelength",
                     all_axes["epw_y"],
                 ) 

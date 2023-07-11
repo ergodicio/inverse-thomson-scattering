@@ -429,7 +429,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             loss += jnp.sum(sqdev_e_r, axis=1)
             sqdev["ele"] += sqdev_e_r
 
-        loss = loss#*e_norm
+        loss = loss
 
         return loss, sqdev, used_points, [ThryE, ThryI, params]
 

@@ -26,13 +26,13 @@ def prepare_data(config: Dict) -> Dict:
     )
 
     # get scattering angles and weights
-    sa = get_scattering_angles(config["other"]["extraoptions"]["spectype"])
+    sa = get_scattering_angles(config)
 
     # Calibrate axes
     [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(
         config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
     )
-    all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI} 
+    all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI, "x_label": xlab} 
 
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
     if not config["other"]["extraoptions"]["load_ion_spec"]:
