@@ -4,6 +4,8 @@ import numpy as np
 import scipy.io as sio
 from os.path import join, exists
 
+from sa_table import sa_lookup
+
 def get_calibrations(shotNum, tstype, CCDsize):
     stddev = dict()
     # Dispersions and calibrations
@@ -142,103 +144,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
 
 def get_scattering_angles(config):
     if config["other"]["extraoptions"]["spectype"] != "angular":
-        if config["data"]["probe_beam"] == "P9":
-            # Scattering angle in degrees for OMEGA TIM6 TS
-            sa = dict(
-                sa=np.linspace(53.637560, 66.1191, 10),
-                weights=np.array(
-                    [
-                        0.00702671050853565,
-                        0.0391423809738300,
-                        0.0917976667717670,
-                        0.150308544660150,
-                        0.189541011666141,
-                        0.195351560740507,
-                        0.164271879645061,
-                        0.106526733030044,
-                        0.0474753389486960,
-                        0.00855817305526778,
-                    ]
-                ),
-            )
-        elif config["data"]["probe_beam"] == "B15":
-            # Scattering angle in degrees for OMEGA TIM6 TS
-            sa = dict(
-                sa=np.linspace(12.0404, 24.0132, 10),
-                weights=np.array(
-                    [
-                        0.0093239,
-                        0.04189,
-                        0.0912121,
-                        0.145579,
-                        0.182019,
-                        0.188055,
-                        0.163506,
-                        0.1104,
-                        0.0546822,
-                        0.0133327,
-                    ]
-                ),
-            )
-        elif config["data"]["probe_beam"] == "B23":
-            # Scattering angle in degrees for OMEGA TIM6 TS
-            sa = dict(
-                sa=np.linspace(72.281, 84.3307, 10),
-                weights=np.array(
-                    [
-                        0.00945903,
-                        0.0430611,
-                        0.0925634,
-                        0.146705,
-                        0.182694,
-                        0.1881,
-                        0.162876,
-                        0.109319,
-                        0.0530607,
-                        0.0121616,
-                    ]
-                ),
-            )
-        elif config["data"]["probe_beam"] == "B26":
-            # Scattering angle in degrees for OMEGA TIM6 TS
-            sa = dict(
-                sa=np.linspace(55.5636, 68.1058, 10),
-                weights=np.array(
-                    [
-                        0.00648619,
-                        0.0386019,
-                        0.0913923,
-                        0.150489,
-                        0.190622,
-                        0.195171,
-                        0.166389,
-                        0.105671,
-                        0.0470249,
-                        0.00815279,
-                    ]
-                ),
-            )
-        elif config["data"]["probe_beam"] == "B58":
-            # Scattering angle in degrees for OMEGA TIM6 TS
-            sa = dict(
-                sa=np.linspace(119.093, 131.666, 10),
-                weights=np.array(
-                    [
-                        0.00549525,
-                        0.0337372,
-                        0.0819783,
-                        0.140084,
-                        0.186388,
-                        0.19855,
-                        0.174136,
-                        0.117517,
-                        0.0527003,
-                        0.00941399,
-                    ]
-                ),
-            )
-        else:
-            raise NotImplmentedError("Other probe geometrries are not yet supported")
+        sa = sa_lookup(config["data"]["probe_beam"])
     else:
         # Scattering angle in degrees for Artemis
         imp = sio.loadmat(join("files", "angleWghtsFredfine.mat"), variable_names="weightMatrix")
