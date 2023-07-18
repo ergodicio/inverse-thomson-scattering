@@ -43,12 +43,25 @@ def get_calibrations(shotNum, tstype, CCDsize):
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
 
-        if shotNum <109000:
+        elif shotNum <108950:
             #these are calibrations for shot 108135
             EPWDisp = 0.4104
             IAWDisp = 0.005749
             EPWoff = 319.3
             IAWoff = 523.3438  # 522.90
+            stddev["spect_stddev_ion"] = 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
+            stddev["spect_stddev_ele"] = 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
+
+            # Sweep speed calculated from 5 Ghz comb (should be updated, date unknown)
+            magI = 5  # (ps / px) this is just a rough guess
+            magE = 5  # (ps / px) this is just a rough guess
+        
+        elif shotNum <108990:
+            #these are calibrations for shots 108964-
+            EPWDisp = 0.4104
+            IAWDisp = 0.00959
+            EPWoff = 135.0
+            IAWoff = 346.09
             stddev["spect_stddev_ion"] = 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
             stddev["spect_stddev_ele"] = 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
 
@@ -148,7 +161,7 @@ def get_scattering_angles(config):
                     ]
                 ),
             )
-        if config["data"]["probe_beam"] == "B15":
+        elif config["data"]["probe_beam"] == "B15":
             # Scattering angle in degrees for OMEGA TIM6 TS
             sa = dict(
                 sa=np.linspace(12.0404, 24.0132, 10),
@@ -167,7 +180,7 @@ def get_scattering_angles(config):
                     ]
                 ),
             )
-        if config["data"]["probe_beam"] == "B23":
+        elif config["data"]["probe_beam"] == "B23":
             # Scattering angle in degrees for OMEGA TIM6 TS
             sa = dict(
                 sa=np.linspace(72.281, 84.3307, 10),
@@ -186,7 +199,7 @@ def get_scattering_angles(config):
                     ]
                 ),
             )
-        if config["data"]["probe_beam"] == "B26":
+        elif config["data"]["probe_beam"] == "B26":
             # Scattering angle in degrees for OMEGA TIM6 TS
             sa = dict(
                 sa=np.linspace(55.5636, 68.1058, 10),
@@ -205,7 +218,7 @@ def get_scattering_angles(config):
                     ]
                 ),
             )
-        if config["data"]["probe_beam"] == "B58":
+        elif config["data"]["probe_beam"] == "B58":
             # Scattering angle in degrees for OMEGA TIM6 TS
             sa = dict(
                 sa=np.linspace(119.093, 131.666, 10),

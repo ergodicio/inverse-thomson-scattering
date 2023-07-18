@@ -320,13 +320,13 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             
             #this wont work for ion+electron fitting (just electrons will be plotted)
             if config["other"]["extraoptions"]["load_ion_spec"]:
-                coords = (
-                    all_axes["x_label"], 
-                    np.array(all_axes["iaw_x"][config["data"]["lineouts"]["val"]])), 
-                (
+                coords = (all_axes["x_label"], 
+                    np.array(all_axes["iaw_x"][config["data"]["lineouts"]["val"]])), (
                     "Wavelength",
                     all_axes["iaw_y"],
                 )
+                #print(coords)
+                #print(all_axes["x_label"])
                 dat = {"fit": fits["ion"], "data": all_data["i_data"]}
                 sorted_fits = fits["ion"][loss_inds]
                 sorted_data = all_data["i_data"][loss_inds]

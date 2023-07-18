@@ -15,15 +15,15 @@ parameters:
         lb: 0.01
         ub: 3.75
     lam:
-        val: 524.5
+        val: 351
         active: True
-        lb: 523.
-        ub: 528.
+        lb: 350
+        ub: 353.
     Te:
         val: 0.5
         active: True
-        lb: 0.01
-        ub: 1.5
+        lb: 0.35
+        ub: 0.85
     Te_gradient:
         val: 0.0
         active: False
@@ -31,18 +31,19 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: .2
-        active: False
-        lb: 0.001
-        ub: 3.
+        val: 0.1
+        active: True
+        lb: 0.05
+        ub: 0.6
     Z:
-        val: 6.
-        active: False
-        lb: 1.
-        ub: 25.
+        val: 5.
+        active: True
+        lb: 3.5
+        ub: 6.8
     A:
         val: 14.
         active: False
+
     ud:
         val: 0.0
         active: False
@@ -51,13 +52,13 @@ parameters:
     Va:
         val: 0.0
         active: False
-        lb: -2.0
-        ub: 2.0
+        lb: -1.1
+        ub: 2.5
     ne:
-        val: 0.2
+        val: 0.5
         active: True
-        lb: .001
-        ub: 1.
+        lb: .4
+        ub: 0.7
     ne_gradient:
         val: 0.
         active: False
@@ -67,8 +68,8 @@ parameters:
     m:
         val: 2.0
         active: True
-        lb: 2.
-        ub: 5.
+        lb: 1.5
+        ub: 3.
     fe:
         val: []
         active: False
@@ -80,13 +81,13 @@ parameters:
         fe_decrease_strict: False
 
 data:
-    shotnum: 101675
+    shotnum: 108969
     lineouts:
         type:
             pixel
-        start: 320
-        end: 680
-        skip: 1
+        start: 240
+        end: 550
+        skip: 2
     background:
         type:
             pixel
@@ -103,5 +104,5 @@ other:
     refit_thresh: 5.0
 
 mlflow:
-    experiment: inverse-thomson-scattering
-    run: AAC_example_600_edge
+    experiment: llnl-inverse-thomson-scattering
+    run: magcbet108969dpix6_EPW_Top9scattering6
