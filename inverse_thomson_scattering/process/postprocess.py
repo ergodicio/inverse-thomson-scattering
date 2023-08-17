@@ -220,6 +220,11 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
                 "fit": fits,
                 "data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
             }
+            coords = (all_axes["x_label"], 
+                    np.array(all_axes["epw_x"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"]])),(
+                    "Wavelength",
+                    all_axes["epw_y"],
+            ) 
             savedata = xr.Dataset({k: xr.DataArray(v) for k, v in dat.items()})
             savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
             savedata["data"] = savedata["data"].T

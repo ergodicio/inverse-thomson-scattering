@@ -81,7 +81,7 @@ parameters:
         fe_decrease_strict: False
 
 data:
-    shotnum: 108969
+    shotnum: 101675
     lineouts:
         type:
             pixel
@@ -104,5 +104,5 @@ other:
     refit_thresh: 5.0
 
 mlflow:
-    experiment: llnl-inverse-thomson-scattering
-    run: magcbet108969dpix6_EPW_Top9scattering6
+    experiment: inverse-thomson-scattering
+    run: slider_test_1

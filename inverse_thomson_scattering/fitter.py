@@ -63,13 +63,12 @@ def validate_inputs(config):
     num_slices = len(config["data"]["lineouts"]["val"])
     batch_size = config["optimizer"]["batch_size"]
 
-    if not len(config["data"]["lineouts"]["val"]) % config["optimizer"]["batch_size"] == 0:
+    if not num_slices % batch_size == 0:
         print(f"total slices: {num_slices}")
-        print(f"{batch_size=}")
-        print(f"batch size = {config['optimizer']['batch_size']} is not a round divisor of the number of lineouts")
-        num_batches = np.ceil(len(config["data"]["lineouts"]["val"]) / config["optimizer"]["batch_size"])
-        config["optimizer"]["batch_size"] = int(len(config["data"]["lineouts"]["val"]) // num_batches)
-        print(f"new batch size = {config['optimizer']['batch_size']}")
+        #print(f"{batch_size=}")
+        print(f"batch size = {batch_size} is not a round divisor of the number of lineouts")
+        config["data"]["lineouts"]["val"] = config["data"]["lineouts"]["val"][:-(num_slices % batch_size)]
+        print(f"final {num_slices % batch_size} lineouts have been removed")
 
     config["units"] = init_param_norm_and_shift(config)
 

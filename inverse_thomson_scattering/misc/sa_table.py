@@ -1,4 +1,6 @@
-def sa_lookup(beam)
+import numpy as np
+
+def sa_lookup(beam):
     if beam == "P9":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
@@ -18,7 +20,7 @@ def sa_lookup(beam)
                 ]
             ),
         )
-    elif config["data"]["probe_beam"] == "B15":
+    elif beam == "B15":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
             sa=np.linspace(12.0404, 24.0132, 10),
@@ -37,7 +39,7 @@ def sa_lookup(beam)
                 ]
             ),
         )
-    elif config["data"]["probe_beam"] == "B23":
+    elif beam == "B23":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
             sa=np.linspace(72.281, 84.3307, 10),
@@ -56,7 +58,7 @@ def sa_lookup(beam)
                 ]
             ),
         )
-    elif config["data"]["probe_beam"] == "B26":
+    elif beam == "B26":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
             sa=np.linspace(55.5636, 68.1058, 10),
@@ -75,7 +77,7 @@ def sa_lookup(beam)
                 ]
             ),
         )
-    elif config["data"]["probe_beam"] == "B35":
+    elif beam == "B35":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
             sa=np.linspace(32.3804, 44.6341, 10),
@@ -94,7 +96,7 @@ def sa_lookup(beam)
                 ]
             ),
         )
-    elif config["data"]["probe_beam"] == "B42":
+    elif beam == "B42":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
             sa=np.linspace(155.667, 167.744, 10),
@@ -113,7 +115,7 @@ def sa_lookup(beam)
                 ]
             ),
         )
-    elif config["data"]["probe_beam"] == "B46":
+    elif beam == "B46":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
             sa=np.linspace(56.5615, 69.1863, 10),
@@ -132,7 +134,7 @@ def sa_lookup(beam)
                 ]
             ),
         )
-    elif config["data"]["probe_beam"] == "B58":
+    elif beam == "B58":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
             sa=np.linspace(119.093, 131.666, 10),
@@ -153,3 +155,5 @@ def sa_lookup(beam)
         )
     else:
         raise NotImplmentedError("Other probe geometrries are not yet supported")
+    
+    return sa

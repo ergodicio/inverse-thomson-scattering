@@ -4,7 +4,7 @@ import numpy as np
 import scipy.io as sio
 from os.path import join, exists
 
-from sa_table import sa_lookup
+from inverse_thomson_scattering.misc.sa_table import sa_lookup
 
 def get_calibrations(shotNum, tstype, CCDsize):
     stddev = dict()

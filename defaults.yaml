@@ -117,6 +117,7 @@ plotting:
     
 
 data:
+    launch_data_visualizer: False
     shotnum: 101675
     shotDay: False
     fit_rng:
