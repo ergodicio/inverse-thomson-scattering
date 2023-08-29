@@ -66,7 +66,7 @@ def recalculate_with_chosen_weights(
         }
         these_weights = best_weights
         # loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
-        losses, sqdevs["ele"], used_points, [ThryE, _, params] = func_dict["array_loss_fn"](raw_weights, batch)
+        losses, sqds, used_points, [ThryE, _, params] = func_dict["array_loss_fn"](raw_weights, batch)
         ThryE, ThryI, lamAxisE, lamAxisI, params = func_dict["calculate_spectra"](raw_weights, batch)
         # these_params = func_dict["get_active_params"](these_weights, batch)
         # hess = func_dict["h_func"](these_params, batch)
@@ -74,6 +74,7 @@ def recalculate_with_chosen_weights(
 
         # sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
         fits["ele"] = ThryE
+        sqdevs["ele"] = sqds["ele"]
 
         for k in all_params.keys():
             all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
@@ -217,7 +218,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
 
             # coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", all_axes["epw_y"]) #replace with true wavelength axis
             dat = {
-                "fit": fits,
+                "fit": fits["ele"],
                 "data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
             }
             coords = (all_axes["x_label"], 
@@ -255,7 +256,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             ax[1].set_ylabel("Wavelength (nm)")
             fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
             
-            used_points = used_points * sqdevs.shape[1]
+            used_points = used_points * sqdevs["ele"].shape[1]
             red_losses = np.sum(losses) / (1.1 * (used_points - len(all_params)))
             mlflow.log_metrics({"Total reduced loss": float(red_losses)})
 
@@ -272,7 +273,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
                 ax[0].set_ylabel("Amplitude (arb. units)")
                 ax[0].legend(fontsize=14)
                 ax[0].grid()
-                ax[1].plot(all_axes["epw_y"], np.squeeze(sqdevs[i, :]), label="Residual")
+                ax[1].plot(all_axes["epw_y"], np.squeeze(sqdevs["ele"][i, :]), label="Residual")
                 ax[1].set_ylabel("$\chi^2_i$")
                 ax[1].set_xlabel("Wavelength (nm)")
                 ax[1].grid()

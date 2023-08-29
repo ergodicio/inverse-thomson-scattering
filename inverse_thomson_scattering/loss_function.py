@@ -408,9 +408,10 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 sqdev_e_b,
                 0.0,
             )
+            #not sure whether this should be lamAxisE[0,:]  or lamAxisE
             used_points += jnp.sum(
-                    (lamAxisE[0,:] > config["data"]["fit_rng"]["blue_min"])
-                    & (lamAxisE[0,:] < config["data"]["fit_rng"]["blue_max"]))
+                    (lamAxisE > config["data"]["fit_rng"]["blue_min"])
+                    & (lamAxisE < config["data"]["fit_rng"]["blue_max"]))
 
             loss += jnp.sum(sqdev_e_b, axis=1)
             sqdev["ele"] += sqdev_e_b
@@ -423,8 +424,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 0.0,
             )
             used_points += jnp.sum(
-                    (lamAxisE[0,:] > config["data"]["fit_rng"]["red_min"])
-                    & (lamAxisE[0,:] < config["data"]["fit_rng"]["red_max"]))
+                    (lamAxisE > config["data"]["fit_rng"]["red_min"])
+                    & (lamAxisE < config["data"]["fit_rng"]["red_max"]))
 
             loss += jnp.sum(sqdev_e_r, axis=1)
             sqdev["ele"] += sqdev_e_r
@@ -513,8 +514,14 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             e_error += jnp.mean(_error_)
 
         dv = config["velocity"][1] - config["velocity"][0]
-        density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
-        temperature_loss = jnp.mean(
+        if config["parameters"]["fe"]["symmetric"]:
+            density_loss = jnp.mean(jnp.square(1.0 - 2.0*jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
+            temperature_loss = jnp.mean(
+            jnp.square(1.0 - 2.0*jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
+        )
+        else:
+            density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
+            temperature_loss = jnp.mean(
             jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
         )
 

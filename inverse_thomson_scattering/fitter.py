@@ -40,6 +40,8 @@ def init_param_norm_and_shift(config: Dict) -> Dict:
 def validate_inputs(config):
     # get derived quantities
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+    if config["parameters"]["fe"]["symmetric"]:
+        config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
 
     # get slices
     config["data"]["lineouts"]["val"] = [
@@ -241,7 +243,7 @@ def fit(config):
                     jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                     # hess=hess_fn if config["optimizer"]["hessian"] else None,
                     bounds=func_dict["bounds"],
-                    options={"disp": True},
+                    options={"disp": True, "maxiter": 300},
                 )
                 best_weights = func_dict["get_params"](res["x"], batch)
                 if i == config["optimizer"]["num_mins"] - 1:
@@ -250,6 +252,9 @@ def fit(config):
                     config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
                 )
                 refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+                if config["parameters"]["fe"]["symmetric"]:
+                    refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+                
                 refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(best_weights["fe"]))
 
                 config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))

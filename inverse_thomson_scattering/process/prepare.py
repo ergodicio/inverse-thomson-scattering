@@ -107,7 +107,8 @@ def prepare_data(config: Dict) -> Dict:
         all_axes["epw_x"] = axisxE.reshape((-1,1))
         all_data = {"e_data": data_res_unit, "e_amps": np.amax(data_res_unit, axis = 1, keepdims = True)}
         all_data["i_data"] = all_data["i_amps"] = np.zeros(len(data_res_unit))
-        config["other"]["PhysParams"]["noiseI"] = 0
+        #changed this 8-29-23 not sure how it worked with =0?
+        config["other"]["PhysParams"]["noiseI"] = np.zeros(np.shape(bg_res_unit))
         config["other"]["PhysParams"]["noiseE"] = bg_res_unit
         config["other"]["CCDsize"] = np.shape(data_res_unit)
         config["data"]["lineouts"]["start"] = int(config["data"]["lineouts"]["start"]/ ang_res_unit)

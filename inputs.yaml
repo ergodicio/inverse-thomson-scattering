@@ -15,15 +15,15 @@ parameters:
         lb: 0.01
         ub: 3.75
     lam:
-        val: 351
+        val: 524.5
         active: True
-        lb: 350
-        ub: 353.
+        lb: 523.0
+        ub: 528.0
     Te:
-        val: 0.5
+        val: 1.0
         active: True
-        lb: 0.35
-        ub: 0.85
+        lb: 0.01
+        ub: 1.5
     Te_gradient:
         val: 0.0
         active: False
@@ -31,15 +31,15 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: 0.1
-        active: True
-        lb: 0.05
-        ub: 0.6
+        val: 0.2
+        active: False
+        lb: 0.01
+        ub: 3.0
     Z:
-        val: 5.
-        active: True
-        lb: 3.5
-        ub: 6.8
+        val: 8.
+        active: False
+        lb: 1.0
+        ub: 25.0
     A:
         val: 14.
         active: False
@@ -55,10 +55,10 @@ parameters:
         lb: -1.1
         ub: 2.5
     ne:
-        val: 0.5
+        val: 0.4
         active: True
-        lb: .4
-        ub: 0.7
+        lb: .001
+        ub: 1.0
     ne_gradient:
         val: 0.
         active: False
@@ -66,32 +66,33 @@ parameters:
         ub: 15.
         num_grad_points: 1
     m:
-        val: 2.0
-        active: True
-        lb: 1.5
-        ub: 3.
+        val: 3.5
+        active: False
+        lb: 2.0
+        ub: 5.0
     fe:
         val: []
-        active: False
-        length: 3999
+        active: True
+        length: 16
         type:
             DLM:
         lb: -100.
         ub: -0.5
-        fe_decrease_strict: False
+        fe_decrease_strict: True
+        symmetric: True
 
 data:
-    shotnum: 101675
+    shotnum: 94475
     lineouts:
         type:
-            pixel
-        start: 240
-        end: 550
-        skip: 2
+            range
+        start: 90
+        end: 950
+        skip: 1
     background:
         type:
-            pixel
-        slice: 900
+            Fit
+        slice: 94477
 
 other:
     extraoptions:
@@ -100,9 +101,9 @@ other:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
-    refit: True
+    refit: False
     refit_thresh: 5.0
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: slider_test_1
+    run: arts_symmetric_updated_pentalty_16pt_start_decrease

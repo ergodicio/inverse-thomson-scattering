@@ -35,6 +35,11 @@ def get_fit_model(config, sa, backend: str = "haiku"):
         )
 
         fecur = jnp.exp(parameters["fe"]["val"])
+        vcur = config["velocity"]
+        if config["parameters"]["fe"]["symmetric"]:
+            fecur = jnp.concatenate((jnp.flip(fecur[1:]),fecur))
+            vcur = jnp.concatenate((-jnp.flip(vcur[1:]),vcur))
+        
         #fecur = parameters["fe"]["val"]
         lam = parameters["lam"]["val"]
 
@@ -49,7 +54,7 @@ def get_fit_model(config, sa, backend: str = "haiku"):
                 parameters["Va"]["val"],
                 parameters["ud"]["val"],
                 sa["sa"],
-                (fecur, config["velocity"]),
+                (fecur, vcur),
                 lam,
             )
 
@@ -58,7 +63,7 @@ def get_fit_model(config, sa, backend: str = "haiku"):
 
             ThryI = jnp.real(ThryI)
             ThryI = jnp.mean(ThryI, axis=0)
-            modlI = jnp.sum(ThryI * sa["weights"], axis=1)
+            modlI = jnp.sum(ThryI * sa["weights"][0], axis=1)
         else:
             modlI = 0
             lamAxisI = []
@@ -74,7 +79,7 @@ def get_fit_model(config, sa, backend: str = "haiku"):
                 parameters["Va"]["val"],
                 parameters["ud"]["val"],
                 sa["sa"],
-                (fecur, config["velocity"]),
+                (fecur, vcur),
                 lam,
             )
 
@@ -89,7 +94,7 @@ def get_fit_model(config, sa, backend: str = "haiku"):
 
             # remove extra dimensions and rescale to nm
             lamAxisE = jnp.squeeze(lamAxisE) * 1e7  # TODO hardcoded
-
+        
             ThryE = jnp.real(ThryE)
             ThryE = jnp.mean(ThryE, axis=0)
             if config["other"]["extraoptions"]["spectype"] == "angular_full":
