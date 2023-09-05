@@ -158,8 +158,8 @@ optimizer:
     num_epochs: 200
     learning_rate: 1.0e-4
     parameter_norm: True
-    refine_factor: 2
-    num_mins: 3
+    refine_factor: 0
+    num_mins: 1
 
 nn:
     use: false

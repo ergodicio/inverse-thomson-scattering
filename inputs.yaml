@@ -73,13 +73,13 @@ parameters:
     fe:
         val: []
         active: True
-        length: 16
+        length: 256
         type:
             DLM:
         lb: -100.
         ub: -0.5
         fe_decrease_strict: True
-        symmetric: True
+        symmetric: False
 
 data:
     shotnum: 94475
@@ -88,7 +88,7 @@ data:
             range
         start: 90
         end: 950
-        skip: 1
+        skip: 20
     background:
         type:
             Fit
@@ -105,5 +105,5 @@ other:
     refit_thresh: 5.0
 
 mlflow:
-    experiment: inverse-thomson-scattering
-    run: arts_symmetric_updated_pentalty_16pt_start_decrease
+    experiment: inverse-thomson-scattering-d2
+    run: archis-test

@@ -1,37 +1,52 @@
-import time
+import tempfile, time, os, yaml
 import multiprocessing as mp
-import yaml
 import mlflow
 from flatten_dict import flatten, unflatten
 from jax import config
 
 config.update("jax_enable_x64", True)
+config.update("jax_disable_jit", True)
 
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
 
 
 def one_run(config):
-    with mlflow.start_run(run_name=config["mlflow"]["run"]) as run:
-        utils.log_params(config)
-        t0 = time.time()
-        fit_results = fitter.fit(config=config)
-        metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
-        mlflow.log_metrics(metrics=metrics_dict)
-        mlflow.set_tag("status", "completed")
+    utils.log_params(config)
+
+    t0 = time.time()
+    fit_results = fitter.fit(config=config)
+    metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
+    mlflow.log_metrics(metrics=metrics_dict)
+    mlflow.set_tag("status", "completed")
 
 
 if __name__ == "__main__":
-    with open("defaults.yaml", "r") as fi:
-        defaults = yaml.safe_load(fi)
+    all_configs = {}
+    for k in ["defaults", "inputs"]:
+        with open(f"{k}.yaml", "r") as fi:
+            all_configs[k] = yaml.safe_load(fi)
 
-    with open("inputs.yaml", "r") as fi:
-        inputs = yaml.safe_load(fi)
+    if "mlflow" in all_configs["inputs"].keys():
+        experiment = all_configs["inputs"]["mlflow"]["experiment"]
+        run_name = all_configs["inputs"]["mlflow"]["run"]
 
-    defaults = flatten(defaults)
-    defaults.update(flatten(inputs))
-    config = unflatten(defaults)
-    mlflow.set_experiment(config["mlflow"]["experiment"])
-    
-    one_run(config)
+    else:
+        experiment = all_configs["defaults"]["mlflow"]["experiment"]
+        run_name = all_configs["defaults"]["mlflow"]["run"]
 
+    mlflow.set_experiment(experiment)
+
+    with mlflow.start_run(run_name=run_name) as run:
+        with tempfile.TemporaryDirectory() as td:
+            for k in ["defaults", "inputs"]:
+                with open(os.path.join(td, f"{k}.yaml"), "w") as fi:
+                    yaml.dump(all_configs[k], fi)
+
+            mlflow.log_artifacts(td)
+
+        defaults = flatten(all_configs["defaults"])
+        defaults.update(flatten(all_configs["inputs"]))
+        config = unflatten(defaults)
+
+        one_run(config)
