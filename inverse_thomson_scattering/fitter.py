@@ -267,14 +267,24 @@ def fit(config):
                 config["velocity"] = refined_v
                 try:
                     config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
+                except:
+                    pass
                 try:
                     config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
+                except:
+                    pass
                 try:
                     config["parameters"]["lam"]["val"] = best_weights["lam"].squeeze()
+                except:
+                    pass
                 try:
                     config["parameters"]["amp1"]["val"] = best_weights["amp1"].squeeze()
+                except:
+                    pass
                 try:
                     config["parameters"]["amp2"]["val"] = best_weights["amp2"].squeeze()
+                except:
+                    pass
 
                 config["parameters"]["fe"]["ub"] = -0.5
                 config["parameters"]["fe"]["lb"] = -50
