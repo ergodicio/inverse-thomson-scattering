@@ -13,92 +13,14 @@ from jax.lax import scan
 from jax.flatten_util import ravel_pytree
 import haiku as hk
 import numpy as np
+from inverse_thomson_scattering import nn
 from inverse_thomson_scattering.generate_spectra import get_fit_model
 from inverse_thomson_scattering.process import irf
 
 
-class NNReparameterizer(hk.Module):
-    def __init__(self, cfg, num_spectra):
-        super(NNReparameterizer, self).__init__()
-        self.cfg = cfg
-        self.num_spectra = num_spectra
-        self.nn = cfg["nn"]
-        convs = [int(i) for i in cfg["nn"]["conv_filters"].split("|")]
-        widths = (
-            [cfg["nn"]["linear_widths"]]
-            if isinstance(cfg["nn"]["linear_widths"], int)
-            else cfg["nn"]["linear_widths"].split("|")
-        )
-        linears = [int(i) for i in widths]
-
-        num_outputs = 0
-        for k, v in self.cfg["parameters"].items():
-            if v["active"]:
-                num_outputs += 1
-        if self.nn == "resnet":
-            self.embedding_generators = defaultdict(list)
-            for i in range(num_spectra):
-                res_blocks = []
-                down_convs = []
-                first_convs = []
-                for cc in convs:
-                    first_convs.append(hk.Sequential([hk.Conv1D(cc, 3, padding="same"), jax.nn.tanh]))
-                    res_blocks.append(
-                        hk.Sequential(
-                            [hk.Conv1D(output_channels=cc, kernel_shape=3, stride=1, padding="same"), jax.nn.tanh]
-                        )
-                    )
-                    down_convs.append(
-                        hk.Sequential([hk.Conv1D(output_channels=cc, kernel_shape=3, stride=1), jax.nn.tanh])
-                    )
-                self.embedding_generators["first_convs"].append(first_convs)
-                self.embedding_generators["res_blocks"].append(res_blocks)
-                self.embedding_generators["down_convs"].append(down_convs)
-                self.embedding_generators["final"].append(hk.Sequential([hk.Conv1D(1, 3), jax.nn.tanh]))
-            self.combiner = hk.nets.MLP(linears + [num_outputs], activation=jax.nn.tanh)
-
-        else:
-            self.param_extractors = []
-            for i in range(num_spectra):
-                layers = []
-
-                for cc in convs:
-                    layers.append(hk.Conv1D(output_channels=cc, kernel_shape=3, stride=1))
-                    layers.append(jax.nn.tanh)
-
-                # layers.append(hk.Conv1D(1, 3))
-                # layers.append(jax.nn.tanh)
-
-                layers.append(hk.Flatten())
-                for ll in linears:
-                    layers.append(hk.Linear(ll))
-                    layers.append(jax.nn.tanh)
-
-                self.param_extractors.append(hk.Sequential(layers))
-            self.combiner = hk.Linear(num_outputs)
-
-    def __call__(self, spectra: jnp.ndarray):
-        if self.nn == "resnet":
-            embedding = []
-            for i_spec, (res_blocks, down_convs, first_conv) in enumerate(
-                zip(
-                    self.embedding_generators["res_blocks"],
-                    self.embedding_generators["down_convs"],
-                    self.embedding_generators["first_convs"],
-                )
-            ):
-                out = spectra[:, i_spec, :, None]
-                for res_block, down_conv in zip(res_blocks, down_convs):
-                    out = first_conv(out)
-                    temp_out = res_block(out)
-                    out = down_conv(temp_out + out)
-                embedding.append(out)
-            return jax.nn.sigmoid(self.combiner(hk.Flatten()(embedding)))
-        else:
-            embeddings = jnp.concatenate(
-                [self.param_extractors[i](spectra[:, i][..., None]) for i in range(self.num_spectra)], axis=-1
-            )
-            return jax.nn.sigmoid(self.combiner(embeddings))
+class LossFunction:
+    def __init__(self, config, sas, dummy_batch):
+        pass
 
 
 def get_loss_function(config: Dict, sas, dummy_batch: Dict):
@@ -121,8 +43,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         if config["other"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, ThryI = irf.add_ion_IRF(config, lamAxisI, modlI, amps["i_amps"], TSins)
         else:
-            #lamAxisI = jnp.nan
-            ThryI = modlI#jnp.nan
+            # lamAxisI = jnp.nan
+            ThryI = modlI  # jnp.nan
 
         if config["other"]["extraoptions"]["load_ele_spec"] & (
             config["other"]["extraoptions"]["spectype"] == "angular_full"
@@ -131,13 +53,15 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         elif config["other"]["extraoptions"]["load_ele_spec"]:
             lamAxisE, ThryE = irf.add_electron_IRF(config, lamAxisE, modlE, amps["e_amps"], TSins, lam)
         else:
-            #lamAxisE = jnp.nan
-            ThryE = modlE#jnp.nan
+            # lamAxisE = jnp.nan
+            ThryE = modlE  # jnp.nan
 
         return ThryE, ThryI, lamAxisE, lamAxisI
 
-    if (config["other"]["extraoptions"]["spectype"] == "angular_full" or
-        max(dummy_batch["e_data"].shape[0],dummy_batch["i_data"].shape[0]) <=1):
+    if (
+        config["other"]["extraoptions"]["spectype"] == "angular_full"
+        or max(dummy_batch["e_data"].shape[0], dummy_batch["i_data"].shape[0]) <= 1
+    ):
         # ATS data can't be vmaped and single lineouts cant be vmapped
         vmap_forward_pass = forward_pass
         vmap_postprocess_thry = postprocess_thry
@@ -164,7 +88,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             self.num_spectra = num_spectra
             self.batch_size = cfg["optimizer"]["batch_size"]
             if cfg["nn"]["use"]:
-                self.nn_reparameterizer = NNReparameterizer(cfg, num_spectra)
+                self.nn_reparameterizer = nn.Reparameterizer(cfg, num_spectra)
 
             self.crop_window = cfg["other"]["crop_window"]
             self.smooth_window_len = round(round(cfg["velocity"].size / 10) * 1.5)
@@ -221,7 +145,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             return these_params
 
         def get_active_params(self, batch):
-            #print("in get_active_params")
+            # print("in get_active_params")
             if self.cfg["nn"]["use"]:
                 all_params = self.nn_reparameterizer(batch["data"][:, :, self.crop_window : -self.crop_window])
                 these_params = defaultdict(list)
@@ -281,7 +205,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             return these_params
 
     def initialize_rest_of_params(config):
-        #print("in initialize_rest_of_params")
+        # print("in initialize_rest_of_params")
         these_params = dict()
         for param_name, param_config in config["parameters"].items():
             if param_config["active"]:
@@ -314,7 +238,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             {
                 "data": normed_batch,
                 "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]},
-                "noise_e": batch["noise_e"], "noise_i": batch["noise_i"],
+                "noise_e": batch["noise_e"],
+                "noise_i": batch["noise_i"],
             }
         )
 
@@ -329,7 +254,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             {
                 "data": normed_batch,
                 "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]},
-                "noise_e": batch["noise_e"], "noise_i": batch["noise_i"],
+                "noise_e": batch["noise_e"],
+                "noise_i": batch["noise_i"],
             }
         )
 
@@ -375,7 +301,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         return ThryE, lamAxisE
 
     def array_loss_fn(weights, batch):
-        #Used for postprocessing
+        # Used for postprocessing
         ThryE, ThryI, lamAxisE, lamAxisI, params = calculate_spectra(weights, batch)
 
         used_points = 0
@@ -383,9 +309,9 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         i_data = batch["i_data"]
         e_data = batch["e_data"]
-        #normed_batch = get_normed_batch(batch)
-        #normed_i_data = normed_batch["i_data"]
-        #normed_e_data = normed_batch["e_data"]
+        # normed_batch = get_normed_batch(batch)
+        # normed_i_data = normed_batch["i_data"]
+        # normed_e_data = normed_batch["e_data"]
         sqdev = {"ele": jnp.zeros(e_data.shape), "ion": jnp.zeros(i_data.shape)}
 
         if config["other"]["extraoptions"]["fit_IAW"]:
@@ -398,34 +324,34 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             )
             loss += jnp.sum(sqdev["ion"], axis=1)
             used_points += jnp.sum(
-                    (lamAxisI > config["data"]["fit_rng"]["iaw_min"])
-                    & (lamAxisI < config["data"]["fit_rng"]["iaw_max"]))
+                (lamAxisI > config["data"]["fit_rng"]["iaw_min"]) & (lamAxisI < config["data"]["fit_rng"]["iaw_max"])
+            )
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
-            sqdev_e_b = jnp.square(e_data - ThryE) / jnp.abs(e_data)#jnp.square(e_norm)
+            sqdev_e_b = jnp.square(e_data - ThryE) / jnp.abs(e_data)  # jnp.square(e_norm)
             sqdev_e_b = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
                 sqdev_e_b,
                 0.0,
             )
-            #not sure whether this should be lamAxisE[0,:]  or lamAxisE
+            # not sure whether this should be lamAxisE[0,:]  or lamAxisE
             used_points += jnp.sum(
-                    (lamAxisE > config["data"]["fit_rng"]["blue_min"])
-                    & (lamAxisE < config["data"]["fit_rng"]["blue_max"]))
+                (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"])
+            )
 
             loss += jnp.sum(sqdev_e_b, axis=1)
             sqdev["ele"] += sqdev_e_b
 
         if config["other"]["extraoptions"]["fit_EPWr"]:
-            sqdev_e_r = jnp.square(e_data - ThryE) / jnp.abs(e_data)#jnp.square(e_norm)
+            sqdev_e_r = jnp.square(e_data - ThryE) / jnp.abs(e_data)  # jnp.square(e_norm)
             sqdev_e_r = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
                 sqdev_e_r,
                 0.0,
             )
             used_points += jnp.sum(
-                    (lamAxisE > config["data"]["fit_rng"]["red_min"])
-                    & (lamAxisE < config["data"]["fit_rng"]["red_max"]))
+                (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"])
+            )
 
             loss += jnp.sum(sqdev_e_r, axis=1)
             sqdev["ele"] += sqdev_e_r
@@ -444,7 +370,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         e_data = batch["e_data"]
 
         if config["other"]["extraoptions"]["fit_IAW"]:
-            _error_ = jnp.square(i_data - ThryI)/ (jnp.abs(i_data) + 1e-10)
+            _error_ = jnp.square(i_data - ThryI) / (jnp.abs(i_data) + 1e-10)
             _error_ = jnp.where(
                 (lamAxisI > config["data"]["fit_rng"]["iaw_min"]) & (lamAxisI < config["data"]["fit_rng"]["iaw_max"]),
                 _error_,
@@ -453,7 +379,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             i_error += jnp.sum(_error_)
 
         if config["other"]["extraoptions"]["fit_EPWb"]:
-            _error_ = jnp.square(e_data - ThryE)/ (jnp.abs(e_data) + 1e-10)
+            _error_ = jnp.square(e_data - ThryE) / (jnp.abs(e_data) + 1e-10)
             _error_ = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
                 _error_,
@@ -463,7 +389,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             e_error += jnp.sum(_error_)
 
         if config["other"]["extraoptions"]["fit_EPWr"]:
-            _error_ = jnp.square(e_data - ThryE)/ (jnp.abs(e_data) + 1e-10)
+            _error_ = jnp.square(e_data - ThryE) / (jnp.abs(e_data) + 1e-10)
             _error_ = jnp.where(
                 (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
                 _error_,
@@ -485,7 +411,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         normed_e_data = normed_batch["e_data"]
 
         if config["other"]["extraoptions"]["fit_IAW"]:
-            #i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
+            # i_error += jnp.mean(jnp.square(i_data - ThryI) / jnp.square(i_norm))
             _error_ = jnp.square(i_data - ThryI) / jnp.square(i_norm)
             _error_ = jnp.where(
                 (lamAxisI > config["data"]["fit_rng"]["iaw_min"]) & (lamAxisI < config["data"]["fit_rng"]["iaw_max"]),
@@ -515,20 +441,20 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
         dv = config["velocity"][1] - config["velocity"][0]
         if config["parameters"]["fe"]["symmetric"]:
-            density_loss = jnp.mean(jnp.square(1.0 - 2.0*jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
+            density_loss = jnp.mean(jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
             temperature_loss = jnp.mean(
-            jnp.square(1.0 - 2.0*jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
-        )
+                jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
+            )
         else:
             density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
             temperature_loss = jnp.mean(
-            jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
-        )
+                jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
+            )
 
         if config["parameters"]["fe"]["fe_decrease_strict"]:
             gradfe = jnp.sign(config["velocity"][1:]) * jnp.diff(params["fe"].squeeze())
             vals = jnp.where(gradfe > 0, gradfe, 0).sum()
-            fe_penalty = jnp.tan(jnp.amin(jnp.array([vals, jnp.pi/2])))
+            fe_penalty = jnp.tan(jnp.amin(jnp.array([vals, jnp.pi / 2])))
         else:
             fe_penalty = 0
 
@@ -579,6 +505,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
             pytree_weights = unravel_pytree(weights)
             (value, aux), grad = _vg_func_(pytree_weights, batch)
+            grad["ts_parameter_generator"]["fe"] = 0.1 * grad["ts_parameter_generator"]["fe"]
             temp_grad, _ = ravel_pytree(grad)
             flattened_grads = np.array(temp_grad)
             return value, flattened_grads

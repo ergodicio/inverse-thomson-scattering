@@ -68,7 +68,7 @@ def recalculate_with_chosen_weights(
         # loss, [ThryE, _, params] = func_dict["array_loss_fn"](these_weights, batch)
         losses, sqds, used_points, [ThryE, _, params] = func_dict["array_loss_fn"](raw_weights, batch)
         ThryE, ThryI, lamAxisE, lamAxisI, params = func_dict["calculate_spectra"](raw_weights, batch)
-        # these_params = func_dict["get_active_params"](these_weights, batch)
+
         # hess = func_dict["h_func"](these_params, batch)
         # losses = np.mean(loss, axis=1)
 
@@ -78,6 +78,15 @@ def recalculate_with_chosen_weights(
 
         for k in all_params.keys():
             all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+
+        if calc_sigma:
+            these_params = func_dict["get_active_params"](these_weights, batch)
+            hess = func_dict["h_func"](these_params, batch)
+            try:
+                sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
+            except:
+                print("Unable to calculate sigmas from Hessian, fits likely did not converge")
+                calc_sigma = False
 
     else:
         for i_batch, inds in enumerate(batch_indices):
