@@ -167,7 +167,8 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 self.nn_reparameterizer = NNReparameterizer(cfg, num_spectra)
 
             self.crop_window = cfg["other"]["crop_window"]
-            self.smooth_window_len = round(round(cfg["velocity"].size / 10) * 1.5)
+            self.smooth_window_len = cfg["dist_fit"]["window"]["len"] #round(round(cfg["velocity"].size / 10) * 0.5)
+            #print(self.smooth_window_len)
 
             if cfg["dist_fit"]["window"]["type"] == "hamming":
                 self.w = jnp.hamming(self.smooth_window_len)
@@ -532,7 +533,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         else:
             fe_penalty = 0
 
-        return i_error + e_error + density_loss + temperature_loss, [ThryE, normed_e_data, params]
+        return i_error + e_error + density_loss + temperature_loss + fe_penalty, [ThryE, normed_e_data, params]
 
     rng_key = jax.random.PRNGKey(42)
     init_weights = _get_params_.init(rng_key, dummy_batch)

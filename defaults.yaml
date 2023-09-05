@@ -117,12 +117,12 @@ plotting:
     
 
 data:
-    launch_data_visualizer: False
+    launch_data_visualizer: True
     shotnum: 101675
     shotDay: False
     fit_rng:
         blue_min: 450
-        blue_max: 510
+        blue_max: 515
         red_min: 545
         red_max: 650
         iaw_min: 350
@@ -168,7 +168,7 @@ nn:
 
 dist_fit:
     window:
-        len: 256 #should be even
+        len: 16 #should be even
         type: hamming # one of [hamming, hann, bartlett]
 
 mlflow:

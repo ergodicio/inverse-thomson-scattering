@@ -15,7 +15,7 @@ parameters:
         lb: 0.01
         ub: 3.75
     lam:
-        val: 524.5
+        val: 526.5
         active: True
         lb: 523.0
         ub: 528.0
@@ -55,7 +55,7 @@ parameters:
         lb: -1.1
         ub: 2.5
     ne:
-        val: 0.4
+        val: 0.45
         active: True
         lb: .001
         ub: 1.0
@@ -106,4 +106,4 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: arts_symmetric_updated_pentalty_16pt_start_decrease
+    run: arts_symmetric_reduced_hamming_5_more_mins

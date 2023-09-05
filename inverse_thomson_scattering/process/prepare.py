@@ -8,7 +8,7 @@ from inverse_thomson_scattering.misc.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
 from inverse_thomson_scattering.misc.calibration import get_calibrations, get_scattering_angles
 from inverse_thomson_scattering.lineouts import get_lineouts
-from inverse_thomson_scattering.data_visualizer import launch_data_visualizer
+from inverse_thomson_scattering.data_visualizer2 import launch_data_visualizer
 
 
 def prepare_data(config: Dict) -> Dict:
@@ -52,8 +52,8 @@ def prepare_data(config: Dict) -> Dict:
 
     # Not possible on JupyterLab looking for another solution
     # Lauch the data visualizer for manual linout selection
-    # if config["data"]["launch_data_visualizer"]:
-    #     launch_data_visualizer(elecData, ionData, all_axes, config)
+    if config["data"]["launch_data_visualizer"]:
+        launch_data_visualizer(elecData, ionData, all_axes, config)
     
     # load and correct background
     [BGele, BGion] = get_shot_bg(config, axisyE, elecData)

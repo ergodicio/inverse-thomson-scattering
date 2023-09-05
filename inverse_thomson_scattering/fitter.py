@@ -51,6 +51,12 @@ def validate_inputs(config):
         )
     ]
 
+    #Warn if fe and m are fit
+    if config["parameters"]["fe"]["active"] and config["parameters"]["m"]["active"]:
+        print("Super-Gaussian order and distribtuion function cannot be fit simultaneously, fitting super-Gaussian order")
+        config["parameters"]["fe"]["active"] = False
+        
+    
     # create fes
     NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
     if not config["parameters"]["fe"]["val"]:
@@ -243,7 +249,7 @@ def fit(config):
                     jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                     # hess=hess_fn if config["optimizer"]["hessian"] else None,
                     bounds=func_dict["bounds"],
-                    options={"disp": True, "maxiter": 300},
+                    options={"disp": True},
                 )
                 best_weights = func_dict["get_params"](res["x"], batch)
                 if i == config["optimizer"]["num_mins"] - 1:
@@ -259,8 +265,16 @@ def fit(config):
 
                 config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
                 config["velocity"] = refined_v
-                config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
-                config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
+                try:
+                    config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
+                try:
+                    config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
+                try:
+                    config["parameters"]["lam"]["val"] = best_weights["lam"].squeeze()
+                try:
+                    config["parameters"]["amp1"]["val"] = best_weights["amp1"].squeeze()
+                try:
+                    config["parameters"]["amp2"]["val"] = best_weights["amp2"].squeeze()
 
                 config["parameters"]["fe"]["ub"] = -0.5
                 config["parameters"]["fe"]["lb"] = -50
