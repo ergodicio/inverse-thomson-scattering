@@ -91,7 +91,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 self.nn_reparameterizer = nn.Reparameterizer(cfg, num_spectra)
 
             self.crop_window = cfg["other"]["crop_window"]
-            self.smooth_window_len = round(round(cfg["velocity"].size / 10) * 1.5)
+            self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
 
             if cfg["dist_fit"]["window"]["type"] == "hamming":
                 self.w = jnp.hamming(self.smooth_window_len)
@@ -505,7 +505,9 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
 
             pytree_weights = unravel_pytree(weights)
             (value, aux), grad = _vg_func_(pytree_weights, batch)
-            grad["ts_parameter_generator"]["fe"] = 0.1 * grad["ts_parameter_generator"]["fe"]
+            grad["ts_parameter_generator"]["fe"] = (
+                config["optimizer"]["grad_scalar"] * grad["ts_parameter_generator"]["fe"]
+            )
             temp_grad, _ = ravel_pytree(grad)
             flattened_grads = np.array(temp_grad)
             return value, flattened_grads
