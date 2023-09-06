@@ -67,9 +67,9 @@ def validate_inputs(config):
 
     if not num_slices % batch_size == 0:
         print(f"total slices: {num_slices}")
-        #print(f"{batch_size=}")
+        # print(f"{batch_size=}")
         print(f"batch size = {batch_size} is not a round divisor of the number of lineouts")
-        config["data"]["lineouts"]["val"] = config["data"]["lineouts"]["val"][:-(num_slices % batch_size)]
+        config["data"]["lineouts"]["val"] = config["data"]["lineouts"]["val"][: -(num_slices % batch_size)]
         print(f"final {num_slices % batch_size} lineouts have been removed")
 
     config["units"] = init_param_norm_and_shift(config)
@@ -314,4 +314,4 @@ def fit(config):
         config, batch_indices, all_data, all_axes, best_weights, func_dict, sa, raw_weights
     )
 
-    return final_params
+    return final_params, float(overall_loss)

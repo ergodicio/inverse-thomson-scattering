@@ -91,7 +91,9 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
                 self.nn_reparameterizer = nn.Reparameterizer(cfg, num_spectra)
 
             self.crop_window = cfg["other"]["crop_window"]
+
             self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
+            self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
 
             if cfg["dist_fit"]["window"]["type"] == "hamming":
                 self.w = jnp.hamming(self.smooth_window_len)
