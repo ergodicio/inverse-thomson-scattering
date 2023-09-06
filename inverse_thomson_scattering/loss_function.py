@@ -450,6 +450,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
             temperature_loss = jnp.mean(
                 jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * config["velocity"] ** 2.0 * dv, axis=1))
             )
+        momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * config["velocity"] * dv, axis=1)))
 
         if config["parameters"]["fe"]["fe_decrease_strict"]:
             gradfe = jnp.sign(config["velocity"][1:]) * jnp.diff(params["fe"].squeeze())
@@ -458,7 +459,7 @@ def get_loss_function(config: Dict, sas, dummy_batch: Dict):
         else:
             fe_penalty = 0
 
-        return i_error + e_error + density_loss + temperature_loss, [ThryE, normed_e_data, params]
+        return i_error + e_error + density_loss + temperature_loss + momentum_loss, [ThryE, normed_e_data, params]
 
     rng_key = jax.random.PRNGKey(42)
     init_weights = _get_params_.init(rng_key, dummy_batch)
