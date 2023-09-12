@@ -3,12 +3,11 @@ from typing import Dict
 import numpy as np
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.misc import plotters
-from inverse_thomson_scattering.evaluate_background import get_shot_bg
+from inverse_thomson_scattering.process.evaluate_background import get_shot_bg
 from inverse_thomson_scattering.misc.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
 from inverse_thomson_scattering.misc.calibration import get_calibrations, get_scattering_angles
-from inverse_thomson_scattering.lineouts import get_lineouts
-from inverse_thomson_scattering.data_visualizer import launch_data_visualizer
+from inverse_thomson_scattering.process.lineouts import get_lineouts
 
 
 def prepare_data(config: Dict) -> Dict:

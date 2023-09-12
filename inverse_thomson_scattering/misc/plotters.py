@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.generate_spectra import get_fit_model
+from inverse_thomson_scattering.model.physics.generate_spectra import get_fit_model
 
 
 def plotinput(config, sa):

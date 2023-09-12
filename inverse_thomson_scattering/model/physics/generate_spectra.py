@@ -1,6 +1,6 @@
 import copy
 
-from inverse_thomson_scattering.form_factor import get_form_factor_fn
+from inverse_thomson_scattering.model.physics.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 from jax import numpy as jnp

@@ -1,5 +1,5 @@
 import jax
-from jax import config, jit
+from jax import config
 
 config.update("jax_enable_x64", True)
 #config.update('jax_disable_jit',True)
@@ -11,7 +11,7 @@ import scipy.interpolate as sp
 import numpy as np
 import haiku as hk
 
-from inverse_thomson_scattering import ratintn
+from inverse_thomson_scattering.model.physics import ratintn
 from inverse_thomson_scattering.misc import lam_parse
 
 

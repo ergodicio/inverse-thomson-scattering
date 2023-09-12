@@ -7,7 +7,7 @@ from copy import deepcopy
 config.update("jax_enable_x64", True)
 from numpy.testing import assert_allclose
 from scipy.signal import find_peaks
-from inverse_thomson_scattering.form_factor import get_form_factor_fn
+from inverse_thomson_scattering.model.physics.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 
