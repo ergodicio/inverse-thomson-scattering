@@ -109,24 +109,29 @@ class TSParameterGenerator(hk.Module):
         self.num_spectra = num_spectra
         self.batch_size = cfg["optimizer"]["batch_size"]
         if cfg["nn"]["use"]:
-            self.nn_reparameterizer = nn.Reparameterizer(cfg, num_spectra)
+            self.nn_reparameterizer = Reparameterizer(cfg, num_spectra)
 
         self.crop_window = cfg["other"]["crop_window"]
 
-        self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
-        self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
+        if "dist_fit" in cfg:
+            self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
+            self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
 
-        if cfg["dist_fit"]["window"]["type"] == "hamming":
-            self.w = jnp.hamming(self.smooth_window_len)
-        elif cfg["dist_fit"]["window"]["type"] == "hann":
-            self.w = jnp.hanning(self.smooth_window_len)
-        elif cfg["dist_fit"]["window"]["type"] == "bartlett":
-            self.w = jnp.bartlett(self.smooth_window_len)
+            if cfg["dist_fit"]["window"]["type"] == "hamming":
+                self.w = jnp.hamming(self.smooth_window_len)
+            elif cfg["dist_fit"]["window"]["type"] == "hann":
+                self.w = jnp.hanning(self.smooth_window_len)
+            elif cfg["dist_fit"]["window"]["type"] == "bartlett":
+                self.w = jnp.bartlett(self.smooth_window_len)
+            else:
+                raise NotImplementedError
         else:
-            raise NotImplementedError
+            print("\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n")
 
     def _init_nn_params_(self, batch):
-        all_params = self.nn_reparameterizer(batch[:, :, self.crop_window : -self.crop_window])
+        nn_batch = jnp.concatenate([batch["e_data"][:, None, :], batch["e_data"][:, None, :]], axis=1)
+
+        all_params = self.nn_reparameterizer(nn_batch[:, :, self.crop_window : -self.crop_window])
         these_params = defaultdict(list)
         for i_slice in range(self.batch_size):
             # unpack all params which is an array that came out of the NN and into a dictionary that contains

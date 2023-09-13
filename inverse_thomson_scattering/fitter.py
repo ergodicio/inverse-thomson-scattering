@@ -1,6 +1,7 @@
-from typing import Dict
+from typing import Dict, Tuple
 import time
 import numpy as np
+import pandas as pd
 import scipy.optimize as spopt
 
 import optax, jaxopt, mlflow
@@ -266,7 +267,7 @@ def scipy_loop(config, all_data, sa, batch_indices, num_batches):
     return raw_weights, best_weights, overall_loss, ts_fitter
 
 
-def fit(config):
+def fit(config) -> Tuple[pd.DataFrame, float]:
     """
     This function fits the Thomson scattering spectral density function to experimental data, or plots specified spectra. All inputs are derived from the input dictionary config.
 
