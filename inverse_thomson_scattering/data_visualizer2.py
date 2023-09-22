@@ -42,7 +42,5 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
             ax.set_xlabel(all_axes["x_label"])
             ax.set_ylabel("Wavelength")
             fig.savefig(os.path.join(td, "electron_fit_ranges.png"), bbox_inches="tight")
-            print("here")
             
         mlflow.log_artifacts(td)
-        print("here")

@@ -23,8 +23,8 @@ def one_run(config):
 
 
 if __name__ == "__main__":
-    for filt in ["hamming", "hann", "bartlett"]:
-        for i in [3, 5, 9, 15, 25]:
+    for filt in ["hann", "bartlett"]:
+        for i in [3, 5, 9, 15]:
             for ii in [1, 2]:
 
                 with open("defaults.yaml", "r") as fi:

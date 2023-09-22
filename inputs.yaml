@@ -73,7 +73,7 @@ parameters:
     fe:
         val: []
         active: True
-        length: 16
+        length: 128
         type:
             DLM:
         lb: -100.
@@ -106,4 +106,4 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: arts_symmetric_reduced_hamming_5_more_mins
+    run: arts_filter_reduction_3x_hamming_128pts

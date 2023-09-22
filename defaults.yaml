@@ -158,7 +158,7 @@ optimizer:
     num_epochs: 200
     learning_rate: 1.0e-4
     parameter_norm: True
-    refine_factor: 2
+    refine_factor: 1
     num_mins: 3
 
 nn:
@@ -168,7 +168,7 @@ nn:
 
 dist_fit:
     window:
-        len: 16 #should be even
+        len: 30 #should be even
         type: hamming # one of [hamming, hann, bartlett]
 
 mlflow:

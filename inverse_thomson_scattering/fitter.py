@@ -265,6 +265,7 @@ def fit(config):
 
                 config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
                 config["velocity"] = refined_v
+                #config["dist_fit"]["window"]["len"] = round(config["dist_fit"]["window"]["len"]/2)
                 try:
                     config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
                 except:
