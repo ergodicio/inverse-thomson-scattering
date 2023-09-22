@@ -149,7 +149,7 @@ class TSParameterGenerator(hk.Module):
 
         return these_params
 
-    def _init_params_(self):
+    def _init_params_(self, get_active=False):
         these_params = dict()
         for param_name, param_config in self.cfg["parameters"].items():
             if param_config["active"]:
@@ -166,9 +166,10 @@ class TSParameterGenerator(hk.Module):
                         init=hk.initializers.RandomUniform(minval=0, maxval=1),
                     )
             else:
-                these_params[param_name] = jnp.concatenate(
-                    [jnp.array(param_config["val"]).reshape(1, -1) for _ in range(self.batch_size)]
-                ).reshape(self.batch_size, -1)
+                if ~get_active:
+                    these_params[param_name] = jnp.concatenate(
+                        [jnp.array(param_config["val"]).reshape(1, -1) for _ in range(self.batch_size)]
+                    ).reshape(self.batch_size, -1)
 
         return these_params
 
@@ -193,11 +194,19 @@ class TSParameterGenerator(hk.Module):
             these_params = dict()
             for param_name, param_config in self.cfg["parameters"].items():
                 if param_config["active"]:
-                    these_params[param_name] = hk.get_parameter(
-                        param_name,
-                        shape=[self.batch_size, 1],
-                        init=hk.initializers.RandomUniform(minval=0, maxval=1),
-                    )
+                    if param_name == "fe":
+                        these_params[param_name] = hk.get_parameter(
+                            param_name,
+                            shape=[self.batch_size, param_config["length"]],
+                            init=hk.initializers.RandomUniform(minval=0, maxval=1),
+                        )
+
+                    else:
+                        these_params[param_name] = hk.get_parameter(
+                            param_name,
+                            shape=[self.batch_size, 1],
+                            init=hk.initializers.RandomUniform(minval=0, maxval=1),
+                        )
                     these_params[param_name] = (
                         these_params[param_name] * self.cfg["units"]["norms"][param_name]
                         + self.cfg["units"]["shifts"][param_name]

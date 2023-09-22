@@ -5,7 +5,7 @@ from flatten_dict import flatten, unflatten
 from jax import config
 
 config.update("jax_enable_x64", True)
-# config.update("jax_disable_jit", True)
+config.update("jax_disable_jit", True)
 
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
@@ -25,7 +25,7 @@ def one_run(config):
 
 if __name__ == "__main__":
     all_configs = {}
-    basedir = os.path.join(os.getcwd(), "configs", "1d")
+    basedir = os.path.join(os.getcwd(), "configs", "arts")
     for k in ["defaults", "inputs"]:
         with open(f"{os.path.join(basedir, k)}.yaml", "r") as fi:
             all_configs[k] = yaml.safe_load(fi)

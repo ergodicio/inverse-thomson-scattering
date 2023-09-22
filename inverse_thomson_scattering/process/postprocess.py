@@ -67,7 +67,7 @@ def recalculate_with_chosen_weights(
         these_weights = best_weights
         # loss, [ThryE, _, params] = ts_fitter["array_loss_fn"](these_weights, batch)
         losses, sqds, used_points, [ThryE, _, params] = ts_fitter.array_loss(raw_weights, batch)
-        ThryE, ThryI, lamAxisE, lamAxisI = ts_fitter.calculate_spectra(params, batch)
+        # ThryE, ThryI, lamAxisE, lamAxisI = ts_fitter.calculate_spectra(params, batch)
 
         # hess = ts_fitter["h_func"](these_params, batch)
         # losses = np.mean(loss, axis=1)
@@ -80,13 +80,14 @@ def recalculate_with_chosen_weights(
             all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
 
         if calc_sigma:
-            these_params = ts_fitter.get_active_params(these_weights, batch)
+            these_params = ts_fitter.get_active_params(raw_weights, batch)
+            # these_params["fe"] = np.exp(these_params["fe"])
             hess = ts_fitter.h_loss_wrt_params(these_params, batch)
-            try:
-                sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-            except:
-                print("Unable to calculate sigmas from Hessian, fits likely did not converge")
-                calc_sigma = False
+            # try:
+            sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
+            # except:
+            #     print("Unable to calculate sigmas from Hessian, fits likely did not converge")
+            #     calc_sigma = False
 
     else:
         for i_batch, inds in enumerate(batch_indices):
@@ -115,11 +116,11 @@ def recalculate_with_chosen_weights(
             sqdevs["ele"][inds] = sqds["ele"]
             sqdevs["ion"][inds] = sqds["ion"]
             if calc_sigma:
-                try:
-                    sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-                except:
-                    print("Unable to calculate sigmas from Hessian, fits likely did not converge")
-                    calc_sigma = False
+                # try:
+                sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
+                # except:
+                #     print("Unable to calculate sigmas from Hessian, fits likely did not converge")
+                #     calc_sigma = False
             fits["ele"][inds] = ThryE
             fits["ion"][inds] = ThryI
 
@@ -130,20 +131,33 @@ def recalculate_with_chosen_weights(
 
 
 def get_sigmas(keys, hess, batch_size):
-    sigmas = np.zeros((batch_size, len(keys)))
+    sizes = {key: hess[key][key].shape[1] for key in keys}
+    actual_num_params = sum([v for k, v in sizes.items()])
+    sigmas = np.zeros((batch_size, actual_num_params))
 
     for i in range(batch_size):
-        temp = np.zeros((len(keys), len(keys)))
+        temp = np.zeros((actual_num_params, actual_num_params))
+        xc = 0
         for k1, param in enumerate(keys):
+            yc = 0
             for k2, param2 in enumerate(keys):
-                temp[k1, k2] = np.squeeze(hess[param][param2])[i, i]
+                if i > 0:
+                    temp[k1, k2] = np.squeeze(hess[param][param2])[i, i]
+                else:
+                    temp[xc : xc + sizes[param], yc : yc + sizes[param2]] = hess[param][param2][0, :, 0, :]
+
+                yc += sizes[param2]
+            xc += sizes[param]
 
         # print(temp)
         inv = np.linalg.inv(temp)
         # print(inv)
 
         for k1, param in enumerate(keys):
-            sigmas[i, k1] = np.sign(inv[k1, k1]) * np.sqrt(np.abs(inv[k1, k1]))
+            sigmas[i, xc : xc + sizes[param]] = np.diag(
+                np.sign(inv[xc : xc + sizes[param], xc : xc + sizes[param]])
+                * np.sqrt(np.abs(inv[xc : xc + sizes[param], xc : xc + sizes[param]]))
+            )
             # print(sigmas[i, k1])
 
     return sigmas

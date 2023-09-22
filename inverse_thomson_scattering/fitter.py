@@ -205,7 +205,7 @@ def scipy_loop(config, all_data, sa, batch_indices, num_batches):
                 bounds=ts_fitter.bounds,
                 options={"disp": True, "maxiter": 1},
             )
-            best_weights = ts_fitter.get_params(res["x"], batch)
+            best_weights = ts_fitter.get_params(ts_fitter.unravel_pytree(res["x"]), batch)
             if i == config["optimizer"]["num_mins"] - 1:
                 break
             config["parameters"]["fe"]["length"] = (
