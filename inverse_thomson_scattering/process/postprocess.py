@@ -64,15 +64,7 @@ def recalculate_with_chosen_weights(
                 config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
             ],
         }
-        these_weights = best_weights
-        # loss, [ThryE, _, params] = ts_fitter["array_loss_fn"](these_weights, batch)
         losses, sqds, used_points, [ThryE, _, params] = ts_fitter.array_loss(raw_weights, batch)
-        # ThryE, ThryI, lamAxisE, lamAxisI = ts_fitter.calculate_spectra(params, batch)
-
-        # hess = ts_fitter["h_func"](these_params, batch)
-        # losses = np.mean(loss, axis=1)
-
-        # sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
         fits["ele"] = ThryE
         sqdevs["ele"] = sqds["ele"]
 
@@ -81,13 +73,9 @@ def recalculate_with_chosen_weights(
 
         if calc_sigma:
             these_params = ts_fitter.get_active_params(raw_weights, batch)
-            # these_params["fe"] = np.exp(these_params["fe"])
             hess = ts_fitter.h_loss_wrt_params(these_params, batch)
-            # try:
             sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-            # except:
-            #     print("Unable to calculate sigmas from Hessian, fits likely did not converge")
-            #     calc_sigma = False
+            print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
 
     else:
         for i_batch, inds in enumerate(batch_indices):
@@ -118,9 +106,8 @@ def recalculate_with_chosen_weights(
             if calc_sigma:
                 # try:
                 sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-                # except:
-                #     print("Unable to calculate sigmas from Hessian, fits likely did not converge")
-                #     calc_sigma = False
+                print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
+
             fits["ele"][inds] = ThryE
             fits["ion"][inds] = ThryI
 
@@ -236,333 +223,344 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
     mlflow.set_tag("status", "plotting")
     t1 = time.time()
 
-    if config["other"]["extraoptions"]["spectype"] == "angular_full":
-        with tempfile.TemporaryDirectory() as td:
-            # print(all_params)
-            for key in all_params.keys():
-                all_params[key] = pandas.Series(all_params[key])
-            final_params = pandas.DataFrame(all_params)
-            final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
-
-            # coords = ("lineout", np.array(config["data"]["lineouts"]["val"])), ("Wavelength", all_axes["epw_y"]) #replace with true wavelength axis
-            dat = {
-                "fit": fits["ele"],
-                "data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
-            }
-            coords = (
-                all_axes["x_label"],
-                np.array(all_axes["epw_x"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"]]),
-            ), (
-                "Wavelength",
-                all_axes["epw_y"],
+    with tempfile.TemporaryDirectory() as td:
+        if config["other"]["extraoptions"]["spectype"] == "angular_full":
+            final_params = plot_angular(
+                config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td
             )
-            savedata = xr.Dataset({k: xr.DataArray(v) for k, v in dat.items()})
-            savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
-            savedata["data"] = savedata["data"].T
-            savedata["fit"] = savedata["fit"].T
-
-            angs, wavs = np.meshgrid(
-                all_axes["epw_x"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"]],
-                all_axes["epw_y"],
+        else:
+            final_params = plot_regular(
+                config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td
             )
-
-            # Create fit and data image
-            fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-            clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 21)
-            ax[0].pcolormesh(
-                angs,
-                wavs,
-                savedata["fit"],
-                shading="nearest",
-                cmap="gist_ncar",
-                vmin=np.amin(savedata["data"]),
-                vmax=np.amax(savedata["data"]),
-            )
-            ax[0].set_xlabel("Angle (degrees)")
-            ax[0].set_ylabel("Wavelength (nm)")
-            ax[1].pcolormesh(
-                angs,
-                wavs,
-                savedata["data"],
-                shading="nearest",
-                cmap="gist_ncar",
-                vmin=np.amin(savedata["data"]),
-                vmax=np.amax(savedata["data"]),
-            )
-            ax[1].set_xlabel("Angle (degrees)")
-            ax[1].set_ylabel("Wavelength (nm)")
-            fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
-
-            used_points = used_points * sqdevs["ele"].shape[1]
-            red_losses = np.sum(losses) / (1.1 * (used_points - len(all_params)))
-            mlflow.log_metrics({"Total reduced loss": float(red_losses)})
-
-            # Create lineout images
-            os.makedirs(os.path.join(td, "lineouts"))
-            for i in np.linspace(0, savedata["data"].shape[1] - 1, 8, dtype="int"):
-                # plot model vs actual
-                titlestr = r"|Error|$^2$" + f" = {losses[i]:.2e}, line out # {i}"
-                filename = f"loss={losses[i]:.2e}-lineout={i}.png"
-                fig, ax = plt.subplots(2, 1, figsize=(10, 8), tight_layout=True, sharex=True)
-                ax[0].plot(all_axes["epw_y"], np.squeeze(savedata["data"][:, i]), label="Data")
-                ax[0].plot(all_axes["epw_y"], np.squeeze(savedata["fit"][:, i]), label="Fit")
-                ax[0].set_title(titlestr, fontsize=14)
-                ax[0].set_ylabel("Amplitude (arb. units)")
-                ax[0].legend(fontsize=14)
-                ax[0].grid()
-                ax[1].plot(all_axes["epw_y"], np.squeeze(sqdevs["ele"][i, :]), label="Residual")
-                ax[1].set_ylabel("$\chi^2_i$")
-                ax[1].set_xlabel("Wavelength (nm)")
-                ax[1].grid()
-                fig.savefig(os.path.join(td, "lineouts", filename), bbox_inches="tight")
-                plt.close(fig)
-
-            # Create fe image
-            fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-            # lineouts = np.array(config["data"]["lineouts"]["val"])
-            ax[0].plot(final_params["fe"])
-            # ax.fill_between(
-            # lineouts,
-            # (final_params["ne"] - 3 * sigmas_ds.ne),
-            # (final_params["ne"] + 3 * sigmas_ds.ne),
-            # color="b",
-            # alpha=0.1,
-            # )
-            ax[0].set_xlabel("v/vth (points)", fontsize=14)
-            ax[0].set_ylabel("f_e (ln)")
-            ax[0].grid()
-            # ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
-            ax[0].set_title("$f_e$", fontsize=14)
-            ax[1].plot(np.log10(np.exp(final_params["fe"])))
-            ax[1].set_xlabel("v/vth (points)", fontsize=14)
-            ax[1].set_ylabel("f_e (log)")
-            ax[1].grid()
-            ax[1].set_ylim(-5, 0)
-            ax[1].set_title("$f_e$", fontsize=14)
-            ax[2].plot(np.exp(final_params["fe"]))
-            ax[2].set_xlabel("v/vth (points)", fontsize=14)
-            ax[2].set_ylabel("f_e")
-            ax[2].grid()
-            fig.savefig(os.path.join(td, "fe_final.png"), bbox_inches="tight")
-
-            mlflow.log_artifacts(td)
-            mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
-    else:
-        num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
-        with tempfile.TemporaryDirectory() as td:
-            # store fitted parameters
-            final_params = pandas.DataFrame(all_params)
-            final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
-
-            losses[losses > 1e10] = 1e10
-            red_losses = losses / (1.1 * (used_points - len(all_params)))
-            loss_inds = losses.flatten().argsort()[::-1]
-            sorted_losses = losses[loss_inds]
-            sorted_redchi = red_losses[loss_inds]
-            mlflow.log_metrics(
-                {
-                    "number of fits above threshold after refit": int(
-                        np.sum(red_losses > config["other"]["refit_thresh"])
-                    )
-                }
-            )
-
-            # this wont work for ion+electron fitting (just electrons will be plotted)
-            if config["other"]["extraoptions"]["load_ion_spec"]:
-                coords = (all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["val"]])), (
-                    "Wavelength",
-                    all_axes["iaw_y"],
-                )
-                # print(coords)
-                # print(all_axes["x_label"])
-                dat = {"fit": fits["ion"], "data": all_data["i_data"]}
-                sorted_fits = fits["ion"][loss_inds]
-                sorted_data = all_data["i_data"][loss_inds]
-                sorted_sqdev = sqdevs["ion"][loss_inds]
-                y_axis = all_axes["iaw_y"]
-            if config["other"]["extraoptions"]["load_ele_spec"]:
-                coords = (all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["val"]])), (
-                    "Wavelength",
-                    all_axes["epw_y"],
-                )
-                dat = {"fit": fits["ele"], "data": all_data["e_data"]}
-                sorted_fits = fits["ele"][loss_inds]
-                sorted_data = all_data["e_data"][loss_inds]
-                sorted_sqdev = sqdevs["ele"][loss_inds]
-                y_axis = all_axes["epw_y"]
-
-            # fit vs data storage and plot
-            savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
-            savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
-
-            fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-            clevs = np.linspace(
-                np.amin(savedata["data"])
-                if config["plotting"]["data_cbar_l"] == "data"
-                else config["plotting"]["data_cbar_l"],
-                np.amax(savedata["data"])
-                if config["plotting"]["data_cbar_u"] == "data"
-                else config["plotting"]["data_cbar_u"],
-                11,
-            )
-            # clevs = np.linspace(0, 300, 11)
-            savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
-            savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
-            fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
-
-            fig, ax = plt.subplots(1, 2, figsize=(12, 4), tight_layout=True)
-            if "red_losses_init" not in locals():
-                red_losses_init = red_losses
-                losses_init = losses
-            ax[0].hist([red_losses_init, red_losses], 40)
-            # ax[0].hist(red_losses, 128)
-            ax[0].set_yscale("log")
-            ax[0].set_xlabel("$\chi^2/DOF$")
-            ax[0].set_ylabel("Counts")
-            ax[0].set_title("Normalized $L^2$ Norm of the Error")
-            ax[0].grid()
-            ax[1].hist([losses_init, losses], 40)
-            # ax[1].hist(losses, 128)
-            ax[1].set_yscale("log")
-            ax[1].set_xlabel("$\chi^2$")
-            ax[1].set_ylabel("Counts")
-            ax[1].set_title("$L^2$ Norm of the Error")
-            ax[1].grid()
-            fig.savefig(os.path.join(td, "error_hist.png"), bbox_inches="tight")
-
-            losses_ds = pandas.DataFrame(
-                {
-                    "initial_losses": losses_init,
-                    "losses": losses,
-                    "initial_reduced_losses": red_losses_init,
-                    "reduced_losses": red_losses,
-                }
-            )
-            losses_ds.to_csv(os.path.join(td, "losses.csv"))
-
-            os.makedirs(os.path.join(td, "worst"))
-            os.makedirs(os.path.join(td, "best"))
-
-            plotters.model_v_actual(
-                sorted_losses,
-                sorted_data,
-                sorted_fits,
-                num_plots,
-                td,
-                config,
-                loss_inds,
-                y_axis,
-                sorted_sqdev,
-                sorted_redchi,
-            )
-
-            sigmas_ds = xr.Dataset(
-                {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(all_params.keys())}
-            )
-            sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
-
-            for param in all_params.keys():
-                vals = pandas.Series(final_params[param])
-                std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
-                fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-                lineouts = np.array(config["data"]["lineouts"]["val"])
-                ax.plot(lineouts, final_params[param])
-                ax.fill_between(
-                    lineouts,
-                    (final_params[param] - config["plotting"]["n_sigmas"] * sigmas_ds[param]),
-                    (final_params[param] + config["plotting"]["n_sigmas"] * sigmas_ds[param]),
-                    color="b",
-                    alpha=0.1,
-                )
-                ax.fill_between(
-                    lineouts,
-                    (final_params[param] - config["plotting"]["n_sigmas"] * std.values),
-                    (final_params[param] + config["plotting"]["n_sigmas"] * std.values),
-                    color="r",
-                    alpha=0.1,
-                )
-                ax.set_xlabel("lineout", fontsize=14)
-                ax.grid()
-                ax.set_ylim(0.8 * np.min(final_params[param]), 1.2 * np.max(final_params[param]))
-                ax.set_ylabel(param, fontsize=14)
-                fig.savefig(os.path.join(td, "learned_" + param + ".png"), bbox_inches="tight")
-            # ne_vals = pandas.Series(final_params["ne"])
-            # ne_std = ne_vals.rolling(5, min_periods=1, center=True).std()
-            # Te_vals = pandas.Series(final_params["Te"])
-            # Te_std = Te_vals.rolling(5, min_periods=1, center=True).std()
-            # m_vals = pandas.Series(final_params["m"])
-            # m_std = m_vals.rolling(5, min_periods=1, center=True).std()
-
-            # print(final_params)
-            # print(sigmas_ds)
-            # ne, Te, m plots with errorbars
-            #             fig, ax = plt.subplots(1, 3, figsize=(15, 4))
-            #             lineouts = np.array(config["data"]["lineouts"]["val"])
-            #             ax[0].plot(lineouts, final_params["ne"])
-            #             ax[0].fill_between(
-            #                 lineouts,
-            #                 (final_params["ne"] - 3 * sigmas_ds.ne),
-            #                 (final_params["ne"] + 3 * sigmas_ds.ne),
-            #                 color="b",
-            #                 alpha=0.1,
-            #             )
-            #             ax[0].fill_between(
-            #                 lineouts,
-            #                 (final_params["ne"] - 3 * ne_std.values),
-            #                 (final_params["ne"] + 3 * ne_std.values),
-            #                 color="r",
-            #                 alpha=0.1,
-            #             )
-            #             ax[0].set_xlabel("lineout", fontsize=14)
-            #             ax[0].grid()
-            #             ax[0].set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
-            #             ax[0].set_title("$n_e$(t)", fontsize=14)
-
-            #             ax[1].plot(lineouts, final_params["Te"])
-            #             ax[1].fill_between(
-            #                 lineouts,
-            #                 (final_params["Te"] - 3 * sigmas_ds.Te),
-            #                 (final_params["Te"] + 3 * sigmas_ds.Te),
-            #                 color="b",
-            #                 alpha=0.1,
-            #             )
-            #             ax[1].fill_between(
-            #                 lineouts,
-            #                 (final_params["Te"] - 3 * Te_std.values),
-            #                 (final_params["Te"] + 3 * Te_std.values),
-            #                 color="r",
-            #                 alpha=0.1,
-            #             )
-            #             ax[1].set_xlabel("lineout", fontsize=14)
-            #             ax[1].grid()
-            #             ax[1].set_ylim(0.8 * np.min(final_params["Te"]), 1.2 * np.max(final_params["Te"]))
-            #             ax[1].set_title("$T_e$(t)", fontsize=14)
-
-            #             ax[2].plot(lineouts, final_params["m"])
-            #             ax[2].fill_between(
-            #                 lineouts,
-            #                 (final_params["m"] - 3 * sigmas_ds.m),
-            #                 (final_params["m"] + 3 * sigmas_ds.m),
-            #                 color="b",
-            #                 alpha=0.1,
-            #             )
-            #             ax[2].fill_between(
-            #                 lineouts,
-            #                 (final_params["m"] - 3 * m_std.values),
-            #                 (final_params["m"] + 3 * m_std.values),
-            #                 color="r",
-            #                 alpha=0.1,
-            #             )
-            #             ax[2].set_xlabel("lineout", fontsize=14)
-            #             ax[2].grid()
-            #             ax[2].set_ylim(0.8 * np.min(final_params["m"]), 1.2 * np.max(final_params["m"]))
-            #             ax[2].set_title("$m$(t)", fontsize=14)
-
-            #             fig.savefig(os.path.join(td, "learned_parameters.png"), bbox_inches="tight")
-
-            mlflow.log_artifacts(td)
-            mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
+        mlflow.log_artifacts(td)
+    mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
 
     mlflow.set_tag("status", "done plotting")
+
+    return final_params
+
+
+def plot_angular(config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td):
+    for key in all_params.keys():
+        all_params[key] = pandas.Series(all_params[key])
+    final_params = pandas.DataFrame(all_params)
+    final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
+
+    sigma_params = []
+    param_ctr = []
+    for i, k in enumerate(all_params.keys()):
+        if k == "fe":
+            sigma_fe = np.squeeze(sigmas[i])
+            sigma_fe = xr.DataArray(sigma_fe, coords=(("v", np.linspace(-7, 7, len(sigma_fe))),))
+        else:
+            sigma_params.append(sigmas[i])
+            param_ctr.append(k)
+
+    sigma_fe.to_netcdf(os.path.join(td, "sigma-fe.nc"))
+    sigma_params = xr.DataArray(sigma_params)
+    sigma_params.to_netcdf(os.path.join(td, "sigma-params.nc"))
+
+    dat = {
+        "fit": fits["ele"],
+        "data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+    }
+    savedata = xr.Dataset({k: xr.DataArray(v) for k, v in dat.items()})
+    savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
+    savedata["data"] = savedata["data"].T
+    savedata["fit"] = savedata["fit"].T
+
+    angs, wavs = np.meshgrid(
+        all_axes["epw_x"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"]],
+        all_axes["epw_y"],
+    )
+
+    # Create fit and data image
+    fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
+    clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 21)
+    ax[0].pcolormesh(
+        angs,
+        wavs,
+        savedata["fit"],
+        shading="nearest",
+        cmap="gist_ncar",
+        vmin=np.amin(savedata["data"]),
+        vmax=np.amax(savedata["data"]),
+    )
+    ax[0].set_xlabel("Angle (degrees)")
+    ax[0].set_ylabel("Wavelength (nm)")
+    ax[1].pcolormesh(
+        angs,
+        wavs,
+        savedata["data"],
+        shading="nearest",
+        cmap="gist_ncar",
+        vmin=np.amin(savedata["data"]),
+        vmax=np.amax(savedata["data"]),
+    )
+    ax[1].set_xlabel("Angle (degrees)")
+    ax[1].set_ylabel("Wavelength (nm)")
+    fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
+
+    used_points = used_points * sqdevs["ele"].shape[1]
+    red_losses = np.sum(losses) / (1.1 * (used_points - len(all_params)))
+    mlflow.log_metrics({"Total reduced loss": float(red_losses)})
+
+    # Create lineout images
+    os.makedirs(os.path.join(td, "lineouts"))
+    for i in np.linspace(0, savedata["data"].shape[1] - 1, 8, dtype="int"):
+        # plot model vs actual
+        titlestr = r"|Error|$^2$" + f" = {losses[i]:.2e}, line out # {i}"
+        filename = f"loss={losses[i]:.2e}-lineout={i}.png"
+        fig, ax = plt.subplots(2, 1, figsize=(10, 8), tight_layout=True, sharex=True)
+        ax[0].plot(all_axes["epw_y"], np.squeeze(savedata["data"][:, i]), label="Data")
+        ax[0].plot(all_axes["epw_y"], np.squeeze(savedata["fit"][:, i]), label="Fit")
+        ax[0].set_title(titlestr, fontsize=14)
+        ax[0].set_ylabel("Amplitude (arb. units)")
+        ax[0].legend(fontsize=14)
+        ax[0].grid()
+        ax[1].plot(all_axes["epw_y"], np.squeeze(sqdevs["ele"][i, :]), label="Residual")
+        ax[1].set_ylabel("$\chi^2_i$")
+        ax[1].set_xlabel("Wavelength (nm)")
+        ax[1].grid()
+        fig.savefig(os.path.join(td, "lineouts", filename), bbox_inches="tight")
+        plt.close(fig)
+
+    # Create fe image
+    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+    # lineouts = np.array(config["data"]["lineouts"]["val"])
+    ax[0].plot(xie := np.linspace(-7, 7, config["parameters"]["fe"]["length"]), final_params["fe"])
+    ax[0].fill_between(
+        xie,
+        (final_params["fe"] - config["plotting"]["n_sigmas"] * sigma_fe.data),
+        (final_params["fe"] + config["plotting"]["n_sigmas"] * sigma_fe.data),
+        color="b",
+        alpha=0.1,
+    )
+
+    # no rolling sigma bc we use a smoothing kernel
+    ax[0].set_xlabel("v/vth (points)", fontsize=14)
+    ax[0].set_ylabel("f_e (ln)")
+    ax[0].grid()
+    # ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
+    ax[0].set_title("$f_e$", fontsize=14)
+    ax[1].plot(np.log10(np.exp(final_params["fe"])))
+    ax[1].set_xlabel("v/vth (points)", fontsize=14)
+    ax[1].set_ylabel("f_e (log)")
+    ax[1].grid()
+    ax[1].set_ylim(-5, 0)
+    ax[1].set_title("$f_e$", fontsize=14)
+    ax[2].plot(np.exp(final_params["fe"]))
+    ax[2].set_xlabel("v/vth (points)", fontsize=14)
+    ax[2].set_ylabel("f_e")
+    ax[2].grid()
+    fig.savefig(os.path.join(td, "fe_final.png"), bbox_inches="tight")
+
+    return final_params
+
+
+def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td):
+    num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
+
+    # store fitted parameters
+    final_params = pandas.DataFrame(all_params)
+    final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
+
+    losses[losses > 1e10] = 1e10
+    red_losses = losses / (1.1 * (used_points - len(all_params)))
+    loss_inds = losses.flatten().argsort()[::-1]
+    sorted_losses = losses[loss_inds]
+    sorted_redchi = red_losses[loss_inds]
+    mlflow.log_metrics(
+        {"number of fits above threshold after refit": int(np.sum(red_losses > config["other"]["refit_thresh"]))}
+    )
+
+    # this wont work for ion+electron fitting (just electrons will be plotted)
+    if config["other"]["extraoptions"]["load_ion_spec"]:
+        coords = (all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["val"]])), (
+            "Wavelength",
+            all_axes["iaw_y"],
+        )
+        # print(coords)
+        # print(all_axes["x_label"])
+        dat = {"fit": fits["ion"], "data": all_data["i_data"]}
+        sorted_fits = fits["ion"][loss_inds]
+        sorted_data = all_data["i_data"][loss_inds]
+        sorted_sqdev = sqdevs["ion"][loss_inds]
+        y_axis = all_axes["iaw_y"]
+    if config["other"]["extraoptions"]["load_ele_spec"]:
+        coords = (all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["val"]])), (
+            "Wavelength",
+            all_axes["epw_y"],
+        )
+        dat = {"fit": fits["ele"], "data": all_data["e_data"]}
+        sorted_fits = fits["ele"][loss_inds]
+        sorted_data = all_data["e_data"][loss_inds]
+        sorted_sqdev = sqdevs["ele"][loss_inds]
+        y_axis = all_axes["epw_y"]
+
+    # fit vs data storage and plot
+    savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in dat.items()})
+    savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
+
+    fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
+    clevs = np.linspace(
+        np.amin(savedata["data"]) if config["plotting"]["data_cbar_l"] == "data" else config["plotting"]["data_cbar_l"],
+        np.amax(savedata["data"]) if config["plotting"]["data_cbar_u"] == "data" else config["plotting"]["data_cbar_u"],
+        11,
+    )
+    # clevs = np.linspace(0, 300, 11)
+    savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
+    savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
+    fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
+
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4), tight_layout=True)
+    if "red_losses_init" not in locals():
+        red_losses_init = red_losses
+        losses_init = losses
+    ax[0].hist([red_losses_init, red_losses], 40)
+    # ax[0].hist(red_losses, 128)
+    ax[0].set_yscale("log")
+    ax[0].set_xlabel("$\chi^2/DOF$")
+    ax[0].set_ylabel("Counts")
+    ax[0].set_title("Normalized $L^2$ Norm of the Error")
+    ax[0].grid()
+    ax[1].hist([losses_init, losses], 40)
+    # ax[1].hist(losses, 128)
+    ax[1].set_yscale("log")
+    ax[1].set_xlabel("$\chi^2$")
+    ax[1].set_ylabel("Counts")
+    ax[1].set_title("$L^2$ Norm of the Error")
+    ax[1].grid()
+    fig.savefig(os.path.join(td, "error_hist.png"), bbox_inches="tight")
+
+    losses_ds = pandas.DataFrame(
+        {
+            "initial_losses": losses_init,
+            "losses": losses,
+            "initial_reduced_losses": red_losses_init,
+            "reduced_losses": red_losses,
+        }
+    )
+    losses_ds.to_csv(os.path.join(td, "losses.csv"))
+
+    os.makedirs(os.path.join(td, "worst"))
+    os.makedirs(os.path.join(td, "best"))
+
+    plotters.model_v_actual(
+        sorted_losses,
+        sorted_data,
+        sorted_fits,
+        num_plots,
+        td,
+        config,
+        loss_inds,
+        y_axis,
+        sorted_sqdev,
+        sorted_redchi,
+    )
+
+    sigmas_ds = xr.Dataset(
+        {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(all_params.keys())}
+    )
+    sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
+
+    for param in all_params.keys():
+        vals = pandas.Series(final_params[param])
+        std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
+        fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+        lineouts = np.array(config["data"]["lineouts"]["val"])
+        ax.plot(lineouts, final_params[param])
+        ax.fill_between(
+            lineouts,
+            (final_params[param] - config["plotting"]["n_sigmas"] * sigmas_ds[param]),
+            (final_params[param] + config["plotting"]["n_sigmas"] * sigmas_ds[param]),
+            color="b",
+            alpha=0.1,
+        )
+        ax.fill_between(
+            lineouts,
+            (final_params[param] - config["plotting"]["n_sigmas"] * std.values),
+            (final_params[param] + config["plotting"]["n_sigmas"] * std.values),
+            color="r",
+            alpha=0.1,
+        )
+        ax.set_xlabel("lineout", fontsize=14)
+        ax.grid()
+        ax.set_ylim(0.8 * np.min(final_params[param]), 1.2 * np.max(final_params[param]))
+        ax.set_ylabel(param, fontsize=14)
+        fig.savefig(os.path.join(td, "learned_" + param + ".png"), bbox_inches="tight")
+    # ne_vals = pandas.Series(final_params["ne"])
+    # ne_std = ne_vals.rolling(5, min_periods=1, center=True).std()
+    # Te_vals = pandas.Series(final_params["Te"])
+    # Te_std = Te_vals.rolling(5, min_periods=1, center=True).std()
+    # m_vals = pandas.Series(final_params["m"])
+    # m_std = m_vals.rolling(5, min_periods=1, center=True).std()
+
+    # print(final_params)
+    # print(sigmas_ds)
+    # ne, Te, m plots with errorbars
+    #             fig, ax = plt.subplots(1, 3, figsize=(15, 4))
+    #             lineouts = np.array(config["data"]["lineouts"]["val"])
+    #             ax[0].plot(lineouts, final_params["ne"])
+    #             ax[0].fill_between(
+    #                 lineouts,
+    #                 (final_params["ne"] - 3 * sigmas_ds.ne),
+    #                 (final_params["ne"] + 3 * sigmas_ds.ne),
+    #                 color="b",
+    #                 alpha=0.1,
+    #             )
+    #             ax[0].fill_between(
+    #                 lineouts,
+    #                 (final_params["ne"] - 3 * ne_std.values),
+    #                 (final_params["ne"] + 3 * ne_std.values),
+    #                 color="r",
+    #                 alpha=0.1,
+    #             )
+    #             ax[0].set_xlabel("lineout", fontsize=14)
+    #             ax[0].grid()
+    #             ax[0].set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
+    #             ax[0].set_title("$n_e$(t)", fontsize=14)
+
+    #             ax[1].plot(lineouts, final_params["Te"])
+    #             ax[1].fill_between(
+    #                 lineouts,
+    #                 (final_params["Te"] - 3 * sigmas_ds.Te),
+    #                 (final_params["Te"] + 3 * sigmas_ds.Te),
+    #                 color="b",
+    #                 alpha=0.1,
+    #             )
+    #             ax[1].fill_between(
+    #                 lineouts,
+    #                 (final_params["Te"] - 3 * Te_std.values),
+    #                 (final_params["Te"] + 3 * Te_std.values),
+    #                 color="r",
+    #                 alpha=0.1,
+    #             )
+    #             ax[1].set_xlabel("lineout", fontsize=14)
+    #             ax[1].grid()
+    #             ax[1].set_ylim(0.8 * np.min(final_params["Te"]), 1.2 * np.max(final_params["Te"]))
+    #             ax[1].set_title("$T_e$(t)", fontsize=14)
+
+    #             ax[2].plot(lineouts, final_params["m"])
+    #             ax[2].fill_between(
+    #                 lineouts,
+    #                 (final_params["m"] - 3 * sigmas_ds.m),
+    #                 (final_params["m"] + 3 * sigmas_ds.m),
+    #                 color="b",
+    #                 alpha=0.1,
+    #             )
+    #             ax[2].fill_between(
+    #                 lineouts,
+    #                 (final_params["m"] - 3 * m_std.values),
+    #                 (final_params["m"] + 3 * m_std.values),
+    #                 color="r",
+    #                 alpha=0.1,
+    #             )
+    #             ax[2].set_xlabel("lineout", fontsize=14)
+    #             ax[2].grid()
+    #             ax[2].set_ylim(0.8 * np.min(final_params["m"]), 1.2 * np.max(final_params["m"]))
+    #             ax[2].set_title("$m$(t)", fontsize=14)
+
+    #             fig.savefig(os.path.join(td, "learned_parameters.png"), bbox_inches="tight")
 
     return final_params
