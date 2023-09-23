@@ -250,10 +250,10 @@ def plot_angular(config, losses, all_params, used_points, all_axes, fits, all_da
     param_ctr = []
     for i, k in enumerate(all_params.keys()):
         if k == "fe":
-            sigma_fe = np.squeeze(sigmas[i])
+            sigma_fe = np.squeeze(sigmas[0, i])
             sigma_fe = xr.DataArray(sigma_fe, coords=(("v", np.linspace(-7, 7, len(sigma_fe))),))
         else:
-            sigma_params.append(sigmas[i])
+            sigma_params.append(sigmas[0, i])
             param_ctr.append(k)
 
     sigma_fe.to_netcdf(os.path.join(td, "sigma-fe.nc"))
