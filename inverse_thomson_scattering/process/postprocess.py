@@ -246,18 +246,19 @@ def plot_angular(config, losses, all_params, used_points, all_axes, fits, all_da
     final_params = pandas.DataFrame(all_params)
     final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
 
-    sigma_params = []
-    param_ctr = []
+    sigma_params = {}
+    sizes = {key: all_params[key].shape[0] for key in all_params.keys()}
+    param_ctr = 0
     for i, k in enumerate(all_params.keys()):
+        val = sigmas[0, param_ctr : param_ctr + sizes[k]]
         if k == "fe":
-            sigma_fe = np.squeeze(sigmas[0, i])
-            sigma_fe = xr.DataArray(sigma_fe, coords=(("v", np.linspace(-7, 7, len(sigma_fe))),))
+            sigma_fe = xr.DataArray(val, coords=(("v", np.linspace(-7, 7, len(val))),))
         else:
-            sigma_params.append(sigmas[0, i])
-            param_ctr.append(k)
+            sigma_params[k] = xr.DataArray(val, coords=(("ind", [0]),))
+        param_ctr += sizes[k]
 
     sigma_fe.to_netcdf(os.path.join(td, "sigma-fe.nc"))
-    sigma_params = xr.DataArray(sigma_params)
+    sigma_params = xr.Dataset(sigma_params)
     sigma_params.to_netcdf(os.path.join(td, "sigma-params.nc"))
 
     dat = {
