@@ -209,26 +209,42 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
         config["optimizer"]["batch_size"] = true_batch_size
 
     mlflow.log_metrics({"refitting time": round(time.time() - t1, 2)})
-    losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
-        config,
-        batch_indices,
-        all_data,
-        best_weights,
-        ts_fitter,
-        calc_sigma=config["other"]["calc_sigmas"],
-        raw_weights=raw_weights,
-    )
-
-    mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
-    mlflow.set_tag("status", "plotting")
-    t1 = time.time()
 
     with tempfile.TemporaryDirectory() as td:
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
+            best_weights_val = {}
+            best_weights_std = {}
+            for k in best_weights[0].keys():
+                best_weights_val[k] = np.average([val[k] for val in best_weights], axis=0)
+                best_weights_std[k] = np.std([val[k] for val in best_weights], axis=0)
+            losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
+                config,
+                batch_indices,
+                all_data,
+                best_weights,
+                ts_fitter,
+                calc_sigma=config["other"]["calc_sigmas"],
+                raw_weights=raw_weights,
+            )
+            mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
+            mlflow.set_tag("status", "plotting")
+            t1 = time.time()
             final_params = plot_angular(
-                config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td
+                config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td, best_weights_val, best_weights_std
             )
         else:
+            losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
+                config,
+                batch_indices,
+                all_data,
+                best_weights,
+                ts_fitter,
+                calc_sigma=config["other"]["calc_sigmas"],
+                raw_weights=raw_weights,
+            )
+            mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
+            mlflow.set_tag("status", "plotting")
+            t1 = time.time()
             final_params = plot_regular(
                 config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td
             )
@@ -240,7 +256,8 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
     return final_params
 
 
-def plot_angular(config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td):
+def plot_angular(config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td, best_weights_val, best_weights_std):
+    all_params = best_weights_val
     for key in all_params.keys():
         all_params[key] = pandas.Series(all_params[key])
     final_params = pandas.DataFrame(all_params)
@@ -249,14 +266,16 @@ def plot_angular(config, losses, all_params, used_points, all_axes, fits, all_da
     sigma_params = {}
     sizes = {key: all_params[key].shape[0] for key in all_params.keys()}
     param_ctr = 0
-    for i, k in enumerate(all_params.keys()):
-        val = sigmas[0, param_ctr : param_ctr + sizes[k]]
-        if k == "fe":
-            sigma_fe = xr.DataArray(val, coords=(("v", np.linspace(-7, 7, len(val))),))
-        else:
-            sigma_params[k] = xr.DataArray(val, coords=(("ind", [0]),))
-        param_ctr += sizes[k]
+    if config["other"]["calc_sigmas"]:
+        for i, k in enumerate(all_params.keys()):
+            val = sigmas[0, param_ctr : param_ctr + sizes[k]]
+            if k == "fe":
+                sigma_fe = xr.DataArray(val, coords=(("v", np.linspace(-7, 7, len(val))),))
+            else:
+                sigma_params[k] = xr.DataArray(val, coords=(("ind", [0]),))
+            param_ctr += sizes[k]
 
+    sigma_params = best_weights_std
     sigma_fe.to_netcdf(os.path.join(td, "sigma-fe.nc"))
     sigma_params = xr.Dataset(sigma_params)
     sigma_params.to_netcdf(os.path.join(td, "sigma-params.nc"))

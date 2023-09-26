@@ -107,7 +107,7 @@ other:
     lam_res_unit: 5
     refit: True
     refit_thresh: 0.25
-    calc_sigmas: True
+    calc_sigmas: False
 
 plotting:
     n_sigmas: 3
@@ -159,8 +159,8 @@ optimizer:
     num_epochs: 200
     learning_rate: 1.0e-4
     parameter_norm: True
-    refine_factor: 0
-    num_mins: 1
+    refine_factor: 1
+    num_mins: 10
 
 nn:
     use: false

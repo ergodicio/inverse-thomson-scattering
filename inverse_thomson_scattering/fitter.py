@@ -179,6 +179,7 @@ def adam_loop(config, all_data, sa, batch_indices, num_batches):
 
 def scipy_loop(config, all_data, sa, batch_indices, num_batches):
     best_weights = {}
+    all_weights = []
     if config["other"]["extraoptions"]["spectype"] == "angular_full":
         print("Running Angular, setting batch_size to 1")
         config["optimizer"]["batch_size"] = 1
@@ -196,6 +197,9 @@ def scipy_loop(config, all_data, sa, batch_indices, num_batches):
         }
         for i in range(config["optimizer"]["num_mins"]):
             ts_fitter = TSFitter(config, sa, batch)
+            ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
+                0.97, 1.03, len(ts_fitter.flattened_weights)
+            )
             res = spopt.minimize(
                 ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
                 ts_fitter.flattened_weights,
@@ -231,9 +235,10 @@ def scipy_loop(config, all_data, sa, batch_indices, num_batches):
                 config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
             )
             config["units"] = init_param_norm_and_shift(config)
-
+            all_weights.append(best_weights)
         raw_weights = ts_fitter.unravel_pytree(res["x"])
         overall_loss = res["fun"]
+        best_weights = all_weights
         # print(best_weights)
     else:
         batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
