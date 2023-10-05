@@ -12,7 +12,8 @@ from jax.flatten_util import ravel_pytree
 import haiku as hk
 import numpy as np
 
-from inverse_thomson_scattering.model.hk_classes import TSParameterGenerator, SpectrumCalculator
+from inverse_thomson_scattering.model.parameters import TSParameterGenerator
+from inverse_thomson_scattering.model.spectrum import SpectrumCalculator
 
 
 class TSFitter:
