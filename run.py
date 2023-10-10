@@ -5,7 +5,7 @@ from flatten_dict import flatten, unflatten
 from jax import config
 
 config.update("jax_enable_x64", True)
-config.update("jax_disable_jit", True)
+# config.update("jax_disable_jit", True)
 
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
