@@ -1,9 +1,7 @@
 from collections import defaultdict
 
 import numpy as np
-from scipy.signal import convolve2d as conv2
-from inverse_thomson_scattering.misc.plotters import ColorPlots
-from inverse_thomson_scattering.evaluate_background import get_lineout_bg
+from inverse_thomson_scattering.process.evaluate_background import get_lineout_bg
 
 
 def get_lineouts(

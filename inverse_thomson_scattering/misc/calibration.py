@@ -4,6 +4,8 @@ import numpy as np
 import scipy.io as sio
 from os.path import join, exists
 
+from inverse_thomson_scattering.misc.sa_table import sa_lookup
+
 def get_calibrations(shotNum, tstype, CCDsize):
     stddev = dict()
     # Dispersions and calibrations
@@ -43,12 +45,25 @@ def get_calibrations(shotNum, tstype, CCDsize):
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
 
-        if shotNum <109000:
+        elif shotNum <108950:
             #these are calibrations for shot 108135
             EPWDisp = 0.4104
             IAWDisp = 0.005749
             EPWoff = 319.3
             IAWoff = 523.3438  # 522.90
+            stddev["spect_stddev_ion"] = 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
+            stddev["spect_stddev_ele"] = 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
+
+            # Sweep speed calculated from 5 Ghz comb (should be updated, date unknown)
+            magI = 5  # (ps / px) this is just a rough guess
+            magE = 5  # (ps / px) this is just a rough guess
+        
+        elif shotNum <108990:
+            #these are calibrations for shots 108964-
+            EPWDisp = 0.4104
+            IAWDisp = 0.00959
+            EPWoff = 135.0
+            IAWoff = 346.09
             stddev["spect_stddev_ion"] = 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
             stddev["spect_stddev_ele"] = 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
 
@@ -127,26 +142,9 @@ def get_calibrations(shotNum, tstype, CCDsize):
     return axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev
 
 
-def get_scattering_angles(spectype):
-    if spectype != "angular":
-        # Scattering angle in degrees for OMEGA TIM6 TS
-        sa = dict(
-            sa=np.linspace(53.637560, 66.1191, 10),
-            weights=np.array(
-                [
-                    0.00702671050853565,
-                    0.0391423809738300,
-                    0.0917976667717670,
-                    0.150308544660150,
-                    0.189541011666141,
-                    0.195351560740507,
-                    0.164271879645061,
-                    0.106526733030044,
-                    0.0474753389486960,
-                    0.00855817305526778,
-                ]
-            ),
-        )
+def get_scattering_angles(config):
+    if config["other"]["extraoptions"]["spectype"] != "angular":
+        sa = sa_lookup(config["data"]["probe_beam"])
     else:
         # Scattering angle in degrees for Artemis
         imp = sio.loadmat(join("files", "angleWghtsFredfine.mat"), variable_names="weightMatrix")

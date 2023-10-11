@@ -20,7 +20,7 @@ parameters:
         lb: 523.0
         ub: 528.0
     Te:
-        val: 1.0
+        val: 0.5
         active: True
         lb: 0.01
         ub: 1.5
@@ -33,10 +33,10 @@ parameters:
     Ti:
         val: 0.2
         active: False
-        lb: 0.01
+        lb: 0.001
         ub: 3.0
     Z:
-        val: 8.
+        val: 6.
         active: False
         lb: 1.0
         ub: 25.0
@@ -52,12 +52,12 @@ parameters:
     Va:
         val: 0.0
         active: False
-        lb: -1.1
+        lb: -2.5
         ub: 2.5
     ne:
-        val: 0.4
+        val: 0.2
         active: True
-        lb: .001
+        lb: 0.001
         ub: 1.0
     ne_gradient:
         val: 0.
@@ -66,33 +66,33 @@ parameters:
         ub: 15.
         num_grad_points: 1
     m:
-        val: 3.5
-        active: False
+        val: 2.0
+        active: True
         lb: 2.0
         ub: 5.0
     fe:
         val: []
-        active: True
-        length: 256
+        active: False
+        length: 3999
         type:
             DLM:
         lb: -100.
         ub: -0.5
-        fe_decrease_strict: True
+        fe_decrease_strict: False
         symmetric: False
 
 data:
-    shotnum: 94475
+    shotnum: 101675
     lineouts:
         type:
-            range
-        start: 90
-        end: 950
-        skip: 20
+            pixel
+        start: 320
+        end: 680
+        skip: 24
     background:
         type:
-            Fit
-        slice: 94477
+            pixel
+        slice: 900
 
 other:
     extraoptions:
@@ -103,7 +103,8 @@ other:
         fit_EPWr: True
     refit: False
     refit_thresh: 5.0
+    gain: 135
 
 mlflow:
-    experiment: inverse-thomson-scattering-d2
-    run: archis-test
+    experiment: inverse-thomson-scattering
+    run: simultaneous_fit_test_1

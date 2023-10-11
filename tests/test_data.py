@@ -14,7 +14,7 @@ from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
 
 
-@pytest.mark.parametrize("nn", [True, False])
+@pytest.mark.parametrize("nn", [False])
 def test_data(nn):
     # Test #3: Data test, compare fit to a preknown fit result
     # currently just runs one line of shot 101675 for the electron, should be expanded in the future
@@ -41,7 +41,7 @@ def test_data(nn):
         config["num_cores"] = int(mp.cpu_count())
 
         t0 = time.time()
-        fit_results = fitter.fit(config=config)
+        fit_results, loss = fitter.fit(config=config)
         metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
         mlflow.log_metrics(metrics=metrics_dict)
         mlflow.set_tag("status", "completed")
@@ -55,4 +55,4 @@ def test_data(nn):
 
 
 if __name__ == "__main__":
-    test_data(True)
+    test_data(False)

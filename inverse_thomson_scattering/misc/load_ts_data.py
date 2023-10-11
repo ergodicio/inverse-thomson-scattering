@@ -97,5 +97,8 @@ def loadData(sNum, sDay, loadspecs):
             loadspecs["load_ele_spec"] = False
     else:
         eDat = []
+        
+    if not loadspecs["load_ele_spec"] and not loadspecs["load_ion_spec"]:
+        raise LookupError(f"No data found for shotnumber {sNum} in the data folder") 
 
     return eDat, iDat, xlab, specType

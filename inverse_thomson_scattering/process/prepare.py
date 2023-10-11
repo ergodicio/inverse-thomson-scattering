@@ -3,11 +3,11 @@ from typing import Dict
 import numpy as np
 from scipy.signal import convolve2d as conv2
 from inverse_thomson_scattering.misc import plotters
-from inverse_thomson_scattering.evaluate_background import get_shot_bg
+from inverse_thomson_scattering.process.evaluate_background import get_shot_bg
 from inverse_thomson_scattering.misc.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
 from inverse_thomson_scattering.misc.calibration import get_calibrations, get_scattering_angles
-from inverse_thomson_scattering.lineouts import get_lineouts
+from inverse_thomson_scattering.process.lineouts import get_lineouts
 
 
 def prepare_data(config: Dict) -> Dict:
@@ -26,13 +26,13 @@ def prepare_data(config: Dict) -> Dict:
     )
 
     # get scattering angles and weights
-    sa = get_scattering_angles(config["other"]["extraoptions"]["spectype"])
+    sa = get_scattering_angles(config)
 
     # Calibrate axes
     [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(
         config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
     )
-    all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI} 
+    all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI, "x_label": xlab} 
 
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
     if not config["other"]["extraoptions"]["load_ion_spec"]:
@@ -49,6 +49,11 @@ def prepare_data(config: Dict) -> Dict:
             elecData, config["other"]["extraoptions"]["spectype"], axisyE, config["data"]["shotnum"]
         )
 
+    # Not possible on JupyterLab looking for another solution
+    # Lauch the data visualizer for manual linout selection
+    # if config["data"]["launch_data_visualizer"]:
+    #     launch_data_visualizer(elecData, ionData, all_axes, config)
+    
     # load and correct background
     [BGele, BGion] = get_shot_bg(config, axisyE, elecData)
 
@@ -101,7 +106,8 @@ def prepare_data(config: Dict) -> Dict:
         all_axes["epw_x"] = axisxE.reshape((-1,1))
         all_data = {"e_data": data_res_unit, "e_amps": np.amax(data_res_unit, axis = 1, keepdims = True)}
         all_data["i_data"] = all_data["i_amps"] = np.zeros(len(data_res_unit))
-        config["other"]["PhysParams"]["noiseI"] = 0
+        #changed this 8-29-23 not sure how it worked with =0?
+        config["other"]["PhysParams"]["noiseI"] = np.zeros(np.shape(bg_res_unit))
         config["other"]["PhysParams"]["noiseE"] = bg_res_unit
         config["other"]["CCDsize"] = np.shape(data_res_unit)
         config["data"]["lineouts"]["start"] = int(config["data"]["lineouts"]["start"]/ ang_res_unit)

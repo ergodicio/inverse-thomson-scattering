@@ -1,8 +1,8 @@
-import mlflow, flatdict
+import mlflow, flatten_dict
 
 
 def log_params(cfg):
-    flattened_dict = dict(flatdict.FlatDict(cfg, delimiter="."))
+    flattened_dict = flatten_dict.flatten(cfg, reducer="dot")  # dict(flatdict.FlatDict(cfg, delimiter="."))
     num_entries = len(flattened_dict.keys())
 
     if num_entries > 100:
