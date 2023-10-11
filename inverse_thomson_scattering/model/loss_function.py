@@ -18,6 +18,15 @@ from inverse_thomson_scattering.model.spectrum import SpectrumCalculator
 
 class TSFitter:
     def __init__(self, cfg: Dict, sas, dummy_batch):
+        """
+        `sas` are the scattering angles that are a subset of the device specific information that is required to
+        perform the analysis
+
+        Args:
+            cfg:
+            sas:
+            dummy_batch:
+        """
         self.cfg = cfg
 
         if cfg["optimizer"]["y_norm"]:
@@ -65,7 +74,13 @@ class TSFitter:
             return active_params
 
         self._get_active_params_ = hk.without_apply_rng(hk.transform(__get_active_params__))
-        self.spec_calc = SpectrumCalculator(cfg, sas, dummy_batch)
+
+        vmap_fwd = (
+            cfg["other"]["extraoptions"]["spectype"] == "angular_full"
+            or max(dummy_batch["e_data"].shape[0], dummy_batch["i_data"].shape[0]) <= 1
+        )
+
+        self.spec_calc = SpectrumCalculator(cfg, sas, vmap_fwd)
 
         rng_key = jax.random.PRNGKey(42)
         init_weights = self._get_params_.init(rng_key, dummy_batch)

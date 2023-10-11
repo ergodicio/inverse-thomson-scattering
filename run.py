@@ -25,7 +25,7 @@ def one_run(config):
 
 if __name__ == "__main__":
     all_configs = {}
-    basedir = os.path.join(os.getcwd(), "configs", "arts")
+    basedir = os.path.join(os.getcwd(), "configs", "1d")
     for k in ["defaults", "inputs"]:
         with open(f"{os.path.join(basedir, k)}.yaml", "r") as fi:
             all_configs[k] = yaml.safe_load(fi)

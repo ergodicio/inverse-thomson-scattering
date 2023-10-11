@@ -8,7 +8,7 @@ from inverse_thomson_scattering.process import irf
 
 
 class SpectrumCalculator:
-    def __init__(self, cfg, sas, dummy_batch):
+    def __init__(self, cfg, sas, vmap_fwd):
         super().__init__()
         self.cfg = cfg
         self.sas = sas
@@ -20,10 +20,7 @@ class SpectrumCalculator:
         self.cfg_for_params = copy.deepcopy(cfg)
         self.cfg_for_params_2 = copy.deepcopy(cfg)
 
-        if (
-            cfg["other"]["extraoptions"]["spectype"] == "angular_full"
-            or max(dummy_batch["e_data"].shape[0], dummy_batch["i_data"].shape[0]) <= 1
-        ):
+        if vmap_fwd:
             # ATS data can't be vmaped and single lineouts cant be vmapped
             self.vmap_forward_pass = self.forward_pass
             self.vmap_postprocess_thry = self.postprocess_thry
