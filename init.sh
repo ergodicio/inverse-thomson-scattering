@@ -3,9 +3,9 @@
 
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 
-cp ~/private/init_confs/zshrc ~/.zshrc
+cp ~/init_confs/zshrc ~/.zshrc
 mkdir ~/.ssh
-cp ~/private/init_confs/config ~/.ssh/config
+cp ~/init_confs/config ~/.ssh/config
 
 cat << 'EOF' >> ~/.zshrc
 export "PATH=$PATH:/opt/conda/bin"
