@@ -11,11 +11,11 @@ parameters:
         ub: 3.75
     amp3:
         val: 1.
-        active: False
+        active: True
         lb: 0.01
         ub: 3.75
     lam:
-        val: 524.5
+        val: 526.5
         active: True
         lb: 523.0
         ub: 528.0
@@ -37,7 +37,7 @@ parameters:
         ub: 3.0
     Z:
         val: 6.
-        active: False
+        active: True
         lb: 1.0
         ub: 25.0
     A:
@@ -46,12 +46,12 @@ parameters:
 
     ud:
         val: 0.0
-        active: False
+        active: True
         lb: -2.0
         ub: 2.0
     Va:
         val: 0.0
-        active: False
+        active: True
         lb: -2.5
         ub: 2.5
     ne:
@@ -96,9 +96,9 @@ data:
 
 other:
     extraoptions:
-        load_ion_spec: False
+        load_ion_spec: True
         load_ele_spec: True
-        fit_IAW: False
+        fit_IAW: True
         fit_EPWb: True
         fit_EPWr: True
     refit: False
@@ -107,4 +107,4 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: simultaneous_fit_test_1
+    run: simultaneous_fit_test_3
