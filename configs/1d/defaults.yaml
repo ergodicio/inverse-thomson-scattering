@@ -82,6 +82,7 @@ parameters:
         active: False
 
 other:
+    crop_window: 1
     ion_window_start: 525
     ion_window_end: 528
     ele_window_start: 425

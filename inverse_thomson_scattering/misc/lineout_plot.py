@@ -2,11 +2,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-def lineout_plot(sorted_data, sorted_fits, sorted_sqdev, yaxis, s_ind, e_ind, titlestr, filename, td):
+def lineout_plot(sorted_data, sorted_fits, sorted_sqdev, yaxis, s_ind, e_ind, titlestr, filename, td, tag):
     if len(sorted_data) == 2:
         num_col = 2
     else:
         num_col = 1
+        
     fig, ax = plt.subplots(2, num_col, figsize=(12, 8), squeeze=False, tight_layout=True, sharex=False)
     for col in range(len(ax)):
         ax[0][col].plot(
@@ -32,5 +33,5 @@ def lineout_plot(sorted_data, sorted_fits, sorted_sqdev, yaxis, s_ind, e_ind, ti
         ax[1][col].set_ylabel("$\chi_i^2$")
     
     
-    fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
+    fig.savefig(os.path.join(td, tag, filename), bbox_inches="tight")
     plt.close(fig)

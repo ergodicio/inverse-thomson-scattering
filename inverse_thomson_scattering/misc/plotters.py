@@ -89,125 +89,14 @@ def model_v_actual(
         )
         filename = f"loss={sorted_losses[i]:.2e}-reduced_loss={sorted_red_losses[i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[i]]}.png"
         
-        lineout_plot(sorted_data[:][i,:], sorted_fits[:][i,:], sorted_sqdev[:][i,:], yaxis, titlestr, filename, td)
+        lineout_plot(np.array(sorted_data)[:,i,:], np.array(sorted_fits)[:,i,:], np.array(sorted_sqdev)[:,i,:], yaxis, s_ind, e_ind, titlestr, filename, td, "worst")
 
         titlestr = (
             r"|Error|$^2$" + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
                 )
         filename = f"loss={sorted_losses[-1 - i]:.2e}-reduced_loss={sorted_red_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
         
-        lineout_plot(sorted_data[:][-1-i,:], sorted_fits[:][-1-i,:], sorted_sqdev[:][-1-i,:], yaxis, titlestr, filename, td)
-        # if len(sorted_data)==2:
-            
-        #     titlestr = (
-        #         r"|Error|$^2$"
-        #         + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
-        #     )
-        #     filename = f"loss={sorted_losses[-1 - i]:.2e}-reduced_loss={sorted_red_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
-        #     fig, ax = plt.subplots(2, 2, figsize=(10, 10), tight_layout=True, sharex=False)
-        #     ax[0][0].plot(
-        #         yaxis[0][ele_s_ind : ele_e_ind],
-        #         np.squeeze(sorted_data[0][-1 - i, ele_s_ind : ele_e_ind]),
-        #         label="Data",
-        #     )
-        #     ax[0][0].plot(
-        #         yaxis[0][ele_s_ind : ele_e_ind],
-        #         np.squeeze(sorted_fits[0][-1 - i, ele_s_ind : ele_e_ind]),
-        #         label="Fit",
-        #     )
-        #     ax[0][0].set_title(titlestr, fontsize=14)
-        #     ax[0][0].set_ylabel("Amp (arb. units)")
-        #     ax[0][0].legend(fontsize=14)
-        #     ax[0][0].grid()
-        #     ax[1][0].plot(
-        #         yaxis[0][ele_s_ind : ele_e_ind],
-        #         np.squeeze(sorted_sqdev[0][i, ele_s_ind : ele_e_ind]),
-        #         label="Residual",
-        #     )
-        #     ax[1][0].set_xlabel("Wavelength (nm)")
-        #     ax[1][0].set_ylabel("$\chi_i^2$")
-        #     ax[0][1].plot(
-        #         yaxis[1][ion_s_ind : ion_e_ind],
-        #         np.squeeze(sorted_data[1][i, ion_s_ind : ion_e_ind]),
-        #         label="Data",
-        #     )
-        #     ax[0][1].plot(
-        #         yaxis[1][ion_s_ind : ion_e_ind],
-        #         np.squeeze(sorted_fits[1][-1 - i, ion_s_ind : ion_e_ind]),
-        #         label="Fit",
-        #     )
-        #     ax[0][1].set_title(titlestr, fontsize=14)
-        #     ax[0][1].set_ylabel("Amp (arb. units)")
-        #     ax[0][1].legend(fontsize=14)
-        #     ax[0][1].grid()
-        #     ax[1][1].plot(
-        #         yaxis[1][ion_s_ind : ion_e_ind],
-        #         np.squeeze(sorted_sqdev[1][i, ion_s_ind : ion_e_ind]),
-        #         label="Residual",
-        #     )
-        #     ax[1][1].set_xlabel("Wavelength (nm)")
-        #     ax[1][1].set_ylabel("$\chi_i^2$")
-            
-            
-        #     fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
-        #     plt.close(fig)
-        
-        # else:
-        #     fig, ax = plt.subplots(2, 1, figsize=(10, 8), tight_layout=True, sharex=True)
-        #     ax[0].plot(
-        #         yaxis[s_ind : e_ind],
-        #         np.squeeze(sorted_data[i, s_ind : e_ind]),
-        #         label="Data",
-        #     )
-        #     ax[0].plot(
-        #         yaxis[s_ind : e_ind],
-        #         np.squeeze(sorted_fits[i, s_ind : e_ind]),
-        #         label="Fit",
-        #     )
-        #     ax[0].set_title(titlestr, fontsize=14)
-        #     ax[0].set_ylabel("Amp (arb. units)")
-        #     ax[0].legend(fontsize=14)
-        #     ax[0].grid()
-        #     ax[1].plot(
-        #         yaxis[s_ind : e_ind],
-        #         np.squeeze(sorted_sqdev[i, s_ind : e_ind]),
-        #         label="Residual",
-        #     )
-        #     ax[1].set_xlabel("Wavelength (nm)")
-        #     ax[1].set_ylabel("$\chi_i^2$")
-        #     fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
-        #     plt.close(fig)
-
-        #     titlestr = (
-        #         r"|Error|$^2$"
-        #         + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
-        #     )
-        #     filename = f"loss={sorted_losses[-1 - i]:.2e}-reduced_loss={sorted_red_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
-        #     fig, ax = plt.subplots(2, 1, figsize=(10, 8), tight_layout=True, sharex=True)
-        #     ax[0].plot(
-        #         yaxis[s_ind : e_ind],
-        #         np.squeeze(sorted_data[-1 - i, s_ind : e_ind]),
-        #         label="Data",
-        #     )
-        #     ax[0].plot(
-        #         yaxis[s_ind : e_ind],
-        #         np.squeeze(sorted_fits[-1 - i, s_ind : e_ind]),
-        #         label="Fit",
-        #     )
-        #     ax[0].set_title(titlestr, fontsize=14)
-        #     ax[0].set_ylabel("Amp (arb. units)")
-        #     ax[0].legend(fontsize=14)
-        #     ax[0].grid()
-        #     ax[1].plot(
-        #         yaxis[s_ind : e_ind],
-        #         np.squeeze(sorted_sqdev[-1 - i, s_ind : e_ind]),
-        #         label="Residual",
-        #     )
-        #     ax[1].set_xlabel("Wavelength (nm)")
-        #     ax[1].set_ylabel("$\chi_i^2$")
-        #     fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
-        #     plt.close(fig)
-
+        lineout_plot(np.array(sorted_data)[:,-1-i,:], np.array(sorted_fits)[:,-1-i,:], np.array(sorted_sqdev)[:,-1-i,:], yaxis, s_ind, e_ind, titlestr, filename, td, "best")
 
 def LinePlots(
     x,
