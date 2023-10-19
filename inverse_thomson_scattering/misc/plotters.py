@@ -77,10 +77,16 @@ def model_v_actual(
     elif config["other"]["extraoptions"]["load_ion_spec"]:
         s_ind = np.argmin(np.abs(yaxis-config["other"]["ion_window_start"]))
         e_ind = np.argmin(np.abs(yaxis-config["other"]["ion_window_end"]))
+        sorted_data = np.array(sorted_data).reshape(1,np.shape(sorted_data))
+        sorted_fits = np.array(sorted_fits).reshape(1,np.shape(sorted_fits))
+        sorted_sqdev = np.array(sorted_sqdev).reshape(1,np.shape(sorted_sqdev))
+        
     elif config["other"]["extraoptions"]["load_ele_spec"]:
         s_ind = np.argmin(np.abs(yaxis-config["other"]["ele_window_start"]))
         e_ind = np.argmin(np.abs(yaxis-config["other"]["ele_window_end"]))
-    
+        sorted_data = np.array(sorted_data).reshape(1,np.shape(sorted_data))
+        sorted_fits = np.array(sorted_fits).reshape(1,np.shape(sorted_fits))
+        sorted_sqdev = np.array(sorted_sqdev).reshape(1,np.shape(sorted_sqdev))
     for i in range(num_plots):
 
         # plot model vs actual
