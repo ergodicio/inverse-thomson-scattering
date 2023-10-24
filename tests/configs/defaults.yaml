@@ -96,13 +96,15 @@ parameters:
 
 other:
     crop_window: 256
-    active: False
+    ion_window_start: 525
+    ion_window_end: 528
+    ele_window_start: 425
+    ele_window_end: 625
     BinWidth: 10
     NumBinInRng: 0
     TotalNumBin: 1023
     expandedions: False
     extraoptions:
-        spectype: 2
         load_ion_spec: False
         load_ele_spec: True
         fit_IAW: False
@@ -117,10 +119,16 @@ other:
     flatbg: 0
     gain: 1
     points_per_pixel: 5
+    ang_res_unit: 10
+    lam_res_unit: 5
+    refit: True
+    refit_thresh: 0.25
+    calc_sigmas: False
 
 data:
     shotnum: 101675
     shotDay: False
+    launch_data_visualizer: False
     fit_rng:
         blue_min: 450
         blue_max: 510
@@ -129,6 +137,10 @@ data:
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1
+    ion_loss_scale: 1.0
+    ele_t0: 0
+    ion_t0_shift: 0.0
+    ele_lam_shift: -2.0
     dpixel: 2
     lineouts:
         type:
@@ -161,13 +173,19 @@ optimizer:
     num_epochs: 200
     learning_rate: 1.0e-4
     parameter_norm: True
+    refine_factor: 0
+    num_mins: 1
 
 nn:
     use: false
     conv_filters: 32|32|16
     linear_widths: 16|8
 
-
+dist_fit:
+    window:
+        len: 0.2 #should be even
+        type: hamming # one of [hamming, hann, bartlett]
+        
 mlflow:
     experiment: inverse-thomson-scattering
     run: base

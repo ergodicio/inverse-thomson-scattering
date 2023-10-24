@@ -8,6 +8,7 @@ from inverse_thomson_scattering.misc.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
 from inverse_thomson_scattering.misc.calibration import get_calibrations, get_scattering_angles
 from inverse_thomson_scattering.process.lineouts import get_lineouts
+from inverse_thomson_scattering.misc.data_visualizer import launch_data_visualizer
 
 
 def prepare_data(config: Dict) -> Dict:
@@ -29,7 +30,7 @@ def prepare_data(config: Dict) -> Dict:
     sa = get_scattering_angles(config)
 
     # Calibrate axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(
+    [axisxE, axisxI, axisyE, axisyI, magE, stddev] = get_calibrations(
         config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
     )
     all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI, "x_label": xlab} 
@@ -49,10 +50,9 @@ def prepare_data(config: Dict) -> Dict:
             elecData, config["other"]["extraoptions"]["spectype"], axisyE, config["data"]["shotnum"]
         )
 
-    # Not possible on JupyterLab looking for another solution
-    # Lauch the data visualizer for manual linout selection
-    # if config["data"]["launch_data_visualizer"]:
-    #     launch_data_visualizer(elecData, ionData, all_axes, config)
+    # Lauch the data visualizer to show linout selection, not currently interactable
+    if config["data"]["launch_data_visualizer"]:
+        launch_data_visualizer(elecData, ionData, all_axes, config)
     
     # load and correct background
     [BGele, BGion] = get_shot_bg(config, axisyE, elecData)
@@ -115,7 +115,8 @@ def prepare_data(config: Dict) -> Dict:
 
     else:
         all_data = get_lineouts(
-            elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, 0, IAWtime, xlab, sa, config
+            elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, config["data"]["ele_t0"],
+            config["data"]["ion_t0_shift"], xlab, sa, config
         )
 
     config["other"]["PhysParams"]["widIRF"] = stddev

@@ -80,7 +80,7 @@ def get_fit_model(config, sa, backend: str = "haiku"):
                 parameters["ud"]["val"],
                 sa["sa"],
                 (fecur, vcur),
-                lam,
+                lam+config["data"]["ele_lam_shift"],
             )
 
             # if parameters.fe['Type']=='MYDLM':

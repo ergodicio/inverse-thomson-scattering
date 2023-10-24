@@ -25,6 +25,12 @@ parameters:
         lb: 0.01
         ub: 3.
         gradient: 0.0
+    Te_gradient:
+        val: 0.0
+        active: False
+        lb: 0.
+        ub: 10.
+        num_grad_points: 1
     Ti:
         val: .2
         active: False
@@ -47,6 +53,12 @@ parameters:
         lb: .001
         ub: 10.
         gradient: 0.0
+    ne_gradient:
+        val: 0.
+        active: False
+        lb: 0.
+        ub: 15.
+        num_grad_points: 1
     ud:
         val: 0
         active: False
@@ -67,6 +79,7 @@ parameters:
         lb: -100.
         ub: -0.5
         fe_decrease_strict: True
+        symmetric: False
     blur:
         val: []
         active: False
@@ -83,6 +96,10 @@ parameters:
 
 other:
     crop_window: 1
+    ion_window_start: 525
+    ion_window_end: 528
+    ele_window_start: 425
+    ele_window_end: 625
     BinWidth: 10
     NumBinInRng: 0
     TotalNumBin: 1023
@@ -107,17 +124,17 @@ other:
     lam_res_unit: 5
     refit: True
     refit_thresh: 0.25
-    calc_sigmas: True
+    calc_sigmas: False
 
 plotting:
     n_sigmas: 3
     rolling_std_width: 5
-    data_cbar_u: 10
+    data_cbar_u: data
     data_cbar_l: 0
     
 
 data:
-    launch_data_visualizer: False
+    launch_data_visualizer: True
     shotnum: 101675
     shotDay: False
     fit_rng:
@@ -125,11 +142,15 @@ data:
         blue_max: 510
         red_min: 545
         red_max: 650
-        iaw_min: 350
-        iaw_max: 352
+        iaw_min: 525
+        iaw_max: 528
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1
+    ion_loss_scale: 1.0
+    ele_t0: 0
+    ion_t0_shift: 0.0
+    ele_lam_shift: -2.0
     probe_beam: P9
     dpixel: 2
     lineouts:

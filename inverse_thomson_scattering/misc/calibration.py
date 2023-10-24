@@ -29,7 +29,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         stddev["spect_FWHM_ele"] = 0.9  # nominally this is ~.8 or .9 for h2
         stddev["spect_stddev_ele"] = stddev["spect_FWHM_ele"] / 2.3548  # dummy
         stddev["ang_FWHM_ele"] = 1  # see Joe's FDR slides ~1-1.2
-        IAWtime = 0  # means nothing here just kept to allow one code to be used for both
+        #IAWtime = 0  # means nothing here just kept to allow one code to be used for both
 
     elif tstype == "temporal":
         if shotNum < 105000:
@@ -84,7 +84,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
 
-        IAWtime = 0  # temporal offset between EPW ross and IAW ross (varies shot to shot, can potentially add a fix based off the fiducials)
+       # IAWtime = 0  # temporal offset between EPW ross and IAW ross (varies shot to shot, can potentially add a fix based off the fiducials)
 
     else:
         if shotNum < 105000:
@@ -118,7 +118,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
             EPWtcc = 1024 - 456.1  # 562;
             IAWtcc = 1024 - 519  # 469;
 
-        IAWtime = 0  # means nothing here just kept to allow one code to be used for both
+        #IAWtime = 0  # means nothing here just kept to allow one code to be used for both
 
     ## Apply calibrations
     axisy = np.arange(1, CCDsize[0] + 1)
@@ -139,7 +139,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         # axisxE = np.vstack(np.loadtxt("files/angsFRED.txt"))
         axisxI = np.arange(1, CCDsize[1] + 1)
 
-    return axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev
+    return axisxE, axisxI, axisyE, axisyI, magE, stddev
 
 
 def get_scattering_angles(config):

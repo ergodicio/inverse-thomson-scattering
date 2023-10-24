@@ -249,7 +249,7 @@ class TSFitter:
         # other_losses = calc_other_losses(params)
         normed_batch = self.get_normed_batch(batch)
         normed_e_data = normed_batch["e_data"]
-        return i_error + e_error + density_loss + temperature_loss + momentum_loss, [ThryE, normed_e_data, params]
+        return self.cfg["data"]["ion_loss_scale"]*i_error + e_error + density_loss + temperature_loss + momentum_loss, [ThryE, normed_e_data, params]
 
     def initialize_rest_of_params(self, config):
         # print("in initialize_rest_of_params")

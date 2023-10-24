@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.model.physics.generate_spectra import get_fit_model
+from inverse_thomson_scattering.misc.lineout_plot import lineout_plot
 
 
 def plotinput(config, sa):
@@ -65,68 +66,44 @@ def plotinput(config, sa):
 def model_v_actual(
     sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds, yaxis, sorted_sqdev, sorted_red_losses
 ):
-    # make plots
+    
+    if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
+        ele_s_ind = np.argmin(np.abs(yaxis[0]-config["other"]["ele_window_start"]))
+        ele_e_ind = np.argmin(np.abs(yaxis[0]-config["other"]["ele_window_end"]))
+        ion_s_ind = np.argmin(np.abs(yaxis[1]-config["other"]["ion_window_start"]))
+        ion_e_ind = np.argmin(np.abs(yaxis[1]-config["other"]["ion_window_end"]))
+        s_ind = [ele_s_ind, ion_s_ind]
+        e_ind = [ele_e_ind, ion_e_ind]
+    elif config["other"]["extraoptions"]["load_ion_spec"]:
+        s_ind = [np.argmin(np.abs(yaxis-config["other"]["ion_window_start"]))]
+        e_ind = [np.argmin(np.abs(yaxis-config["other"]["ion_window_end"]))]
+        sorted_data = [sorted_data]#np.array(sorted_data).reshape((1,)+np.shape(sorted_data))
+        sorted_fits = [sorted_fits]#np.array(sorted_fits).reshape((1,)+np.shape(sorted_fits))
+        sorted_sqdev = [sorted_sqdev]#np.array(sorted_sqdev).reshape((1,)+np.shape(sorted_sqdev))
+        
+    elif config["other"]["extraoptions"]["load_ele_spec"]:
+        s_ind = [np.argmin(np.abs(yaxis-config["other"]["ele_window_start"]))]
+        e_ind = [np.argmin(np.abs(yaxis-config["other"]["ele_window_end"]))]
+        sorted_data = [sorted_data]#np.array(sorted_data).reshape((1,)+np.shape(sorted_data))
+        sorted_fits = [sorted_fits]#np.array(sorted_fits).reshape((1,)+np.shape(sorted_fits))
+        sorted_sqdev = [sorted_sqdev]#np.array(sorted_sqdev).reshape((1,)+np.shape(sorted_sqdev))
+        
     for i in range(num_plots):
+
         # plot model vs actual
         titlestr = (
             r"|Error|$^2$" + f" = {sorted_losses[i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[i]]}"
         )
-        filename = f"loss={sorted_losses[i]:.2e}-reduced_loss={sorted_red_losses[i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
-        fig, ax = plt.subplots(2, 1, figsize=(10, 8), tight_layout=True, sharex=True)
-        ax[0].plot(
-            yaxis[config["other"]["crop_window"] : -config["other"]["crop_window"]],
-            np.squeeze(sorted_data[i, config["other"]["crop_window"] : -config["other"]["crop_window"]]),
-            label="Data",
-        )
-        ax[0].plot(
-            yaxis[config["other"]["crop_window"] : -config["other"]["crop_window"]],
-            np.squeeze(sorted_fits[i, config["other"]["crop_window"] : -config["other"]["crop_window"]]),
-            label="Fit",
-        )
-        ax[0].set_title(titlestr, fontsize=14)
-        ax[0].set_ylabel("Amp (arb. units)")
-        ax[0].legend(fontsize=14)
-        ax[0].grid()
-        ax[1].plot(
-            yaxis[config["other"]["crop_window"] : -config["other"]["crop_window"]],
-            np.squeeze(sorted_sqdev[i, config["other"]["crop_window"] : -config["other"]["crop_window"]]),
-            label="Residual",
-        )
-        ax[1].set_xlabel("Wavelength (nm)")
-        ax[1].set_ylabel("$\chi_i^2$")
-        fig.savefig(os.path.join(td, "worst", filename), bbox_inches="tight")
-        plt.close(fig)
+        filename = f"loss={sorted_losses[i]:.2e}-reduced_loss={sorted_red_losses[i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[i]]}.png"
+        
+        lineout_plot(np.array(sorted_data)[:,i,:], np.array(sorted_fits)[:,i,:], np.array(sorted_sqdev)[:,i,:], yaxis, s_ind, e_ind, titlestr, filename, td, "worst")
 
         titlestr = (
-            r"|Error|$^2$"
-            + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
-        )
+            r"|Error|$^2$" + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
+                )
         filename = f"loss={sorted_losses[-1 - i]:.2e}-reduced_loss={sorted_red_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
-        fig, ax = plt.subplots(2, 1, figsize=(10, 8), tight_layout=True, sharex=True)
-        ax[0].plot(
-            yaxis[config["other"]["crop_window"] : -config["other"]["crop_window"]],
-            np.squeeze(sorted_data[-1 - i, config["other"]["crop_window"] : -config["other"]["crop_window"]]),
-            label="Data",
-        )
-        ax[0].plot(
-            yaxis[config["other"]["crop_window"] : -config["other"]["crop_window"]],
-            np.squeeze(sorted_fits[-1 - i, config["other"]["crop_window"] : -config["other"]["crop_window"]]),
-            label="Fit",
-        )
-        ax[0].set_title(titlestr, fontsize=14)
-        ax[0].set_ylabel("Amp (arb. units)")
-        ax[0].legend(fontsize=14)
-        ax[0].grid()
-        ax[1].plot(
-            yaxis[config["other"]["crop_window"] : -config["other"]["crop_window"]],
-            np.squeeze(sorted_sqdev[-1 - i, config["other"]["crop_window"] : -config["other"]["crop_window"]]),
-            label="Residual",
-        )
-        ax[1].set_xlabel("Wavelength (nm)")
-        ax[1].set_ylabel("$\chi_i^2$")
-        fig.savefig(os.path.join(td, "best", filename), bbox_inches="tight")
-        plt.close(fig)
-
+        
+        lineout_plot(np.array(sorted_data)[:,-1-i,:], np.array(sorted_fits)[:,-1-i,:], np.array(sorted_sqdev)[:,-1-i,:], yaxis, s_ind, e_ind, titlestr, filename, td, "best")
 
 def LinePlots(
     x,
@@ -256,7 +233,7 @@ def ColorPlots(
     cmap = TScmap()
 
     if logplot:
-        C = log(C)
+        C = np.log(C)
 
     im = ax0.imshow(
         C,
