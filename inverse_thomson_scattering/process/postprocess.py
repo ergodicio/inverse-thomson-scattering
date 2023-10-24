@@ -509,7 +509,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
             td,
             config,
             loss_inds,
-            ion_y_axis,
+            np.array([ion_y_axis]),
             ion_sorted_sqdev,
             sorted_redchi,
         )
@@ -534,7 +534,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
             td,
             config,
             loss_inds,
-            ele_y_axis,
+            np.array([ele_y_axis]),
             ele_sorted_sqdev,
             sorted_redchi,
         )

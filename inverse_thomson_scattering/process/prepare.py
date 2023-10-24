@@ -30,7 +30,7 @@ def prepare_data(config: Dict) -> Dict:
     sa = get_scattering_angles(config)
 
     # Calibrate axes
-    [axisxE, axisxI, axisyE, axisyI, magE, IAWtime, stddev] = get_calibrations(
+    [axisxE, axisxI, axisyE, axisyI, magE, stddev] = get_calibrations(
         config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
     )
     all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI, "x_label": xlab} 
@@ -115,7 +115,8 @@ def prepare_data(config: Dict) -> Dict:
 
     else:
         all_data = get_lineouts(
-            elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, 0, IAWtime, xlab, sa, config
+            elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, config["data"]["ele_t0"],
+            config["data"]["ion_t0_shift"], xlab, sa, config
         )
 
     config["other"]["PhysParams"]["widIRF"] = stddev

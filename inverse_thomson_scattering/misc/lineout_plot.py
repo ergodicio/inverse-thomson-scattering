@@ -9,7 +9,7 @@ def lineout_plot(sorted_data, sorted_fits, sorted_sqdev, yaxis, s_ind, e_ind, ti
         num_col = 1
         
     fig, ax = plt.subplots(2, num_col, figsize=(12, 8), squeeze=False, tight_layout=True, sharex=False)
-    for col in range(len(ax)):
+    for col in range(num_col):
         ax[0][col].plot(
             yaxis[col][s_ind[col] : e_ind[col]],
             np.squeeze(sorted_data[col][s_ind[col] : e_ind[col]]),

@@ -25,6 +25,12 @@ parameters:
         lb: 0.01
         ub: 3.
         gradient: 0.0
+    Te_gradient:
+        val: 0.0
+        active: False
+        lb: 0.
+        ub: 10.
+        num_grad_points: 1
     Ti:
         val: .2
         active: False
@@ -47,6 +53,12 @@ parameters:
         lb: .001
         ub: 10.
         gradient: 0.0
+    ne_gradient:
+        val: 0.
+        active: False
+        lb: 0.
+        ub: 15.
+        num_grad_points: 1
     ud:
         val: 0
         active: False
@@ -67,6 +79,7 @@ parameters:
         lb: -100.
         ub: -0.5
         fe_decrease_strict: True
+        symmetric: False
     blur:
         val: []
         active: False
@@ -135,6 +148,7 @@ data:
     bgscaleI: 0.1
     bgshotmult: 1
     ion_loss_scale: 1.0
+    ele_t0: 0
     ion_t0_shift: 0.0
     ele_lam_shift: -2.0
     probe_beam: P9
