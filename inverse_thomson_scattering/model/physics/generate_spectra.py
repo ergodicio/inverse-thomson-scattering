@@ -12,13 +12,12 @@ def get_fit_model(config, sa, backend: str = "haiku"):
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
 
     def fit_model(fitted_params):
+        print(fitted_params)
         parameters = copy.deepcopy(config["parameters"])
         for key in parameters.keys():
             # if parameters[key]["active"]:
             parameters[key]["val"] = jnp.squeeze(fitted_params[key])
 
-        # if parameters["fe"]["active"]:
-        #     parameters["fe"]["val"] = fitted_params[-parameters["fe"]["length"] : :]
         if parameters["m"]["active"]:
             parameters["fe"]["val"] = jnp.log(num_dist_func(parameters["m"]["val"]))
 
@@ -40,7 +39,6 @@ def get_fit_model(config, sa, backend: str = "haiku"):
             fecur = jnp.concatenate((jnp.flip(fecur[1:]),fecur))
             vcur = jnp.concatenate((-jnp.flip(vcur[1:]),vcur))
         
-        #fecur = parameters["fe"]["val"]
         lam = parameters["lam"]["val"]
 
         if config["other"]["extraoptions"]["load_ion_spec"]:

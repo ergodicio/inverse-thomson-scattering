@@ -4,6 +4,17 @@ import tempfile, mlflow, os
 
             
 def launch_data_visualizer(elecData, ionData, all_axes, config):
+    if config["data"]["lineouts"]["type"] == "ps" or config["data"]["lineouts"]["type"] == "um":
+        LineoutPixelE = [np.argmin(abs(all_axes["epw_x"] - loc - config["data"]["ele_t0"])) for loc in config["data"]["lineouts"]["val"]]
+        IAWtime = config["data"]["ion_t0_shift"]/all_axes["iaw_x"][1] #corrects the iontime to be in the same units as the lineout
+    elif config["data"]["lineouts"]["type"] == "pixel":
+        LineoutPixelE = config["data"]["lineouts"]["val"]
+    else:
+        raise NotImplementedError
+    LineoutPixelI = np.round(LineoutPixelE - IAWtime).astype(int)
+    print(LineoutPixelE)
+    print(LineoutPixelI)
+    
     with tempfile.TemporaryDirectory() as td:
         #until this can be made interactive this plots all the data regions
         if config["other"]["extraoptions"]["load_ion_spec"]:
@@ -14,8 +25,8 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
                     cmap="gist_ncar",
                     vmin=np.amin(ionData),
                     vmax=np.amax(ionData),)
-            sline, = ax.plot([all_axes["iaw_x"][config["data"]["lineouts"]["start"]], all_axes["iaw_x"][config["data"]["lineouts"]["start"]]], [all_axes["iaw_y"][0], all_axes["iaw_y"][-1]], lw=2, color = 'w')
-            eline, = ax.plot([all_axes["iaw_x"][config["data"]["lineouts"]["end"]], all_axes["iaw_x"][config["data"]["lineouts"]["end"]]], [all_axes["iaw_y"][0], all_axes["iaw_y"][-1]], lw=2, color = 'w')
+            sline, = ax.plot([all_axes["iaw_x"][LineoutPixelI[0]], all_axes["iaw_x"][LineoutPixelI[0]]], [all_axes["iaw_y"][0], all_axes["iaw_y"][-1]], lw=2, color = 'w')
+            eline, = ax.plot([all_axes["iaw_x"][LineoutPixelI[-1]], all_axes["iaw_x"][LineoutPixelI[-1]]], [all_axes["iaw_y"][0], all_axes["iaw_y"][-1]], lw=2, color = 'w')
             
             lamsline, = ax.plot([all_axes["iaw_x"][0], all_axes["iaw_x"][-1]], [config["data"]["fit_rng"]["iaw_min"], config["data"]["fit_rng"]["iaw_min"]], lw=2, color = 'w', linestyle = '--')
             lameline, = ax.plot([all_axes["iaw_x"][0], all_axes["iaw_x"][-1]], [config["data"]["fit_rng"]["iaw_max"], config["data"]["fit_rng"]["iaw_max"]], lw=2, color = 'w', linestyle = '--')
@@ -32,8 +43,8 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
                     cmap="gist_ncar",
                     vmin=np.amin(elecData),
                     vmax=np.amax(elecData),)
-            sline, = ax.plot([all_axes["epw_x"][config["data"]["lineouts"]["start"]], all_axes["epw_x"][config["data"]["lineouts"]["start"]]], [all_axes["epw_y"][0], all_axes["epw_y"][-1]], lw=2, color = 'w')
-            eline, = ax.plot([all_axes["epw_x"][config["data"]["lineouts"]["end"]], all_axes["epw_x"][config["data"]["lineouts"]["end"]]], [all_axes["epw_y"][0], all_axes["epw_y"][-1]], lw=2, color = 'w')
+            sline, = ax.plot([all_axes["epw_x"][LineoutPixelE[0]], all_axes["epw_x"][LineoutPixelE[0]]], [all_axes["epw_y"][0], all_axes["epw_y"][-1]], lw=2, color = 'w')
+            eline, = ax.plot([all_axes["epw_x"][LineoutPixelE[-1]], all_axes["epw_x"][LineoutPixelE[-1]]], [all_axes["epw_y"][0], all_axes["epw_y"][-1]], lw=2, color = 'w')
             
             lamsline, = ax.plot([all_axes["epw_x"][0], all_axes["epw_x"][-1]], [config["data"]["fit_rng"]["blue_min"], config["data"]["fit_rng"]["blue_min"]], lw=2, color = 'w', linestyle = '--')
             lameline, = ax.plot([all_axes["epw_x"][0], all_axes["epw_x"][-1]], [config["data"]["fit_rng"]["blue_max"], config["data"]["fit_rng"]["blue_max"]], lw=2, color = 'w', linestyle = '--')
