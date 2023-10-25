@@ -20,7 +20,7 @@ parameters:
         lb: 523.0
         ub: 528.0
     Te:
-        val: 0.5
+        val: 0.087
         active: True
         lb: 0.01
         ub: 1.5
@@ -31,7 +31,7 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: 0.2
+        val: 0.043
         active: False
         lb: 0.001
         ub: 3.0
@@ -50,12 +50,12 @@ parameters:
         lb: -2.0
         ub: 2.0
     Va:
-        val: 0.0
+        val: 1.1
         active: True
         lb: -2.5
         ub: 2.5
     ne:
-        val: 0.2
+        val: 0.06
         active: True
         lb: 0.001
         ub: 1.0
@@ -66,7 +66,7 @@ parameters:
         ub: 15.
         num_grad_points: 1
     m:
-        val: 2.0
+        val: 3.2
         active: True
         lb: 2.0
         ub: 5.0
@@ -107,4 +107,4 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: simultaneous_fit_test_3
+    run: single_pass_zach_test4

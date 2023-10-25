@@ -33,18 +33,21 @@ def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam):
 
 def add_ion_IRF(config, lamAxisI, modlI, amps, TSins):
     stddevI = config["other"]["PhysParams"]["widIRF"]["spect_stddev_ion"]
-    originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
-    inst_funcI = jnp.squeeze(
-        (1.0 / (stddevI * jnp.sqrt(2.0 * jnp.pi))) * jnp.exp(-((lamAxisI - originI) ** 2.0) / (2.0 * (stddevI) ** 2.0))
-    )  # Gaussian
-    ThryI = jnp.convolve(modlI, inst_funcI, "same")
-    ThryI = (jnp.amax(modlI) / jnp.amax(ThryI)) * ThryI
-    ThryI = jnp.average(ThryI.reshape(1024, -1), axis=1)
+    if stddevI:
+        originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
+        inst_funcI = jnp.squeeze(
+            (1.0 / (stddevI * jnp.sqrt(2.0 * jnp.pi))) * jnp.exp(-((lamAxisI - originI) ** 2.0) / (2.0 * (stddevI) ** 2.0))
+        )  # Gaussian
+        ThryI = jnp.convolve(modlI, inst_funcI, "same")
+        ThryI = (jnp.amax(modlI) / jnp.amax(ThryI)) * ThryI
+        ThryI = jnp.average(ThryI.reshape(1024, -1), axis=1)
 
-    if config["other"]["PhysParams"]["norm"] == 0:
-        lamAxisI = jnp.average(lamAxisI.reshape(1024, -1), axis=1)
-        ThryI = TSins["amp3"]["val"] * amps * ThryI / jnp.amax(ThryI)
-        #lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
+        if config["other"]["PhysParams"]["norm"] == 0:
+            lamAxisI = jnp.average(lamAxisI.reshape(1024, -1), axis=1)
+            ThryI = TSins["amp3"]["val"] * amps * ThryI / jnp.amax(ThryI)
+            #lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
+    else:
+        ThryI = modlI
 
     return lamAxisI, ThryI
 

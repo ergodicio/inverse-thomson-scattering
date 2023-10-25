@@ -18,12 +18,10 @@ def one_run(config):
     utils.log_params(config)
 
     t0 = time.time()
-    fit_results, loss = singlepass.calc_spec(config=config)
+    singlepass.calc_spec(config=config)
     metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
     mlflow.log_metrics(metrics=metrics_dict)
     mlflow.set_tag("status", "completed")
-
-    return loss
 
 def upload_dir_to_s3(local_directory: str, bucket: str, destination: str, run_id: str):
     client = boto3.client("s3")

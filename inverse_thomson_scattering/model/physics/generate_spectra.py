@@ -12,7 +12,6 @@ def get_fit_model(config, sa, backend: str = "haiku"):
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
 
     def fit_model(fitted_params):
-        print(fitted_params)
         parameters = copy.deepcopy(config["parameters"])
         for key in parameters.keys():
             # if parameters[key]["active"]:
