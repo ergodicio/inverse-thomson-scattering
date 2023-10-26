@@ -263,7 +263,7 @@ def scipy_loop(config, all_data, sa, batch_indices, num_batches):
                     method=config["optimizer"]["method"],
                     jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                     bounds=ts_fitter.bounds,
-                    options={"disp": True, "maxiter": 1},
+                    options={"disp": True},
                 )
                 best_weights[i_batch] = ts_fitter.unravel_pytree(res["x"])
                 overall_loss += res["fun"]

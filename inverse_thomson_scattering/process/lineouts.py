@@ -15,7 +15,7 @@ def get_lineouts(
         LineoutPixelE = config["data"]["lineouts"]["val"]
     else:
         raise NotImplementedError
-    LineoutPixelI = np.round(LineoutPixelE - IAWtime).astype(int)
+    LineoutPixelI = np.round(np.array(LineoutPixelE) - IAWtime).astype(int)
 
     if config["data"]["background"]["type"] == "ps":
         BackgroundPixel = np.argmin(abs(axisxE - config["data"]["background"]["slice"]))

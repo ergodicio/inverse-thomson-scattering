@@ -9,9 +9,10 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
         IAWtime = config["data"]["ion_t0_shift"]/all_axes["iaw_x"][1] #corrects the iontime to be in the same units as the lineout
     elif config["data"]["lineouts"]["type"] == "pixel":
         LineoutPixelE = config["data"]["lineouts"]["val"]
+        IAWtime = config["data"]["ion_t0_shift"]
     else:
         raise NotImplementedError
-    LineoutPixelI = np.round(LineoutPixelE - IAWtime).astype(int)
+    LineoutPixelI = np.round(np.array(LineoutPixelE) - IAWtime).astype(int)
     print(LineoutPixelE)
     print(LineoutPixelI)
     
