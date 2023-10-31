@@ -249,7 +249,9 @@ class TSFitter:
         # other_losses = calc_other_losses(params)
         normed_batch = self.get_normed_batch(batch)
         normed_e_data = normed_batch["e_data"]
-        return self.cfg["data"]["ion_loss_scale"]*i_error + e_error + density_loss + temperature_loss + momentum_loss, [ThryE, normed_e_data, params]
+        return self.cfg["data"][
+            "ion_loss_scale"
+        ] * i_error + e_error + density_loss + temperature_loss + momentum_loss, [ThryE, normed_e_data, params]
 
     def initialize_rest_of_params(self, config):
         # print("in initialize_rest_of_params")
@@ -289,6 +291,12 @@ class TSFitter:
                 grad["ts_parameter_generator"]["fe"] = (
                     self.cfg["optimizer"]["grad_scalar"] * grad["ts_parameter_generator"]["fe"]
                 )
+
+            for k, param_dict in self.cfg["parameters"].items():
+                if param_dict["active"]:
+                    scalar = param_dict["gradient_scalar"] if "gradient_scalar" in param_dict else 1.0
+                    grad["ts_parameter_generator"][k] *= scalar
+
             temp_grad, _ = ravel_pytree(grad)
             flattened_grads = np.array(temp_grad)
             return value, flattened_grads
