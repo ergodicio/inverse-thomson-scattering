@@ -21,8 +21,12 @@ def init_param_norm_and_shift(config: Dict) -> Dict:
     for key in parameters.keys():
         if parameters[key]["active"]:
             active_params.append(key)
-            lb[key] = parameters[key]["lb"]
-            ub[key] = parameters[key]["ub"]
+            if np.size(parameters[key]["val"]) > 1:
+                lb[key] = parameters[key]["lb"]*np.ones(np.size(parameters[key]["val"]))
+                ub[key] = parameters[key]["ub"]*np.ones(np.size(parameters[key]["val"]))
+            else:
+                lb[key] = parameters[key]["lb"]
+                ub[key] = parameters[key]["ub"]
 
     norms = {}
     shifts = {}
@@ -263,7 +267,7 @@ def scipy_loop(config, all_data, sa, batch_indices, num_batches):
                     method=config["optimizer"]["method"],
                     jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                     bounds=ts_fitter.bounds,
-                    options={"disp": True},
+                    options={"disp": True, "maxiter": 2},
                 )
                 best_weights[i_batch] = ts_fitter.unravel_pytree(res["x"])
                 overall_loss += res["fun"]

@@ -63,6 +63,12 @@ class TSParameterGenerator(hk.Module):
                         shape=[self.batch_size, param_config["length"]],
                         init=hk.initializers.RandomUniform(minval=0, maxval=1),
                     )
+                elif param_name in ['Z', 'A', 'fract']:
+                    these_params[param_name] = hk.get_parameter(
+                        param_name,
+                        shape=[self.batch_size, 1, len(self.cfg["parameters"]["fract"]["val"])],
+                        init=hk.initializers.RandomUniform(minval=0, maxval=1),
+                    )
                 else:
                     these_params[param_name] = hk.get_parameter(
                         param_name,
@@ -102,6 +108,12 @@ class TSParameterGenerator(hk.Module):
                         these_params[param_name] = hk.get_parameter(
                             param_name,
                             shape=[self.batch_size, param_config["length"]],
+                            init=hk.initializers.RandomUniform(minval=0, maxval=1),
+                        )
+                    elif param_name in ['Z', 'A', 'fract']:
+                        these_params[param_name] = hk.get_parameter(
+                            param_name,
+                            shape=[self.batch_size, 1, len(self.cfg["parameters"]["fract"]["val"])],
                             init=hk.initializers.RandomUniform(minval=0, maxval=1),
                         )
 

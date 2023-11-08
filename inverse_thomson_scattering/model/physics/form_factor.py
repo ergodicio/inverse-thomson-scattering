@@ -127,6 +127,9 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         vTi = jnp.sqrt(Ti / Mi)  # ion thermal velocity
         # kldi = jnp.transpose(vTi / omgpi, [1, 0, 2, 3]) * k
         kldi = (vTi / omgpi) * (k[..., jnp.newaxis])
+        #print(vTi)
+        #print(omgpi)
+        #print(kldi)
 
         # ion susceptibilities
         # finding derivative of plasma dispersion function along xii array
@@ -139,6 +142,8 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         ZpiR = jnp.interp(xii, xi2, Zpi[0, :], left=0, right=0)  # , "cubic", bounds_error=False, fill_value=0)
         ZpiI = jnp.interp(xii, xi2, Zpi[1, :], left=0, right=0)  # , "cubic", bounds_error=False, fill_value=0)
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
+        #print(ZpiR)
+        #print(chiR)
 
         # electron susceptibility
         # calculating normilized phase velcoity(xi's) for electrons

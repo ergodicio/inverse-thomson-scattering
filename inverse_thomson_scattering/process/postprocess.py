@@ -31,9 +31,13 @@ def recalculate_with_chosen_weights(
     """
 
     all_params = {}
+    #print(np.shape(config["parameters"]["Z"]["val"]))
     for key in config["parameters"].keys():
         if config["parameters"][key]["active"]:
-            all_params[key] = np.empty(0)
+            #all_params[key] = np.empty(np.shape(config["parameters"][key]["val"]))
+            all_params[key] = np.zeros((batch_indices.flatten()[-1] + 1,np.size(config["parameters"][key]["val"])), dtype=np.float64)
+            #print(np.shape(config["parameters"][key]["val"]))
+            #print(all_params)
     batch_indices.sort()
     losses = np.zeros(batch_indices.flatten()[-1] + 1, dtype=np.float64)
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
@@ -45,11 +49,15 @@ def recalculate_with_chosen_weights(
     fits["ele"] = np.zeros(all_data["e_data"].shape)
     sqdevs["ele"] = np.zeros(all_data["e_data"].shape)
 
+    num_params=0
+    for key, vec in all_params.items():
+        num_params += np.shape(vec)[1]
+    print(num_params)
     if config["other"]["extraoptions"]["load_ion_spec"]:
-        sigmas = np.zeros((all_data["i_data"].shape[0], len(all_params.keys())))
+        sigmas = np.zeros((all_data["i_data"].shape[0], num_params))
 
     if config["other"]["extraoptions"]["load_ele_spec"]:
-        sigmas = np.zeros((all_data["e_data"].shape[0], len(all_params.keys())))
+        sigmas = np.zeros((all_data["e_data"].shape[0], num_params))
 
     if config["other"]["extraoptions"]["spectype"] == "angular_full":
         batch = {
@@ -69,7 +77,8 @@ def recalculate_with_chosen_weights(
         sqdevs["ele"] = sqds["ele"]
 
         for k in all_params.keys():
-            all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+            #all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+            all_params[k] = params[k].reshape(-1)
 
         if calc_sigma:
             these_params = ts_fitter.get_active_params(raw_weights, batch)
@@ -112,7 +121,12 @@ def recalculate_with_chosen_weights(
             fits["ion"][inds] = ThryI
 
             for k in all_params.keys():
-                all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+                #all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1, np.size(config["parameters"][key]["val"]))])
+                if np.size(np.shape(params[k])) == 3:
+                    all_params[k][inds] = np.squeeze(params[k][inds])
+                else:
+                    all_params[k][inds] = params[k][inds]
+                
 
     return losses, sqdevs, used_points, fits, sigmas, all_params
 
@@ -382,7 +396,26 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
     num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
 
     # store fitted parameters
-    final_params = pandas.DataFrame(all_params)
+    #print("all_params")
+    #print(type(all_params))
+    #print(all_params)
+    #print(all_params["amp1"])
+    #print(type(all_params["amp1"]))
+    reshaped_params = {}
+    for key in all_params.keys():
+        #cur_ind = 1
+        if np.shape(all_params[key])[1]>1:
+            for i in range(np.shape(all_params[key])[1]):
+                reshaped_params[key+str(i)]=all_params[key][:,i]
+        else:
+            reshaped_params[key]=all_params[key][:,0]
+        #all_params[key] = all_params[key].tolist()
+    final_params = pandas.DataFrame(reshaped_params)
+    #final_params = pandas.DataFrame(all_params)
+    #print("all_params")
+    #print(all_params)
+    #final_params = pandas.DataFrame.from_dict(all_params, orient='index')
+    #final_params = final_params.transpose()
     final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
 
     losses[losses > 1e10] = 1e10
@@ -541,33 +574,50 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
 
 
     sigmas_ds = xr.Dataset(
-        {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(all_params.keys())}
+        {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(reshaped_params.keys())}
     )
     sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
 
-    for param in all_params.keys():
-        vals = pandas.Series(final_params[param])
-        std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
+    print("final_params")
+    print(final_params)
+    for param in reshaped_params.keys():
+        vals = pandas.Series(final_params[param],dtype=float)
         fig, ax = plt.subplots(1, 1, figsize=(4, 4))
         lineouts = np.array(config["data"]["lineouts"]["val"])
-        ax.plot(lineouts, final_params[param])
+        
+        #for i in range(np.shape(vals)[0]):
+        #    print(np.shape(vals))
+        #    print(vals[i])
+        #vals = vals.apply(np.array)
+        #print(vals)
+        #print(type(vals))
+        #print(vals.values)
+        #print(np.vstack(vals.values))
+        #print(vals.to_numpy())
+        std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
+        
+        #vals=vals.to_numpy()
+        #vals=np.transpose(np.vstack(vals.values))
+        ax.plot(lineouts, vals)
+        #print(sigmas_ds[param])
+        #print(vals.values - config["plotting"]["n_sigmas"] * sigmas_ds[param])
         ax.fill_between(
             lineouts,
-            (final_params[param] - config["plotting"]["n_sigmas"] * sigmas_ds[param]),
-            (final_params[param] + config["plotting"]["n_sigmas"] * sigmas_ds[param]),
+            (vals.values - config["plotting"]["n_sigmas"] * sigmas_ds[param].values),
+            (vals.values + config["plotting"]["n_sigmas"] * sigmas_ds[param].values),
             color="b",
             alpha=0.1,
         )
         ax.fill_between(
             lineouts,
-            (final_params[param] - config["plotting"]["n_sigmas"] * std.values),
-            (final_params[param] + config["plotting"]["n_sigmas"] * std.values),
+            (vals.values - config["plotting"]["n_sigmas"] * std.values),
+            (vals.values + config["plotting"]["n_sigmas"] * std.values),
             color="r",
             alpha=0.1,
         )
         ax.set_xlabel("lineout", fontsize=14)
         ax.grid()
-        ax.set_ylim(0.8 * np.min(final_params[param]), 1.2 * np.max(final_params[param]))
+        ax.set_ylim(0.8 * np.min(vals), 1.2 * np.max(vals))
         ax.set_ylabel(param, fontsize=14)
         fig.savefig(os.path.join(td, "learned_" + param + ".png"), bbox_inches="tight")
 

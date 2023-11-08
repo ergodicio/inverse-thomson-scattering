@@ -13,8 +13,6 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
     else:
         raise NotImplementedError
     LineoutPixelI = np.round(np.array(LineoutPixelE) - IAWtime).astype(int)
-    print(LineoutPixelE)
-    print(LineoutPixelI)
     
     with tempfile.TemporaryDirectory() as td:
         #until this can be made interactive this plots all the data regions
