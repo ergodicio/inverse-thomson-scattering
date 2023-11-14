@@ -9,7 +9,7 @@ from jax import numpy as jnp
 
 from jax import jit, value_and_grad
 from jax.flatten_util import ravel_pytree
-import haiku as hk
+import equinox as eqx
 import numpy as np
 
 from inverse_thomson_scattering.model.parameters import TSParameterGenerator
@@ -34,41 +34,11 @@ class TSFitter:
 
         config_for_params = copy.deepcopy(cfg)
 
-        def __get_params__(batch):
-            normed_batch = self.get_normed_batch(batch)
-            parameterizer = TSParameterGenerator(config_for_params)
-            params = parameterizer(
-                {
-                    "data": normed_batch,
-                    "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]},
-                    "noise_e": batch["noise_e"],
-                    "noise_i": batch["noise_i"],
-                }
-            )
-
-            return params
-
-        self._get_params_ = hk.without_apply_rng(hk.transform(__get_params__))
-
-        def __get_active_params__(batch):
-            normed_batch = self.get_normed_batch(batch)
-            parameterizer = TSParameterGenerator(config_for_params)
-            active_params = parameterizer.get_active_params(
-                {
-                    "data": normed_batch,
-                    "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]},
-                    "noise_e": batch["noise_e"],
-                    "noise_i": batch["noise_i"],
-                }
-            )
-
-            return active_params
-
-        self._get_active_params_ = hk.without_apply_rng(hk.transform(__get_active_params__))
+        self.parameterizer = TSParameterGenerator(config_for_params)
         self.spec_calc = SpectrumCalculator(cfg, sas, dummy_batch)
 
         rng_key = jax.random.PRNGKey(42)
-        init_weights = self._get_params_.init(rng_key, dummy_batch)
+        # init_weights = self._get_params_.init(rng_key, dummy_batch)
         self._loss_ = jit(self.__loss__)
         self._vg_func_ = jit(value_and_grad(self.__loss__, argnums=0, has_aux=True))
         self._h_func_ = jit(jax.hessian(self._loss_for_hess_fn_, argnums=0))
@@ -85,6 +55,33 @@ class TSFitter:
             flattened_lb, _ = ravel_pytree(lb)
             flattened_ub, _ = ravel_pytree(ub)
             self.bounds = zip(flattened_lb, flattened_ub)
+
+    def _get_params_(self, batch):
+        normed_batch = self.get_normed_batch(batch)
+
+        params = self.parameterizer(
+            {
+                "data": normed_batch,
+                "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]},
+                "noise_e": batch["noise_e"],
+                "noise_i": batch["noise_i"],
+            }
+        )
+
+        return params
+
+    def _get_active_params_(self, batch):
+        normed_batch = self.get_normed_batch(batch)
+        active_params = self.parameterizer.get_active_params(
+            {
+                "data": normed_batch,
+                "amps": {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]},
+                "noise_e": batch["noise_e"],
+                "noise_i": batch["noise_i"],
+            }
+        )
+
+        return active_params
 
     def calculate_spectra(self, params, batch):
         params = self.get_params(params, batch)
@@ -249,7 +246,9 @@ class TSFitter:
         # other_losses = calc_other_losses(params)
         normed_batch = self.get_normed_batch(batch)
         normed_e_data = normed_batch["e_data"]
-        return self.cfg["data"]["ion_loss_scale"]*i_error + e_error + density_loss + temperature_loss + momentum_loss, [ThryE, normed_e_data, params]
+        return self.cfg["data"][
+            "ion_loss_scale"
+        ] * i_error + e_error + density_loss + temperature_loss + momentum_loss, [ThryE, normed_e_data, params]
 
     def initialize_rest_of_params(self, config):
         # print("in initialize_rest_of_params")
@@ -299,10 +298,10 @@ class TSFitter:
         return self._h_func_(weights, batch)
 
     def get_params(self, weights, batch):
-        return self._get_params_.apply(weights, batch)
+        return self._get_params_(weights, batch)
 
     def get_active_params(self, weights, batch):
-        return self._get_active_params_.apply(weights, batch)
+        return self._get_active_params_(weights, batch)
 
 
 def init_weights_and_bounds(config, init_weights, num_slices):

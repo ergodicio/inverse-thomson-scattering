@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.optimize as spopt
 
-import optax, jaxopt, mlflow
+import jaxopt, mlflow  # , optax
 from tqdm import trange
 
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
@@ -22,8 +22,8 @@ def init_param_norm_and_shift(config: Dict) -> Dict:
         if parameters[key]["active"]:
             active_params.append(key)
             if np.size(parameters[key]["val"]) > 1:
-                lb[key] = parameters[key]["lb"]*np.ones(np.size(parameters[key]["val"]))
-                ub[key] = parameters[key]["ub"]*np.ones(np.size(parameters[key]["val"]))
+                lb[key] = parameters[key]["lb"] * np.ones(np.size(parameters[key]["val"]))
+                ub[key] = parameters[key]["ub"] * np.ones(np.size(parameters[key]["val"]))
             else:
                 lb[key] = parameters[key]["lb"]
                 ub[key] = parameters[key]["ub"]
@@ -79,6 +79,102 @@ def validate_inputs(config):
     config["units"] = init_param_norm_and_shift(config)
 
     return config
+
+
+def scipy_angular_loop(config, all_data, best_weights, all_weights, sa):
+    print("Running Angular, setting batch_size to 1")
+    config["optimizer"]["batch_size"] = 1
+    batch = {
+        "e_data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+        "e_amps": all_data["e_amps"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+        "i_data": all_data["i_data"],
+        "i_amps": all_data["i_amps"],
+        "noise_e": config["other"]["PhysParams"]["noiseE"][
+            config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+        ],
+        "noise_i": config["other"]["PhysParams"]["noiseI"][
+            config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+        ],
+    }
+    for i in range(config["optimizer"]["num_mins"]):
+        ts_fitter = TSFitter(config, sa, batch)
+        ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
+            0.97, 1.03, len(ts_fitter.flattened_weights)
+        )
+        res = spopt.minimize(
+            ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
+            ts_fitter.flattened_weights,
+            args=batch,
+            method=config["optimizer"]["method"],
+            jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+            bounds=ts_fitter.bounds,
+            options={"disp": True, "maxiter": 1},
+        )
+        best_weights = ts_fitter.get_params(ts_fitter.unravel_pytree(res["x"]), batch)
+        if i == config["optimizer"]["num_mins"] - 1:
+            break
+        config["parameters"]["fe"]["length"] = (
+            config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
+        )
+        refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+        if config["parameters"]["fe"]["symmetric"]:
+            refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+
+        refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(best_weights["fe"]))
+
+        config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
+        config["velocity"] = refined_v
+        config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
+        config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
+
+        config["parameters"]["fe"]["ub"] = -0.5
+        config["parameters"]["fe"]["lb"] = -50
+        config["parameters"]["fe"]["lb"] = np.multiply(
+            config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
+        )
+        config["parameters"]["fe"]["ub"] = np.multiply(
+            config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
+        )
+        config["units"] = init_param_norm_and_shift(config)
+        all_weights.append(best_weights)
+    raw_weights = ts_fitter.unravel_pytree(res["x"])
+    overall_loss = res["fun"]
+    best_weights = all_weights
+    # print(best_weights)
+
+    return raw_weights, best_weights, overall_loss, ts_fitter
+
+
+def scipy_1d_loop(config, all_data, batch_indices, num_batches, best_weights, sa):
+    batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
+    overall_loss = 0.0
+    with trange(num_batches, unit="batch") as tbatch:
+        for i_batch in tbatch:
+            inds = batch_indices[i_batch]
+            batch = {
+                "e_data": all_data["e_data"][inds],
+                "e_amps": all_data["e_amps"][inds],
+                "i_data": all_data["i_data"][inds],
+                "i_amps": all_data["i_amps"][inds],
+                "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
+                "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
+            }
+            ts_fitter = TSFitter(config, sa, batch)
+
+            res = spopt.minimize(
+                ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
+                ts_fitter.flattened_weights,
+                args=batch,
+                method=config["optimizer"]["method"],
+                jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+                bounds=ts_fitter.bounds,
+                options={"disp": True, "maxiter": 100},
+            )
+            best_weights[i_batch] = ts_fitter.unravel_pytree(res["x"])
+            overall_loss += res["fun"]
+        raw_weights = best_weights
+
+    return raw_weights, best_weights, overall_loss, ts_fitter
 
 
 def adam_loop(config, all_data, sa, batch_indices, num_batches):
@@ -185,93 +281,13 @@ def scipy_loop(config, all_data, sa, batch_indices, num_batches):
     best_weights = {}
     all_weights = []
     if config["other"]["extraoptions"]["spectype"] == "angular_full":
-        print("Running Angular, setting batch_size to 1")
-        config["optimizer"]["batch_size"] = 1
-        batch = {
-            "e_data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
-            "e_amps": all_data["e_amps"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
-            "i_data": all_data["i_data"],
-            "i_amps": all_data["i_amps"],
-            "noise_e": config["other"]["PhysParams"]["noiseE"][
-                config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
-            ],
-            "noise_i": config["other"]["PhysParams"]["noiseI"][
-                config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
-            ],
-        }
-        for i in range(config["optimizer"]["num_mins"]):
-            ts_fitter = TSFitter(config, sa, batch)
-            ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
-                0.97, 1.03, len(ts_fitter.flattened_weights)
-            )
-            res = spopt.minimize(
-                ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
-                ts_fitter.flattened_weights,
-                args=batch,
-                method=config["optimizer"]["method"],
-                jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-                bounds=ts_fitter.bounds,
-                options={"disp": True, "maxiter": 1},
-            )
-            best_weights = ts_fitter.get_params(ts_fitter.unravel_pytree(res["x"]), batch)
-            if i == config["optimizer"]["num_mins"] - 1:
-                break
-            config["parameters"]["fe"]["length"] = (
-                config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
-            )
-            refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-            if config["parameters"]["fe"]["symmetric"]:
-                refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-
-            refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(best_weights["fe"]))
-
-            config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
-            config["velocity"] = refined_v
-            config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
-            config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
-
-            config["parameters"]["fe"]["ub"] = -0.5
-            config["parameters"]["fe"]["lb"] = -50
-            config["parameters"]["fe"]["lb"] = np.multiply(
-                config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
-            )
-            config["parameters"]["fe"]["ub"] = np.multiply(
-                config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
-            )
-            config["units"] = init_param_norm_and_shift(config)
-            all_weights.append(best_weights)
-        raw_weights = ts_fitter.unravel_pytree(res["x"])
-        overall_loss = res["fun"]
-        best_weights = all_weights
-        # print(best_weights)
+        raw_weights, best_weights, overall_loss, ts_fitter = scipy_angular_loop(
+            config, all_data, best_weights, all_weights, sa
+        )
     else:
-        batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-        overall_loss = 0.0
-        with trange(num_batches, unit="batch") as tbatch:
-            for i_batch in tbatch:
-                inds = batch_indices[i_batch]
-                batch = {
-                    "e_data": all_data["e_data"][inds],
-                    "e_amps": all_data["e_amps"][inds],
-                    "i_data": all_data["i_data"][inds],
-                    "i_amps": all_data["i_amps"][inds],
-                    "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
-                    "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
-                }
-                ts_fitter = TSFitter(config, sa, batch)
-
-                res = spopt.minimize(
-                    ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
-                    ts_fitter.flattened_weights,
-                    args=batch,
-                    method=config["optimizer"]["method"],
-                    jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-                    bounds=ts_fitter.bounds,
-                    options={"disp": True, "maxiter": 2},
-                )
-                best_weights[i_batch] = ts_fitter.unravel_pytree(res["x"])
-                overall_loss += res["fun"]
-            raw_weights = best_weights
+        raw_weights, best_weights, overall_loss, ts_fitter = scipy_1d_loop(
+            config, all_data, batch_indices, num_batches, best_weights, sa
+        )
     mlflow.log_metrics({"overall loss": float(overall_loss)})
     return raw_weights, best_weights, overall_loss, ts_fitter
 
