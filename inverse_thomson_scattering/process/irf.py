@@ -36,7 +36,8 @@ def add_ion_IRF(config, lamAxisI, modlI, amps, TSins):
     if stddevI:
         originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
         inst_funcI = jnp.squeeze(
-            (1.0 / (stddevI * jnp.sqrt(2.0 * jnp.pi))) * jnp.exp(-((lamAxisI - originI) ** 2.0) / (2.0 * (stddevI) ** 2.0))
+            (1.0 / (stddevI * jnp.sqrt(2.0 * jnp.pi)))
+            * jnp.exp(-((lamAxisI - originI) ** 2.0) / (2.0 * (stddevI) ** 2.0))
         )  # Gaussian
         ThryI = jnp.convolve(modlI, inst_funcI, "same")
         ThryI = (jnp.amax(modlI) / jnp.amax(ThryI)) * ThryI
@@ -44,8 +45,8 @@ def add_ion_IRF(config, lamAxisI, modlI, amps, TSins):
 
         if config["other"]["PhysParams"]["norm"] == 0:
             lamAxisI = jnp.average(lamAxisI.reshape(1024, -1), axis=1)
-            ThryI = TSins["amp3"]["val"] * amps * ThryI / jnp.amax(ThryI)
-            #lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
+            ThryI = TSins["amp3"] * amps * ThryI / jnp.amax(ThryI)
+            # lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
     else:
         ThryI = modlI
 
@@ -73,6 +74,6 @@ def add_electron_IRF(config, lamAxisE, modlE, amps, TSins, lam):
     if config["other"]["PhysParams"]["norm"] == 0:
         lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
         ThryE = amps * ThryE / jnp.amax(ThryE)
-        ThryE = jnp.where(lamAxisE < lam, TSins["amp1"]["val"] * ThryE, TSins["amp2"]["val"] * ThryE)
+        ThryE = jnp.where(lamAxisE < lam, TSins["amp1"] * ThryE, TSins["amp2"] * ThryE)
 
     return lamAxisE, ThryE

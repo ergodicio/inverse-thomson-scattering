@@ -5,8 +5,6 @@ import jax
 import matplotlib.pyplot as plt
 import os, mlflow, tempfile
 from inverse_thomson_scattering.misc.calibration import get_scattering_angles
-from inverse_thomson_scattering.model.parameters import TSParameterGenerator
-from inverse_thomson_scattering.model.spectrum import SpectrumCalculator
 from inverse_thomson_scattering.model.loss_function import TSFitter
 from inverse_thomson_scattering.fitter import init_param_norm_and_shift
 

@@ -1,5 +1,3 @@
-import copy
-
 from jax import numpy as jnp
 from jax import vmap
 
@@ -15,10 +13,6 @@ class SpectrumCalculator:
 
         self.forward_pass = get_fit_model(cfg, sas, backend="jax")
         self.lam = cfg["parameters"]["lam"]["val"]
-
-        dv = cfg["velocity"][1] - cfg["velocity"][0]
-        self.cfg_for_params = copy.deepcopy(cfg)
-        self.cfg_for_params_2 = copy.deepcopy(cfg)
 
         if (
             cfg["other"]["extraoptions"]["spectype"] == "angular_full"
@@ -49,25 +43,6 @@ class SpectrumCalculator:
             ThryE = modlE  # jnp.nan
 
         return ThryE, ThryI, lamAxisE, lamAxisI
-
-    def initialize_rest_of_params(self, config):
-        # print("in initialize_rest_of_params")
-        these_params = dict()
-        for param_name, param_config in config["parameters"].items():
-            if param_config["active"]:
-                pass
-            else:
-                these_params[param_name] = jnp.concatenate(
-                    [jnp.array(param_config["val"]).reshape(1, -1) for _ in range(config["optimizer"]["batch_size"])]
-                ).reshape(config["optimizer"]["batch_size"], -1)
-
-        return these_params
-
-    # def get_normed_e_and_i_data(batch):
-    #    normed_i_data = batch["i_data"] / i_input_norm
-    #    normed_e_data = batch["e_data"] / e_input_norm
-
-    #    return normed_e_data, normed_i_data
 
     def reduce_ATS_to_resunit(self, ThryE, lamAxisE, TSins, batch):
         lam_step = round(ThryE.shape[1] / batch["e_data"].shape[1])

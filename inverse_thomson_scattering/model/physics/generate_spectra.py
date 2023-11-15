@@ -1,5 +1,3 @@
-import copy
-
 from inverse_thomson_scattering.model.physics.form_factor import get_form_factor_fn
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
@@ -11,45 +9,43 @@ def get_fit_model(config, sa, backend: str = "haiku"):
     nonMaxwThomsonI_jax = get_form_factor_fn(config["other"]["lamrangI"], npts=config["other"]["npts"], backend=backend)
     num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
 
-    def fit_model(fitted_params):
-        parameters = copy.deepcopy(config["parameters"])
-        for key in parameters.keys():
-            # if parameters[key]["active"]:
-            parameters[key]["val"] = jnp.squeeze(fitted_params[key])
+    def fit_model(all_params):
+        for key in config["parameters"].keys():
+            all_params[key] = jnp.squeeze(all_params[key])
 
-        if parameters["m"]["active"]:
-            parameters["fe"]["val"] = jnp.log(num_dist_func(parameters["m"]["val"]))
+        if config["parameters"]["m"]["active"]:
+            all_params["fe"] = jnp.log(num_dist_func(all_params["m"]))
 
         # Add gradients to electron temperature and density just being applied to EPW
         cur_Te = jnp.linspace(
-            (1 - parameters["Te_gradient"]["val"] / 200) * parameters["Te"]["val"],
-            (1 + parameters["Te_gradient"]["val"] / 200) * parameters["Te"]["val"],
-            parameters["Te_gradient"]["num_grad_points"]
+            (1 - all_params["Te_gradient"] / 200) * all_params["Te"],
+            (1 + all_params["Te_gradient"] / 200) * all_params["Te"],
+            config["parameters"]["Te_gradient"]["num_grad_points"],
         )
         cur_ne = jnp.linspace(
-            (1 - parameters["ne_gradient"]["val"] / 200) * parameters["ne"]["val"],
-            (1 + parameters["ne_gradient"]["val"] / 200) * parameters["ne"]["val"],
-            parameters["Te_gradient"]["num_grad_points"]
+            (1 - all_params["ne_gradient"] / 200) * all_params["ne"],
+            (1 + all_params["ne_gradient"] / 200) * all_params["ne"],
+            config["parameters"]["ne_gradient"]["num_grad_points"],
         )
 
-        fecur = jnp.exp(parameters["fe"]["val"])
+        fecur = jnp.exp(all_params["fe"])
         vcur = config["velocity"]
         if config["parameters"]["fe"]["symmetric"]:
-            fecur = jnp.concatenate((jnp.flip(fecur[1:]),fecur))
-            vcur = jnp.concatenate((-jnp.flip(vcur[1:]),vcur))
-        
-        lam = parameters["lam"]["val"]
+            fecur = jnp.concatenate((jnp.flip(fecur[1:]), fecur))
+            vcur = jnp.concatenate((-jnp.flip(vcur[1:]), vcur))
+
+        lam = all_params["lam"]
 
         if config["other"]["extraoptions"]["load_ion_spec"]:
             ThryI, lamAxisI = nonMaxwThomsonI_jax(
                 cur_Te,
-                parameters["Ti"]["val"],
-                parameters["Z"]["val"],
-                parameters["A"]["val"],
-                parameters["fract"]["val"],
+                all_params["Ti"],
+                all_params["Z"],
+                all_params["A"],
+                all_params["fract"],
                 cur_ne * jnp.array([1e20]),  # TODO hardcoded
-                parameters["Va"]["val"],
-                parameters["ud"]["val"],
+                all_params["Va"],
+                all_params["ud"],
                 sa["sa"],
                 (fecur, vcur),
                 lam,
@@ -68,21 +64,21 @@ def get_fit_model(config, sa, backend: str = "haiku"):
         if config["other"]["extraoptions"]["load_ele_spec"]:
             ThryE, lamAxisE = nonMaxwThomsonE_jax(
                 cur_Te,
-                parameters["Ti"]["val"],
-                parameters["Z"]["val"],
-                parameters["A"]["val"],
-                parameters["fract"]["val"],
+                all_params["Ti"],
+                all_params["Z"],
+                all_params["A"],
+                all_params["fract"],
                 cur_ne * 1e20,  # TODO hardcoded
-                parameters["Va"]["val"],
-                parameters["ud"]["val"],
+                all_params["Va"],
+                all_params["ud"],
                 sa["sa"],
                 (fecur, vcur),
-                lam+config["data"]["ele_lam_shift"],
+                lam + config["data"]["ele_lam_shift"],
             )
 
-            # if parameters.fe['Type']=='MYDLM':
-            #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,parameters.fe['thetaphi'])
-            # elif parameters.fe['Type']=='Numeric':
+            # if all_params.fe['Type']=='MYDLM':
+            #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,all_params.fe['thetaphi'])
+            # elif all_params.fe['Type']=='Numeric':
             #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,[2*np.pi/3,0])
             # else:
             #    [Thry,lamAxisE]=nonMaxwThomson(Te,Te,1,1,1,ne*1e20,0,0,D['lamrangE'],lam,sa['sa'], fecur,xie,expion=D['expandedions'])
@@ -91,7 +87,7 @@ def get_fit_model(config, sa, backend: str = "haiku"):
 
             # remove extra dimensions and rescale to nm
             lamAxisE = jnp.squeeze(lamAxisE) * 1e7  # TODO hardcoded
-        
+
             ThryE = jnp.real(ThryE)
             ThryE = jnp.mean(ThryE, axis=0)
             if config["other"]["extraoptions"]["spectype"] == "angular_full":
@@ -117,6 +113,6 @@ def get_fit_model(config, sa, backend: str = "haiku"):
             modlE = 0
             lamAxisE = []
 
-        return modlE, modlI, lamAxisE, lamAxisI, parameters
+        return modlE, modlI, lamAxisE, lamAxisI, all_params
 
     return fit_model

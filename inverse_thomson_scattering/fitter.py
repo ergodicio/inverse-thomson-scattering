@@ -97,10 +97,10 @@ def scipy_angular_loop(config, all_data, best_weights, all_weights, sa):
         ],
     }
     for i in range(config["optimizer"]["num_mins"]):
-        ts_fitter = TSFitter(config, sa, batch)
-        ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
-            0.97, 1.03, len(ts_fitter.flattened_weights)
-        )
+        # ts_fitter = TSFitter(config, sa, batch)
+        # ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
+        #     0.97, 1.03, len(ts_fitter.flattened_weights)
+        # )
         res = spopt.minimize(
             ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
             ts_fitter.flattened_weights,
