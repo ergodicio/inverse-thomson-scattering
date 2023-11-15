@@ -1,7 +1,7 @@
 from jax import numpy as jnp
 from jax import vmap
 
-from inverse_thomson_scattering.model.physics.generate_spectra import get_fit_model
+from inverse_thomson_scattering.model.physics.generate_spectra import FitModel
 from inverse_thomson_scattering.process import irf
 
 
@@ -11,7 +11,7 @@ class SpectrumCalculator:
         self.cfg = cfg
         self.sas = sas
 
-        self.forward_pass = get_fit_model(cfg, sas, backend="jax")
+        self.forward_pass = FitModel(cfg, sas, backend="jax")
         self.lam = cfg["parameters"]["lam"]["val"]
 
         if (

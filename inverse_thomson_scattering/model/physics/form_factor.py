@@ -1,8 +1,4 @@
 import jax
-from jax import config
-
-config.update("jax_enable_x64", True)
-#config.update('jax_disable_jit',True)
 
 from functools import partial
 from jax import numpy as jnp
@@ -44,26 +40,28 @@ def zprimeMaxw(xi):
     # print(jnp.shape(Zp))
     return Zp
 
-def get_form_factor_fn(lamrang, npts, backend:str="jax"):
 
-    # basic quantities
-    C = 2.99792458e10
-    Me = 510.9896 / C**2  # electron mass keV/C^2
-    Mp = Me * 1836.1  # proton mass keV/C^2
+class FormFactor:
+    def __init__(self, lamrang, npts, backend: str = "jax"):
+        # basic quantities
+        self.C = 2.99792458e10
+        self.Me = 510.9896 / self.C**2  # electron mass keV/C^2
+        self.Mp = self.Me * 1836.1  # proton mass keV/C^2
+        self.lamrang = lamrang
+        self.npts = npts
+        h = 0.01
+        minmax = 8.2
+        h1 = 1000
+        self.xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
+        self.xi2 = jnp.array(jnp.arange(-minmax, minmax, h))
+        self.Zpi = jnp.array(zprimeMaxw(self.xi2))
 
-    h = 0.01
-    minmax = 8.2
-    h1 = 1000
-    xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
-    xi2 = jnp.array(jnp.arange(-minmax, minmax, h))
-    Zpi = jnp.array(zprimeMaxw(xi2))
+        if backend == "jax":
+            self.vmap = jax.vmap
+        else:
+            self.vmap = partial(hk.vmap, split_rng=False)
 
-    if backend == "jax":
-        vmap = jax.vmap
-    else:
-        vmap = partial(hk.vmap, split_rng=False)
-
-    def nonMaxwThomson(Te, Ti, Z, A, fract, ne, Va, ud, sa, fe, lam):
+    def __call__(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
         """
         NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions and scattering angles. The spectral density function is calculated with and without the ion contribution which can be set to an independent grid from the electron contribution. Distribution functions can be one or two dimensional and the appropriate susceptibility is calculated with the rational integration.
 
@@ -85,25 +83,37 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         :return:
         """
 
-        Mi = jnp.array(A) * Mp  # ion mass
+        Te, Ti, Z, A, fract, ne, Va, ud, fe = (
+            cur_Te,
+            params["Ti"],
+            params["Z"],
+            params["A"],
+            params["fract"],
+            cur_ne,
+            params["Va"],
+            params["ud"],
+            f_and_v,
+        )
+
+        Mi = jnp.array(A) * self.Mp  # ion mass
         re = 2.8179e-13  # classical electron radius cm
-        Esq = Me * C**2 * re  # sq of the electron charge keV cm
-        constants = jnp.sqrt(4 * jnp.pi * Esq / Me)
+        Esq = self.Me * self.C**2 * re  # sq of the electron charge keV cm
+        constants = jnp.sqrt(4 * jnp.pi * Esq / self.Me)
         sarad = sa * jnp.pi / 180  # scattering angle in radians
         sarad = jnp.reshape(sarad, [1, 1, -1])
 
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
 
-        omgL, omgs, lamAxis, _ = lam_parse.lamParse(lamrang, lam, npts=npts)  # , True)
+        omgL, omgs, lamAxis, _ = lam_parse.lamParse(self.lamrang, lam, npts=self.npts)  # , True)
 
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
         omgs = omgs[jnp.newaxis, ..., jnp.newaxis]
         omg = omgs - omgL
 
-        ks = jnp.sqrt(omgs**2 - omgpe**2) / C
-        kL = jnp.sqrt(omgL**2 - omgpe**2) / C
+        ks = jnp.sqrt(omgs**2 - omgpe**2) / self.C
+        kL = jnp.sqrt(omgL**2 - omgpe**2) / self.C
         k = jnp.sqrt(ks**2 + kL**2 - 2 * ks * kL * jnp.cos(sarad))
 
         kdotv = k * Va
@@ -112,7 +122,7 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         # plasma parameters
 
         # electrons
-        vTe = jnp.sqrt(Te[..., jnp.newaxis, jnp.newaxis] / Me)  # electron thermal velocity
+        vTe = jnp.sqrt(Te[..., jnp.newaxis, jnp.newaxis] / self.Me)  # electron thermal velocity
         klde = (vTe / omgpe) * k
 
         # ions
@@ -122,14 +132,14 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         fract = jnp.reshape(fract, [1, 1, 1, -1])
         Zbar = jnp.sum(Z * fract)
         ni = fract * ne[..., jnp.newaxis, jnp.newaxis, jnp.newaxis] / Zbar
-        omgpi = constants * Z * jnp.sqrt(ni * Me / Mi)
+        omgpi = constants * Z * jnp.sqrt(ni * self.Me / Mi)
 
         vTi = jnp.sqrt(Ti / Mi)  # ion thermal velocity
         # kldi = jnp.transpose(vTi / omgpi, [1, 0, 2, 3]) * k
         kldi = (vTi / omgpi) * (k[..., jnp.newaxis])
-        #print(vTi)
-        #print(omgpi)
-        #print(kldi)
+        # print(vTi)
+        # print(omgpi)
+        # print(kldi)
 
         # ion susceptibilities
         # finding derivative of plasma dispersion function along xii array
@@ -139,11 +149,15 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         num_ion_pts = jnp.shape(xii)
         chiI = jnp.zeros(num_ion_pts)
 
-        ZpiR = jnp.interp(xii, xi2, Zpi[0, :], left=0, right=0)  # , "cubic", bounds_error=False, fill_value=0)
-        ZpiI = jnp.interp(xii, xi2, Zpi[1, :], left=0, right=0)  # , "cubic", bounds_error=False, fill_value=0)
+        ZpiR = jnp.interp(
+            xii, self.xi2, self.Zpi[0, :], left=0, right=0
+        )  # , "cubic", bounds_error=False, fill_value=0)
+        ZpiI = jnp.interp(
+            xii, self.xi2, self.Zpi[1, :], left=0, right=0
+        )  # , "cubic", bounds_error=False, fill_value=0)
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
-        #print(ZpiR)
-        #print(chiR)
+        # print(ZpiR)
+        # print(chiR)
 
         # electron susceptibility
         # calculating normilized phase velcoity(xi's) for electrons
@@ -184,16 +198,18 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
 
         chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
-        ratmod = jnp.exp(jnp.interp(xi1, x, jnp.log(jnp.squeeze(DF))))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
-        ratdf = jnp.gradient(ratmod, xi1[1] - xi1[0])
+        ratmod = jnp.exp(
+            jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF)))
+        )  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
+        ratdf = jnp.gradient(ratmod, self.xi1[1] - self.xi1[0])
 
         def this_ratintn(this_dx):
-            return jnp.real(ratintn.ratintn(ratdf, this_dx, xi1))
+            return jnp.real(ratintn.ratintn(ratdf, this_dx, self.xi1))
 
-        chiERratprim = vmap(this_ratintn)(xi1[None, :] - xi2[:, None])
+        chiERratprim = self.vmap(this_ratintn)(self.xi1[None, :] - self.xi2[:, None])
         # if len(fe) == 2:
         # not sure about the extrapolation here
-        chiERrat = jnp.reshape(jnp.interp(xie.flatten(), xi2, chiERratprim[:, 0]), xie.shape)
+        chiERrat = jnp.reshape(jnp.interp(xie.flatten(), self.xi2, chiERratprim[:, 0]), xie.shape)
         # else:
         #     chiERrat = jnp.interpn(jnp.arange(0, 2 * jnp.pi, 10**-1.2018), xi2, chiERratprim, beta, xie, "spline")
         chiERrat = -1.0 / (klde**2) * chiERrat
@@ -223,14 +239,12 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         SKW_ele_omg = 2 * jnp.pi * 1.0 / klde * (ele_comp) / ((jnp.abs(epsilon)) ** 2) * vTe / omgpe
         # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
-        PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:,None,None]
-        #PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
+        PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:, None, None]
+        # PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
         # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
-        lams = 2 * jnp.pi * C / omgs
-        PsLam = PsOmg * 2 * jnp.pi * C / lams**2
+        lams = 2 * jnp.pi * self.C / omgs
+        PsLam = PsOmg * 2 * jnp.pi * self.C / lams**2
         # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam
         # formfactorE = PsLamE # commented because unused
         return formfactor, lams
-
-    return nonMaxwThomson

@@ -8,20 +8,20 @@ from copy import deepcopy
 config.update("jax_enable_x64", True)
 
 from scipy.signal import find_peaks
-from inverse_thomson_scattering.model.physics.form_factor import get_form_factor_fn
+from inverse_thomson_scattering.model.physics.form_factor import FormFactor
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 
 def test_epw():
     # Test #1: Bohm-Gross test, calculate a spectrum and compare the resonance to the Bohm gross dispersion relation
-    nonMaxwThomsonE_jax = get_form_factor_fn([400, 700], npts=8192, backend="jax")
+    electron_form_factor = FormFactor([400, 700], npts=8192, backend="jax")
     xie = np.linspace(-7, 7, 1024)
     sa = np.array([60])
     num_dist_func = get_num_dist_func({"DLM": []}, xie)
     fecur = num_dist_func(2.0)
     lam = 526.5
 
-    ThryE, lamAxisE = jit(nonMaxwThomsonE_jax)(0.5, 0.2, 1, 1, 1, np.array([0.2 * 1e20]), 0, 0, sa, (fecur, xie), lam)
+    ThryE, lamAxisE = jit(electron_form_factor)(0.5, 0.2, 1, 1, 1, np.array([0.2 * 1e20]), 0, 0, sa, (fecur, xie), lam)
 
     ThryE = np.squeeze(ThryE)
     # print(type(ThryE))
