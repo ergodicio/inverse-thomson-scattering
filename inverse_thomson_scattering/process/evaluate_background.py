@@ -72,6 +72,8 @@ def get_lineout_bg(
     """
     span = 2 * config["data"]["dpixel"] + 1  # (span must be odd)
 
+    if config["data"]["background"]["type"] not in ["Fit", "Shot", "pixel"]:
+        raise NotImplementedError("Background type must be: 'Fit', 'Shot', or 'pixel'")
     
     if config["other"]["extraoptions"]["load_ele_spec"]:
         if config["data"]["background"]["type"] == "Fit":
@@ -168,6 +170,10 @@ def get_lineout_bg(
     
     
     if config["other"]["extraoptions"]["load_ion_spec"]:
+        #Due to the low background associated with IAWs the fitted background is only performed for the EPW
+        if config["data"]["background"]["type"] == "Fit":
+            BackgroundPixel = config["data"]["background"]["slice"]
+        
         # quantify a uniform background
         noiseI = np.mean(
             (ionData - BGion)[

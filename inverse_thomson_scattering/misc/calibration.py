@@ -87,7 +87,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
        # IAWtime = 0  # temporal offset between EPW ross and IAW ross (varies shot to shot, can potentially add a fix based off the fiducials)
 
     else:
-        if shotNum < 105000:
+        if shotNum < 104000:
             EPWDisp = 0.27093
             IAWDisp = 0.00438
             EPWoff = 396.256  # needs to be checked
@@ -115,8 +115,8 @@ def get_calibrations(shotNum, tstype, CCDsize):
             magI = 2.87  # um / px
             magE = 5.10  # um / px
 
-            EPWtcc = 1024 - 456.1  # 562;
-            IAWtcc = 1024 - 519  # 469;
+            EPWtcc = 1024 - 516  # 562;
+            IAWtcc = 1024 - 450  # 469;
 
         #IAWtime = 0  # means nothing here just kept to allow one code to be used for both
 
@@ -132,7 +132,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         if tstype == "imaging":
             axisxE = axisxE - EPWtcc * magE
             axisxI = axisxI - IAWtcc * magI
-            axisxI = axisxI + 200
+            #axisxI = axisxI + 200
     else:
         imp = sio.loadmat(join("files", "angsFRED.mat"), variable_names="angsFRED")
         axisxE = imp["angsFRED"][0, :]

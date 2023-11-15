@@ -259,18 +259,24 @@ def scipy_loop(config, all_data, sa, batch_indices, num_batches):
                     "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
                 }
                 ts_fitter = TSFitter(config, sa, batch)
+                x0 = ts_fitter.flattened_weights
+                if config["optimizer"]["sequential"] and 'xprev' in locals():
+                    x0=xprev
 
                 res = spopt.minimize(
                     ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
-                    ts_fitter.flattened_weights,
+                    x0,
                     args=batch,
                     method=config["optimizer"]["method"],
                     jac=True if config["optimizer"]["grad_method"] == "AD" else False,
                     bounds=ts_fitter.bounds,
-                    options={"disp": True, "maxiter": 2},
+                    options={"disp": True, "maxiter": 1000},
                 )
                 best_weights[i_batch] = ts_fitter.unravel_pytree(res["x"])
                 overall_loss += res["fun"]
+                
+                if config["optimizer"]["sequential"]:
+                    xprev = res.x
             raw_weights = best_weights
     mlflow.log_metrics({"overall loss": float(overall_loss)})
     return raw_weights, best_weights, overall_loss, ts_fitter
