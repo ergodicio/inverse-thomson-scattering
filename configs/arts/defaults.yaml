@@ -130,6 +130,8 @@ data:
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1
+    ele_lam_shift: 0.0
+    ion_loss_scale: 1.0
     probe_beam: P9
     dpixel: 2
     lineouts:

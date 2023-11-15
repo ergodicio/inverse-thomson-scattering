@@ -97,7 +97,7 @@ def scipy_angular_loop(config, all_data, best_weights, all_weights, sa):
         ],
     }
     for i in range(config["optimizer"]["num_mins"]):
-        # ts_fitter = TSFitter(config, sa, batch)
+        ts_fitter = TSFitter(config, sa, batch)
         # ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
         #     0.97, 1.03, len(ts_fitter.flattened_weights)
         # )
@@ -110,7 +110,7 @@ def scipy_angular_loop(config, all_data, best_weights, all_weights, sa):
             bounds=ts_fitter.bounds,
             options={"disp": True, "maxiter": 1},
         )
-        best_weights = ts_fitter.get_params(ts_fitter.unravel_pytree(res["x"]), batch)
+        best_weights = ts_fitter.unravel_pytree(res["x"])
         if i == config["optimizer"]["num_mins"] - 1:
             break
         config["parameters"]["fe"]["length"] = (
@@ -319,14 +319,14 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     t1 = time.time()
     mlflow.set_tag("status", "preprocessing")
     config = validate_inputs(config)
+
     # prepare data
     all_data, sa, all_axes = prepare.prepare_data(config)
-
-    # prepare optimizer / solver
     batch_indices = np.arange(max(len(all_data["e_data"]), len(all_data["i_data"])))
     num_batches = len(batch_indices) // config["optimizer"]["batch_size"] or 1
     mlflow.log_metrics({"setup_time": round(time.time() - t1, 2)})
 
+    # perform fit
     t1 = time.time()
     mlflow.set_tag("status", "minimizing")
     if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent

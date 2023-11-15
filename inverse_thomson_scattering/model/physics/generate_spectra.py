@@ -16,7 +16,8 @@ class FitModel:
 
     def __call__(self, all_params):
         for key in self.config["parameters"].keys():
-            all_params[key] = jnp.squeeze(all_params[key])
+            if key != "fe":
+                all_params[key] = jnp.squeeze(all_params[key])
 
         if self.config["parameters"]["m"]["active"]:
             all_params["fe"] = jnp.log(self.num_dist_func(all_params["m"]))
@@ -42,14 +43,7 @@ class FitModel:
         lam = all_params["lam"]
 
         if self.config["other"]["extraoptions"]["load_ion_spec"]:
-            ThryI, lamAxisI = self.ion_form_factor(
-                all_params,
-                cur_ne * 1e20,
-                cur_Te,
-                self.sa["sa"],
-                (fecur, vcur),
-                lam + self.config["data"]["ele_lam_shift"],
-            )
+            ThryI, lamAxisI = self.ion_form_factor(all_params, cur_ne * 1e20, cur_Te, self.sa["sa"], (fecur, vcur), lam)
 
             # remove extra dimensions and rescale to nm
             lamAxisI = jnp.squeeze(lamAxisI) * 1e7  # TODO hardcoded

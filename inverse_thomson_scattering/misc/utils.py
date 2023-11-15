@@ -1,4 +1,4 @@
-import mlflow, flatten_dict
+import os, mlflow, flatten_dict, boto3
 
 
 def log_params(cfg):
@@ -26,3 +26,23 @@ def update(base_dict, new_dict):
             combined_dict[k] = new_dict[k]
 
     return combined_dict
+
+
+def upload_dir_to_s3(local_directory: str, bucket: str, destination: str, run_id: str):
+    client = boto3.client("s3")
+
+    # enumerate local files recursively
+    for root, dirs, files in os.walk(local_directory):
+        for filename in files:
+            # construct the full local path
+            local_path = os.path.join(root, filename)
+
+            # construct the full Dropbox path
+            relative_path = os.path.relpath(local_path, local_directory)
+            s3_path = os.path.join(destination, relative_path)
+            client.upload_file(local_path, bucket, s3_path)
+
+    with open(os.path.join(local_directory, f"ingest-{run_id}.txt"), "w") as fi:
+        fi.write("ready")
+
+    client.upload_file(os.path.join(local_directory, f"ingest-{run_id}.txt"), bucket, f"ingest-{run_id}.txt")

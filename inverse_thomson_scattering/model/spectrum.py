@@ -56,7 +56,7 @@ class SpectrumCalculator:
         )
         ThryE = ThryE[self.cfg["data"]["lineouts"]["start"] : self.cfg["data"]["lineouts"]["end"], :]
         ThryE = batch["e_amps"] * ThryE / jnp.amax(ThryE, axis=1, keepdims=True)
-        ThryE = jnp.where(lamAxisE < self.lam, TSins["amp1"]["val"] * ThryE, TSins["amp2"]["val"] * ThryE)
+        ThryE = jnp.where(lamAxisE < self.lam, TSins["amp1"] * ThryE, TSins["amp2"] * ThryE)
         return ThryE, lamAxisE
 
     def __call__(self, params, batch):

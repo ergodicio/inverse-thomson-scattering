@@ -50,6 +50,21 @@ class TSFitter:
             flattened_ub, _ = ravel_pytree(ub)
             self.bounds = zip(flattened_lb, flattened_ub)
 
+        if "dist_fit" in cfg:
+            self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
+            self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
+
+            if cfg["dist_fit"]["window"]["type"] == "hamming":
+                self.w = jnp.hamming(self.smooth_window_len)
+            elif cfg["dist_fit"]["window"]["type"] == "hann":
+                self.w = jnp.hanning(self.smooth_window_len)
+            elif cfg["dist_fit"]["window"]["type"] == "bartlett":
+                self.w = jnp.bartlett(self.smooth_window_len)
+            else:
+                raise NotImplementedError
+        else:
+            print("\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n")
+
     def smooth(self, distribution):
         s = jnp.r_[
             distribution[self.smooth_window_len - 1 : 0 : -1],
