@@ -21,6 +21,8 @@ class FitModel:
 
         if self.config["parameters"]["m"]["active"]:
             all_params["fe"] = jnp.log(self.num_dist_func(all_params["m"]))
+            if self.config["parameters"]["m"]["active"] and self.config["parameters"]["fe"]["active"]:
+                raise ValueError("m and fe cannot be actively fit at the same time")
 
         # Add gradients to electron temperature and density just being applied to EPW
         cur_Te = jnp.linspace(

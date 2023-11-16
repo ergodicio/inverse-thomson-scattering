@@ -54,7 +54,7 @@ def recalculate_with_chosen_weights(
     num_params = 0
     for key, vec in all_params.items():
         num_params += np.shape(vec)[1]
-    print(num_params)
+
     if config["other"]["extraoptions"]["load_ion_spec"]:
         sigmas = np.zeros((all_data["i_data"].shape[0], num_params))
 
@@ -415,11 +415,6 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
     num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
 
     # store fitted parameters
-    # print("all_params")
-    # print(type(all_params))
-    # print(all_params)
-    # print(all_params["amp1"])
-    # print(type(all_params["amp1"]))
     reshaped_params = {}
     for key in all_params.keys():
         # cur_ind = 1
@@ -430,11 +425,6 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
             reshaped_params[key] = all_params[key][:, 0]
         # all_params[key] = all_params[key].tolist()
     final_params = pandas.DataFrame(reshaped_params)
-    # final_params = pandas.DataFrame(all_params)
-    # print("all_params")
-    # print(all_params)
-    # final_params = pandas.DataFrame.from_dict(all_params, orient='index')
-    # final_params = final_params.transpose()
     final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
 
     losses[losses > 1e10] = 1e10
@@ -481,12 +471,10 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
     os.makedirs(os.path.join(td, "best"))
 
     if config["other"]["extraoptions"]["load_ion_spec"]:
-        coords = (all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["val"]])), (
+        coords = (all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]])), (
             "Wavelength",
             all_axes["iaw_y"],
         )
-        # print(coords)
-        # print(all_axes["x_label"])
         ion_dat = {"fit": fits["ion"], "data": all_data["i_data"]}
         ion_sorted_fits = fits["ion"][loss_inds]
         ion_sorted_data = all_data["i_data"][loss_inds]
@@ -496,7 +484,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
         ion_savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in ion_dat.items()})
         ion_savedata.to_netcdf(os.path.join(td, "ion_fit_and_data.nc"))
     if config["other"]["extraoptions"]["load_ele_spec"]:
-        coords = (all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["val"]])), (
+        coords = (all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]])), (
             "Wavelength",
             all_axes["epw_y"],
         )
@@ -612,29 +600,13 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
     )
     sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
 
-    print("final_params")
-    print(final_params)
     for param in reshaped_params.keys():
         vals = pandas.Series(final_params[param], dtype=float)
         fig, ax = plt.subplots(1, 1, figsize=(4, 4))
         lineouts = np.array(config["data"]["lineouts"]["val"])
-
-        # for i in range(np.shape(vals)[0]):
-        #    print(np.shape(vals))
-        #    print(vals[i])
-        # vals = vals.apply(np.array)
-        # print(vals)
-        # print(type(vals))
-        # print(vals.values)
-        # print(np.vstack(vals.values))
-        # print(vals.to_numpy())
         std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
 
-        # vals=vals.to_numpy()
-        # vals=np.transpose(np.vstack(vals.values))
         ax.plot(lineouts, vals)
-        # print(sigmas_ds[param])
-        # print(vals.values - config["plotting"]["n_sigmas"] * sigmas_ds[param])
         ax.fill_between(
             lineouts,
             (vals.values - config["plotting"]["n_sigmas"] * sigmas_ds[param].values),

@@ -89,7 +89,7 @@ background:
 ```
 background:
 	type: fit
-	slice: []
+	slice: 900 <or background slice for IAW>
 ```
 
 **Best operation for lineouts of angular:**

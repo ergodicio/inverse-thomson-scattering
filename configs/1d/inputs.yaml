@@ -20,7 +20,7 @@ parameters:
         lb: 523.0
         ub: 528.0
     Te:
-        val: 0.5
+        val: 0.2
         active: True
         lb: 0.01
         ub: 1.5
@@ -31,7 +31,7 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: 0.2
+        val: 0.1
         active: True
         lb: 0.001
         ub: 3.0
@@ -39,7 +39,7 @@ parameters:
         val: [1., 6.]
         active: True
         lb: 1.0
-        ub: 25.0
+        ub: 7.0
     A:
         val: [1., 14.]
         active: False
@@ -47,7 +47,7 @@ parameters:
         val: [.57, .43]
         active: False
     ud:
-        val: 0.0
+        val: -1.0
         active: False
         lb: -2.0
         ub: 2.0
@@ -57,7 +57,7 @@ parameters:
         lb: -2.5
         ub: 2.5
     ne:
-        val: 0.2
+        val: 0.1
         active: True
         lb: 0.001
         ub: 1.0
@@ -87,13 +87,13 @@ data:
     shotnum: 104035
     lineouts:
         type:
-            pixel
-        start: 320
-        end: 680
-        skip: 20
+            um
+        start: -1000
+        end: 500
+        skip: 10
     background:
         type:
-            pixel
+            Fit
         slice: 900
 
 other:
@@ -109,4 +109,4 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: david_abs_1
+    run: david_abs_seq_2
