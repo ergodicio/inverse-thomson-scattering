@@ -284,6 +284,12 @@ class TSFitter:
 
             if "fe" in grad:
                 grad["fe"] = self.cfg["optimizer"]["grad_scalar"] * grad["fe"]
+
+            for k, param_dict in self.cfg["parameters"].items():
+                if param_dict["active"]:
+                    scalar = param_dict["gradient_scalar"] if "gradient_scalar" in param_dict else 1.0
+                    grad[k] *= scalar
+
             temp_grad, _ = ravel_pytree(grad)
             flattened_grads = np.array(temp_grad)
             return value, flattened_grads
