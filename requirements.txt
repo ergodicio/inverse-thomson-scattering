@@ -10,8 +10,8 @@ mlflow
 boto3
 flatten-dict
 flatdict
-dm-haiku
 optax
 tqdm
 jaxopt
 xarray
+mlflow_export_import

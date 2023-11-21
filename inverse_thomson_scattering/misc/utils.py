@@ -1,4 +1,6 @@
-import os, mlflow, flatten_dict, boto3
+import os, mlflow, flatten_dict, boto3, yaml, botocore, shutil, time, tempfile
+from urllib.parse import urlparse
+from mlflow_export_import.run.export_run import RunExporter
 
 
 def log_params(cfg):
@@ -28,7 +30,7 @@ def update(base_dict, new_dict):
     return combined_dict
 
 
-def upload_dir_to_s3(local_directory: str, bucket: str, destination: str, run_id: str):
+def upload_dir_to_s3(local_directory: str, bucket: str, destination: str, run_id: str, prefix="ingest", step=0):
     client = boto3.client("s3")
 
     # enumerate local files recursively
@@ -37,12 +39,58 @@ def upload_dir_to_s3(local_directory: str, bucket: str, destination: str, run_id
             # construct the full local path
             local_path = os.path.join(root, filename)
 
-            # construct the full Dropbox path
+            # construct the full path
             relative_path = os.path.relpath(local_path, local_directory)
             s3_path = os.path.join(destination, relative_path)
             client.upload_file(local_path, bucket, s3_path)
 
-    with open(os.path.join(local_directory, f"ingest-{run_id}.txt"), "w") as fi:
+    filename = f"{prefix}-{run_id}-{step}.txt"
+    filepath = os.path.join(local_directory, filename)
+
+    with open(filepath, "w") as fi:
         fi.write("ready")
 
-    client.upload_file(os.path.join(local_directory, f"ingest-{run_id}.txt"), bucket, f"ingest-{run_id}.txt")
+    client.upload_file(filepath, bucket, filename)
+
+
+def export_run(run_id, prefix="ingest", step=0):
+    t0 = time.time()
+    run_exp = RunExporter(mlflow_client=mlflow.MlflowClient())
+    with tempfile.TemporaryDirectory(dir=os.getenv("BASE_TEMPDIR")) as td2:
+        run_exp.export_run(run_id, td2)
+        print(f"Export took {round(time.time() - t0, 2)} s")
+        t0 = time.time()
+        upload_dir_to_s3(td2, "remote-mlflow-staging", f"artifacts/{run_id}", run_id, prefix=prefix, step=step)
+    print(f"Uploading took {round(time.time() - t0, 2)} s")
+
+
+def get_cfg(artifact_uri, temp_path):
+    dest_file_path = download_file("config.yaml", artifact_uri, temp_path)
+    with open(dest_file_path, "r") as file:
+        cfg = yaml.safe_load(file)
+
+    return cfg
+
+
+def download_file(fname, artifact_uri, destination_path):
+    file_uri = mlflow.get_artifact_uri(fname)
+    dest_file_path = os.path.join(destination_path, fname)
+
+    if "s3" in artifact_uri:
+        s3 = boto3.client("s3")
+        out = urlparse(file_uri, allow_fragments=False)
+        bucket_name = out.netloc
+        rest_of_path = out.path
+        try:
+            s3.download_file(bucket_name, rest_of_path[1:], dest_file_path)
+        except botocore.exceptions.ClientError as e:
+            return None
+    else:
+        if "file" in artifact_uri:
+            file_uri = file_uri[7:]
+        if os.path.exists(file_uri):
+            shutil.copyfile(file_uri, dest_file_path)
+        else:
+            return None
+
+    return dest_file_path

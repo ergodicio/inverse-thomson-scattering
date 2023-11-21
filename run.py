@@ -1,30 +1,18 @@
-import tempfile, time, os, yaml
-import multiprocessing as mp
+import tempfile, os, yaml, argparse
 import mlflow
 from flatten_dict import flatten, unflatten
 from jax import config
 
 config.update("jax_enable_x64", True)
-config.update("jax_disable_jit", True)
+# config.update("jax_disable_jit", True)
 
-from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
+from inverse_thomson_scattering.runner import run
 
 
-def one_run(config):
-    utils.log_params(config)
-    t0 = time.time()
-    fit_results, loss = fitter.fit(config=config)
-    metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
-    mlflow.log_metrics(metrics=metrics_dict)
-    mlflow.set_tag("status", "completed")
-
-    return loss
-
-
-if __name__ == "__main__":
+def _run_(cfg_path, mode="fit"):
     all_configs = {}
-    basedir = os.path.join(os.getcwd(), "configs", "arts")
+    basedir = os.path.join(os.getcwd(), f"{cfg_path}")
     for k in ["defaults", "inputs"]:
         with open(f"{os.path.join(basedir, k)}.yaml", "r") as fi:
             all_configs[k] = yaml.safe_load(fi)
@@ -39,7 +27,7 @@ if __name__ == "__main__":
 
     mlflow.set_experiment(experiment)
 
-    with mlflow.start_run(run_name=run_name) as run:
+    with mlflow.start_run(run_name=run_name) as mlflow_run:
         with tempfile.TemporaryDirectory() as td:
             for k in ["defaults", "inputs"]:
                 with open(os.path.join(td, f"{k}.yaml"), "w") as fi:
@@ -51,16 +39,16 @@ if __name__ == "__main__":
         defaults.update(flatten(all_configs["inputs"]))
         config = unflatten(defaults)
 
-        one_run(config)
+        run(config, mode=mode)
 
     if "MLFLOW_EXPORT" in os.environ:
-        from mlflow_export_import.run.export_run import RunExporter
+        utils.export_run(mlflow_run.info.run_id)
 
-        t0 = time.time()
-        run_exp = RunExporter(mlflow_client=mlflow.MlflowClient())
-        with tempfile.TemporaryDirectory() as td2:
-            run_exp.export_run(run.info.run_id, td2)
-            print(f"Export took {round(time.time() - t0, 2)} s")
-            t0 = time.time()
-            utils.upload_dir_to_s3(td2, "remote-mlflow-staging", f"artifacts/{run.info.run_id}", run.info.run_id)
-        print(f"Uploading took {round(time.time() - t0, 2)} s")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="TSADAR - Thomson Scattering with Automatic Differentiation")
+    parser.add_argument("--cfg", help="enter path to cfg")
+    parser.add_argument("--mode", help="enter forward or fit")
+    args = parser.parse_args()
+
+    _run_(args.cfg, args.mode)
