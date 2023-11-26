@@ -5,13 +5,11 @@ from jax import numpy as jnp
 
 
 class FitModel:
-    def __init__(self, config, sa, backend: str = "haiku"):
+    def __init__(self, config, sa):
         self.config = config
         self.sa = sa
-        self.electron_form_factor = FormFactor(
-            config["other"]["lamrangE"], npts=config["other"]["npts"], backend=backend
-        )
-        self.ion_form_factor = FormFactor(config["other"]["lamrangI"], npts=config["other"]["npts"], backend=backend)
+        self.electron_form_factor = FormFactor(config["other"]["lamrangE"], npts=config["other"]["npts"])
+        self.ion_form_factor = FormFactor(config["other"]["lamrangI"], npts=config["other"]["npts"])
         self.num_dist_func = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
 
     def __call__(self, all_params):

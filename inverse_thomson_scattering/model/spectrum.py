@@ -11,7 +11,7 @@ class SpectrumCalculator:
         self.cfg = cfg
         self.sas = sas
 
-        self.forward_pass = FitModel(cfg, sas, backend="jax")
+        self.forward_pass = FitModel(cfg, sas)
         self.lam = cfg["parameters"]["lam"]["val"]
 
         if (

@@ -163,11 +163,13 @@ def scipy_1d_loop(config, all_data, batch_indices, num_batches, best_weights, sa
             }
             ts_fitter = TSFitter(config, sa, batch)
 
-            if config["optimizer"]["sequential"]:
-                if previous_weights is None:
-                    init_weights = ts_fitter.flattened_weights
-                else:
-                    init_weights = previous_weights
+            if previous_weights is None:
+                init_weights = ts_fitter.flattened_weights
+
+            if "sequential" in config["optimizer"]:
+                if config["optimizer"]["sequential"]:
+                    if previous_weights is not None:
+                        init_weights = previous_weights
 
             res = spopt.minimize(
                 ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
@@ -181,9 +183,9 @@ def scipy_1d_loop(config, all_data, batch_indices, num_batches, best_weights, sa
             best_weights[i_batch] = ts_fitter.unravel_pytree(res["x"])
             overall_loss += res["fun"]
 
-            if config["optimizer"]["sequential"]:
-                previous_weights = res.x
-
+            if "sequential" in config["optimizer"]:
+                if config["optimizer"]["sequential"]:
+                    previous_weights = res.x
 
         raw_weights = best_weights
 

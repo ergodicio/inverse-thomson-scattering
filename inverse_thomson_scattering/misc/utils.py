@@ -1,6 +1,5 @@
 import os, mlflow, flatten_dict, boto3, yaml, botocore, shutil, time, tempfile
 from urllib.parse import urlparse
-from mlflow_export_import.run.export_run import RunExporter
 
 
 def log_params(cfg):
@@ -55,6 +54,8 @@ def upload_dir_to_s3(local_directory: str, bucket: str, destination: str, run_id
 
 def export_run(run_id, prefix="ingest", step=0):
     t0 = time.time()
+    from mlflow_export_import.run.export_run import RunExporter
+
     run_exp = RunExporter(mlflow_client=mlflow.MlflowClient())
     with tempfile.TemporaryDirectory(dir=os.getenv("BASE_TEMPDIR")) as td2:
         run_exp.export_run(run_id, td2)
@@ -65,11 +66,12 @@ def export_run(run_id, prefix="ingest", step=0):
 
 
 def get_cfg(artifact_uri, temp_path):
-    dest_file_path = download_file("config.yaml", artifact_uri, temp_path)
-    with open(dest_file_path, "r") as file:
-        cfg = yaml.safe_load(file)
+    dest_file_path = download_file("defaults.yaml", artifact_uri, temp_path)
+    dest_file_path = download_file("inputs.yaml", artifact_uri, temp_path)
+    # with open(dest_file_path, "r") as file:
+    #     cfg = yaml.safe_load(file)
 
-    return cfg
+    # return cfg
 
 
 def download_file(fname, artifact_uri, destination_path):

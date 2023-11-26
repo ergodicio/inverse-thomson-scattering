@@ -1,9 +1,11 @@
-import time
+import time, os
 
 import numpy as np
 import matplotlib.pyplot as plt
-import os, mlflow, tempfile
+import mlflow, tempfile, yaml
 import multiprocessing as mp
+from flatten_dict import flatten, unflatten
+
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc.calibration import get_scattering_angles
 from inverse_thomson_scattering.model.loss_function import TSFitter
@@ -17,7 +19,46 @@ else:
     BASE_TEMPDIR = None
 
 
-def run(config, mode="fit"):
+def load_and_make_folders(cfg_path):
+    all_configs = {}
+    basedir = os.path.join(os.getcwd(), f"{cfg_path}")
+    for k in ["defaults", "inputs"]:
+        with open(f"{os.path.join(basedir, k)}.yaml", "r") as fi:
+            all_configs[k] = yaml.safe_load(fi)
+
+    if "mlflow" in all_configs["inputs"].keys():
+        experiment = all_configs["inputs"]["mlflow"]["experiment"]
+        run_name = all_configs["inputs"]["mlflow"]["run"]
+
+    else:
+        experiment = all_configs["defaults"]["mlflow"]["experiment"]
+        run_name = all_configs["defaults"]["mlflow"]["run"]
+
+    mlflow.set_experiment(experiment)
+
+    with mlflow.start_run(run_name=run_name) as mlflow_run:
+        with tempfile.TemporaryDirectory() as td:
+            for k in ["defaults", "inputs"]:
+                with open(os.path.join(td, f"{k}.yaml"), "w") as fi:
+                    yaml.dump(all_configs[k], fi)
+
+            mlflow.log_artifacts(td)
+
+    return mlflow_run.info.run_id, all_configs
+
+
+def run(cfg_path, mode):
+    run_id, all_configs = load_and_make_folders(cfg_path)
+    defaults = flatten(all_configs["defaults"])
+    defaults.update(flatten(all_configs["inputs"]))
+    config = unflatten(defaults)
+    with mlflow.start_run(run_id=run_id) as mlflow_run:
+        _run_(config, mode=mode)
+
+    return run_id
+
+
+def _run_(config, mode="fit"):
     utils.log_params(config)
     t0 = time.time()
     if mode == "fit":
@@ -32,8 +73,19 @@ def run(config, mode="fit"):
 def run_job(run_id, nested):
     with mlflow.start_run(run_id=run_id, nested=nested) as run:
         with tempfile.TemporaryDirectory(dir=BASE_TEMPDIR) as temp_path:
-            cfg = utils.get_cfg(artifact_uri=run.info.artifact_uri, temp_path=temp_path)
-        run(cfg)
+            all_configs = {}
+            for k in ["defaults", "inputs"]:
+                dest_file_path = download_file(f"{k}.yaml", run.info.artifact_uri, temp_path)
+                with open(f"{os.path.join(basedir, k)}.yaml", "r") as fi:
+                    all_configs[k] = yaml.safe_load(fi)
+            defaults = flatten(all_configs["defaults"])
+            defaults.update(flatten(all_configs["inputs"]))
+            config = unflatten(defaults)
+
+        _run_(config, mode=mode)
+
+    if "MLFLOW_EXPORT" in os.environ:
+        utils.export_run(run_id)
 
 
 def calc_spec(config):

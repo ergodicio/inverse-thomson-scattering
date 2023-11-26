@@ -1,11 +1,8 @@
-import jax
-
-from functools import partial
 from jax import numpy as jnp
+from jax import vmap
 
 import scipy.interpolate as sp
 import numpy as np
-import haiku as hk
 
 from inverse_thomson_scattering.model.physics import ratintn
 from inverse_thomson_scattering.misc import lam_parse
@@ -42,7 +39,7 @@ def zprimeMaxw(xi):
 
 
 class FormFactor:
-    def __init__(self, lamrang, npts, backend: str = "jax"):
+    def __init__(self, lamrang, npts):
         # basic quantities
         self.C = 2.99792458e10
         self.Me = 510.9896 / self.C**2  # electron mass keV/C^2
@@ -51,15 +48,10 @@ class FormFactor:
         self.npts = npts
         h = 0.01
         minmax = 8.2
-        h1 = 1000
+        h1 = 1024
         self.xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
         self.xi2 = jnp.array(jnp.arange(-minmax, minmax, h))
         self.Zpi = jnp.array(zprimeMaxw(self.xi2))
-
-        if backend == "jax":
-            self.vmap = jax.vmap
-        else:
-            self.vmap = partial(hk.vmap, split_rng=False)
 
     def __call__(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
         """
@@ -206,7 +198,7 @@ class FormFactor:
         def this_ratintn(this_dx):
             return jnp.real(ratintn.ratintn(ratdf, this_dx, self.xi1))
 
-        chiERratprim = self.vmap(this_ratintn)(self.xi1[None, :] - self.xi2[:, None])
+        chiERratprim = vmap(this_ratintn)(self.xi1[None, :] - self.xi2[:, None])
         # if len(fe) == 2:
         # not sure about the extrapolation here
         chiERrat = jnp.reshape(jnp.interp(xie.flatten(), self.xi2, chiERratprim[:, 0]), xie.shape)

@@ -1,10 +1,6 @@
-import argparse
-import os
-import tempfile
-import time
+import argparse, os, time
 
-import mlflow
-import yaml
+from inverse_thomson_scattering.runner import load_and_make_folders
 
 if "BASE_TEMPDIR" in os.environ:
     BASE_TEMPDIR = os.environ["BASE_TEMPDIR"]
@@ -25,28 +21,11 @@ def _queue_run_(machine, run_id):
 
     with open(os.path.join(os.getcwd(), "new_job.sh"), "w") as job_file:
         job_file.write(base_job)
-        job_file.writelines(f"srun python run.py --mode remote --run_id {run_id}")
+        job_file.writelines(f"srun python run_tsadar.py --type remote --run_id {run_id}")
 
     os.system(f"sbatch new_job.sh")
     time.sleep(0.1)
     os.system("sqs")
-
-
-def load_and_make_folders(cfg_path):
-    with open(f"{cfg_path}.yaml", "r") as file:
-        cfg = yaml.safe_load(file)
-
-    mlflow.set_experiment(cfg["mlflow"]["experiment"])
-    # modify config
-    with mlflow.start_run(run_name=cfg["mlflow"]["run"]) as run:
-        tags = {"sim_status": "queued"}
-        with tempfile.TemporaryDirectory(dir=BASE_TEMPDIR) as temp_path:
-            with open(os.path.join(temp_path, "config.yaml"), "w") as fp:
-                yaml.dump(cfg, fp)
-            mlflow.log_artifacts(temp_path)
-        mlflow.set_tags(tags)
-
-    return cfg, run.info.run_id
 
 
 if __name__ == "__main__":
@@ -54,5 +33,8 @@ if __name__ == "__main__":
     parser.add_argument("--cfg", help="enter path to cfg")
     args = parser.parse_args()
 
-    cfg, run_id = load_and_make_folders(args.cfg)
-    _queue_run_(cfg["machine"]["calculator"], run_id)
+    run_id, all_configs = load_and_make_folders(args.cfg)
+    machine = (
+        all_configs["inputs"]["machine"] if "machine" in all_configs["inputs"] else all_configs["defaults"]["machine"]
+    )
+    _queue_run_(machine, run_id)
