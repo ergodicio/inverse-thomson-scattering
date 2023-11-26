@@ -95,7 +95,7 @@ parameters:
         active: False
 
 other:
-    crop_window: 1
+    crop_window: 256
     ion_window_start: 525
     ion_window_end: 528
     ele_window_start: 425
@@ -110,7 +110,6 @@ other:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
-        plot_raw_data: False
     PhysParams:
         background: [0, 0]
         norm: 0
@@ -119,54 +118,48 @@ other:
     CCDsize: [1024, 1024]
     flatbg: 0
     gain: 1
-    points_per_pixel: 2
+    points_per_pixel: 5
     ang_res_unit: 10
     lam_res_unit: 5
     refit: True
     refit_thresh: 0.25
     calc_sigmas: False
 
-plotting:
-    n_sigmas: 3
-    rolling_std_width: 5
-    data_cbar_u: 100
-    data_cbar_l: 0
-    
-
 data:
-    launch_data_visualizer: True
     shotnum: 101675
     shotDay: False
+    launch_data_visualizer: False
     fit_rng:
         blue_min: 450
         blue_max: 510
-        red_min: 545
-        red_max: 650
-        iaw_min: 525
-        iaw_max: 528
+        red_min: 540
+        red_max: 625
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1
     ion_loss_scale: 1.0
     ele_t0: 0
     ion_t0_shift: 0.0
-    ele_lam_shift: -0.1
-    probe_beam: P9
-    dpixel: 3
+    ele_lam_shift: -2.0
+    dpixel: 2
     lineouts:
         type:
             pixel
         start: 500
-        end: 502
+        end: 510
         skip: 1
     background:
         type:
             pixel
         slice: 900
-        show: False
+    probe_beam: P9
 
+plotting:
+    n_sigmas: 3
+    rolling_std_width: 5
+    data_cbar_u: 10
+    data_cbar_l: 0
 
-    
 optimizer:
     # use adam for nn / stochastic gradient descent
     # use L-BFGS-B for full batch / parameter learning
@@ -176,19 +169,17 @@ optimizer:
     y_norm: True
     x_norm: False
     grad_method: AD
-    grad_scalar: 0.5
-    batch_size: 6
+    batch_size: 2
     num_epochs: 200
     learning_rate: 1.0e-4
     parameter_norm: True
     refine_factor: 0
     num_mins: 1
-    sequential: True
 
 nn:
     use: false
-    conv_filters: 32|16|16 #|32|32
-    linear_widths: 32|16
+    conv_filters: 32|32|16
+    linear_widths: 16|8
 
 dist_fit:
     window:

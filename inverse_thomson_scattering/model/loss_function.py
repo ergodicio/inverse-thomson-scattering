@@ -249,24 +249,10 @@ class TSFitter:
             "ion_loss_scale"
         ] * i_error + e_error + density_loss + temperature_loss + momentum_loss, [ThryE, normed_e_data, params]
 
-    # def initialize_rest_of_params(self, config):
-    #     these_params = dict()
-    #     for param_name, param_config in config["parameters"].items():
-    #         if param_config["active"]:
-    #             pass
-    #         else:
-    #             these_params[param_name] = jnp.concatenate(
-    #                 [jnp.array(param_config["val"]).reshape(1, -1) for _ in range(config["optimizer"]["batch_size"])]
-    #             ).reshape(config["optimizer"]["batch_size"], -1)
-    #
-    #     return these_params
-
     def get_normed_batch(self, batch):
         normed_batch = copy.deepcopy(batch)
         normed_batch["i_data"] = normed_batch["i_data"] / self.i_input_norm
         normed_batch["e_data"] = normed_batch["e_data"] / self.e_input_norm
-        # normed_e_data, normed_i_data = get_normed_e_and_i_data(batch)
-        # normed_batch = jnp.concatenate([normed_e_data[:, None, :], normed_i_data[:, None, :]], axis=1)
         return normed_batch
 
     def loss(self, weights, batch):

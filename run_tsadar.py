@@ -17,7 +17,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if "run_id" in args:
+    if args.run_id is not None:
         run_job(args.run_id, nested=None)
         run_id = args.run_id
     else:

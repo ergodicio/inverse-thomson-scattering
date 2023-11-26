@@ -75,8 +75,8 @@ def run_job(run_id, nested):
         with tempfile.TemporaryDirectory(dir=BASE_TEMPDIR) as temp_path:
             all_configs = {}
             for k in ["defaults", "inputs"]:
-                dest_file_path = download_file(f"{k}.yaml", run.info.artifact_uri, temp_path)
-                with open(f"{os.path.join(basedir, k)}.yaml", "r") as fi:
+                dest_file_path = utils.download_file(f"{k}.yaml", run.info.artifact_uri, temp_path)
+                with open(f"{os.path.join(temp_path, k)}.yaml", "r") as fi:
                     all_configs[k] = yaml.safe_load(fi)
             defaults = flatten(all_configs["defaults"])
             defaults.update(flatten(all_configs["inputs"]))
