@@ -61,7 +61,7 @@ def get_shot_bg(config, axisyE, elecData):
 
 
 def get_lineout_bg(
-    config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, BackgroundPixel, IAWtime, LineoutPixelE, LineoutPixelI
+    config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, BackgroundPixel, LineoutPixelE, LineoutPixelI
 ):
     """
     This function generates noise or background profiles to based off the data or background data. Electron spectra have 2 options "Fit" and "pixel". These specify how forground data is treated. Noise is then the sum of forground and background noise. Ions only have one background option as the background is usualy very small
@@ -72,6 +72,8 @@ def get_lineout_bg(
     """
     span = 2 * config["data"]["dpixel"] + 1  # (span must be odd)
 
+    if config["data"]["background"]["type"] not in ["Fit", "Shot", "pixel"]:
+        raise NotImplementedError("Background type must be: 'Fit', 'Shot', or 'pixel'")
     
     if config["other"]["extraoptions"]["load_ele_spec"]:
         if config["data"]["background"]["type"] == "Fit":
@@ -168,6 +170,10 @@ def get_lineout_bg(
     
     
     if config["other"]["extraoptions"]["load_ion_spec"]:
+        #Due to the low background associated with IAWs the fitted background is only performed for the EPW
+        if config["data"]["background"]["type"] == "Fit":
+            BackgroundPixel = config["data"]["background"]["slice"]
+        
         # quantify a uniform background
         noiseI = np.mean(
             (ionData - BGion)[
@@ -184,7 +190,7 @@ def get_lineout_bg(
         if np.shape(BGion) == tuple(config["other"]["CCDsize"]):
             LineoutBGI = [
                 np.mean(
-                    BGion[:, a - IAWtime - config["data"]["dpixel"] : a - IAWtime + config["data"]["dpixel"]], axis=1
+                    BGion[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1
                 )
                 for a in LineoutPixelI
             ]

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.model.physics.generate_spectra import get_fit_model
+from inverse_thomson_scattering.model.physics.generate_spectra import FitModel
 from inverse_thomson_scattering.misc.lineout_plot import lineout_plot
 
 
@@ -37,7 +37,7 @@ def plotinput(config, sa):
                 ub.append(parameters[key]["ub"])
 
     x0 = np.array(x0)
-    fit_model = get_fit_model(config, xie, sa)
+    fit_model = FitModel(config, xie, sa)
 
     print("plotting")
     mlflow.set_tag("status", "plotting")
@@ -66,44 +66,66 @@ def plotinput(config, sa):
 def model_v_actual(
     sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds, yaxis, sorted_sqdev, sorted_red_losses
 ):
-    
     if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
-        ele_s_ind = np.argmin(np.abs(yaxis[0]-config["other"]["ele_window_start"]))
-        ele_e_ind = np.argmin(np.abs(yaxis[0]-config["other"]["ele_window_end"]))
-        ion_s_ind = np.argmin(np.abs(yaxis[1]-config["other"]["ion_window_start"]))
-        ion_e_ind = np.argmin(np.abs(yaxis[1]-config["other"]["ion_window_end"]))
+        ele_s_ind = np.argmin(np.abs(yaxis[0] - config["other"]["ele_window_start"]))
+        ele_e_ind = np.argmin(np.abs(yaxis[0] - config["other"]["ele_window_end"]))
+        ion_s_ind = np.argmin(np.abs(yaxis[1] - config["other"]["ion_window_start"]))
+        ion_e_ind = np.argmin(np.abs(yaxis[1] - config["other"]["ion_window_end"]))
         s_ind = [ele_s_ind, ion_s_ind]
         e_ind = [ele_e_ind, ion_e_ind]
     elif config["other"]["extraoptions"]["load_ion_spec"]:
-        s_ind = [np.argmin(np.abs(yaxis-config["other"]["ion_window_start"]))]
-        e_ind = [np.argmin(np.abs(yaxis-config["other"]["ion_window_end"]))]
-        sorted_data = [sorted_data]#np.array(sorted_data).reshape((1,)+np.shape(sorted_data))
-        sorted_fits = [sorted_fits]#np.array(sorted_fits).reshape((1,)+np.shape(sorted_fits))
-        sorted_sqdev = [sorted_sqdev]#np.array(sorted_sqdev).reshape((1,)+np.shape(sorted_sqdev))
-        
-    elif config["other"]["extraoptions"]["load_ele_spec"]:
-        s_ind = [np.argmin(np.abs(yaxis-config["other"]["ele_window_start"]))]
-        e_ind = [np.argmin(np.abs(yaxis-config["other"]["ele_window_end"]))]
-        sorted_data = [sorted_data]#np.array(sorted_data).reshape((1,)+np.shape(sorted_data))
-        sorted_fits = [sorted_fits]#np.array(sorted_fits).reshape((1,)+np.shape(sorted_fits))
-        sorted_sqdev = [sorted_sqdev]#np.array(sorted_sqdev).reshape((1,)+np.shape(sorted_sqdev))
-        
-    for i in range(num_plots):
+        s_ind = [np.argmin(np.abs(yaxis - config["other"]["ion_window_start"]))]
+        e_ind = [np.argmin(np.abs(yaxis - config["other"]["ion_window_end"]))]
+        sorted_data = [sorted_data]
+        sorted_fits = [sorted_fits]
+        sorted_sqdev = [sorted_sqdev]
 
+    elif config["other"]["extraoptions"]["load_ele_spec"]:
+        s_ind = [np.argmin(np.abs(yaxis - config["other"]["ele_window_start"]))]
+        e_ind = [np.argmin(np.abs(yaxis - config["other"]["ele_window_end"]))]
+        sorted_data = [sorted_data]
+        sorted_fits = [sorted_fits]
+        sorted_sqdev = [sorted_sqdev]
+
+    for i in range(num_plots):
         # plot model vs actual
         titlestr = (
             r"|Error|$^2$" + f" = {sorted_losses[i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[i]]}"
         )
         filename = f"loss={sorted_losses[i]:.2e}-reduced_loss={sorted_red_losses[i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[i]]}.png"
-        
-        lineout_plot(np.array(sorted_data)[:,i,:], np.array(sorted_fits)[:,i,:], np.array(sorted_sqdev)[:,i,:], yaxis, s_ind, e_ind, titlestr, filename, td, "worst")
+
+        lineout_plot(
+            np.array(sorted_data)[:, i, :],
+            np.array(sorted_fits)[:, i, :],
+            np.array(sorted_sqdev)[:, i, :],
+            yaxis,
+            s_ind,
+            e_ind,
+            titlestr,
+            filename,
+            td,
+            "worst",
+        )
 
         titlestr = (
-            r"|Error|$^2$" + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
-                )
+            r"|Error|$^2$"
+            + f" = {sorted_losses[-1 - i]:.2e}, line out # {config['data']['lineouts']['val'][loss_inds[-1 - i]]}"
+        )
         filename = f"loss={sorted_losses[-1 - i]:.2e}-reduced_loss={sorted_red_losses[-1 - i]:.2e}-lineout={config['data']['lineouts']['val'][loss_inds[-1 - i]]}.png"
-        
-        lineout_plot(np.array(sorted_data)[:,-1-i,:], np.array(sorted_fits)[:,-1-i,:], np.array(sorted_sqdev)[:,-1-i,:], yaxis, s_ind, e_ind, titlestr, filename, td, "best")
+
+        lineout_plot(
+            np.array(sorted_data)[:, -1 - i, :],
+            np.array(sorted_fits)[:, -1 - i, :],
+            np.array(sorted_sqdev)[:, -1 - i, :],
+            yaxis,
+            s_ind,
+            e_ind,
+            titlestr,
+            filename,
+            td,
+            "best",
+        )
+
 
 def LinePlots(
     x,

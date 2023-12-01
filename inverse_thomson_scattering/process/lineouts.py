@@ -10,12 +10,15 @@ def get_lineouts(
     # Convert lineout locations to pixel
     if config["data"]["lineouts"]["type"] == "ps" or config["data"]["lineouts"]["type"] == "um":
         LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
+        IAWtime = IAWtime / axisxI[1]  # corrects the iontime to be in the same units as the lineout
+        LineoutPixelI = [np.argmin(abs(axisxI - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
     elif config["data"]["lineouts"]["type"] == "pixel":
         LineoutPixelE = config["data"]["lineouts"]["val"]
     else:
         raise NotImplementedError
-
-    LineoutPixelI = LineoutPixelE
+    LineoutPixelI = np.round(np.array(LineoutPixelI) - IAWtime).astype(int)
+    config["data"]["lineouts"]["pixelE"] = LineoutPixelE
+    config["data"]["lineouts"]["pixelI"] = LineoutPixelI
 
     if config["data"]["background"]["type"] == "ps":
         BackgroundPixel = np.argmin(abs(axisxE - config["data"]["background"]["slice"]))
@@ -52,7 +55,7 @@ def get_lineouts(
 
     if config["other"]["extraoptions"]["load_ion_spec"]:
         LineoutTSI = [
-            np.sum(ionData[:, a - IAWtime - config["data"]["dpixel"] : a - IAWtime + config["data"]["dpixel"]], axis=1)
+            np.sum(ionData[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1)
             for a in LineoutPixelI
         ]
         LineoutTSI_smooth = [
@@ -68,46 +71,9 @@ def get_lineouts(
         BGion,
         LineoutTSE_smooth,
         BackgroundPixel,
-        IAWtime,
         LineoutPixelE,
         LineoutPixelI,
     )
-
-    # Plot Data
-    # if config["other"]["extraoptions"]["plot_raw_data"]:
-    #     if config["other"]["extraoptions"]["load_ion_spec"]:
-    #         ColorPlots(
-    #             axisxI - shift_zero,
-    #             axisyI,
-    #             conv2(ionData - BGion, np.ones([5, 3]) / 15, mode="same"),
-    #             Line=[
-    #                 [axisxI[LineoutPixelI] - shift_zero, axisxI[LineoutPixelI] - shift_zero],
-    #                 [axisyI[0], axisyI[-1]],
-    #                 [axisxI[BackgroundPixel] - shift_zero, axisxI[BackgroundPixel] - shift_zero],
-    #                 [axisyI[0], axisyI[-1]],
-    #             ],
-    #             vmin=0,
-    #             XLabel=xlab,
-    #             YLabel="Wavelength (nm)",
-    #             title="Shot : " + str(config["data"]["shotnum"]) + " : " + "TS : Corrected and background subtracted",
-    #         )
-    #
-    #     if config["other"]["extraoptions"]["load_ele_spec"]:
-    #         ColorPlots(
-    #             axisxE - shift_zero,
-    #             axisyE,
-    #             conv2(elecData - BGele, np.ones([5, 3]) / 15, mode="same"),
-    #             Line=[
-    #                 [axisxE[LineoutPixelE] - shift_zero, axisxE[LineoutPixelE] - shift_zero],
-    #                 [axisyE[0], axisyE[-1]],
-    #                 [axisxE[BackgroundPixel] - shift_zero, axisxE[BackgroundPixel] - shift_zero],
-    #                 [axisyE[0], axisyE[-1]],
-    #             ],
-    #             vmin=0,
-    #             XLabel=xlab,
-    #             YLabel="Wavelength (nm)",
-    #             title="Shot : " + str(config["data"]["shotnum"]) + " : " + "TS : Corrected and background subtracted",
-    #         )
 
     # Find data amplitudes
     gain = config["other"]["gain"]
@@ -127,7 +93,7 @@ def get_lineouts(
     config["other"]["PhysParams"]["noiseE"] = noiseE
 
     all_data = defaultdict(list)
-    
+
     if config["other"]["extraoptions"]["load_ion_spec"]:
         all_data["i_data"] = LineoutTSI_norm
         all_data["i_amps"] = ampI
@@ -138,7 +104,5 @@ def get_lineouts(
         all_data["e_amps"] = ampE
     else:
         all_data["e_data"] = all_data["e_amps"] = np.zeros(len(config["data"]["lineouts"]["val"]))
-    
-    #all_data = {k: np.concatenate(v) for k, v in all_data.items()}
 
     return all_data
