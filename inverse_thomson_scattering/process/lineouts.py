@@ -16,7 +16,7 @@ def get_lineouts(
         LineoutPixelE = config["data"]["lineouts"]["val"]
     else:
         raise NotImplementedError
-    LineoutPixelI = np.round(np.array(LineoutPixelE) - IAWtime).astype(int)
+    LineoutPixelI = np.round(np.array(LineoutPixelI) - IAWtime).astype(int)
     config["data"]["lineouts"]["pixelE"] = LineoutPixelE
     config["data"]["lineouts"]["pixelI"] = LineoutPixelI
     

@@ -109,15 +109,19 @@ class TSFitter:
             #    loss=loss+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
             sqdev["ion"] = jnp.square(i_data - ThryI) / (jnp.abs(i_data) + 1e-1)
             sqdev["ion"] = jnp.where(
-                (lamAxisI > self.cfg["data"]["fit_rng"]["iaw_min"])
-                & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_max"]),
+                ((lamAxisI > self.cfg["data"]["fit_rng"]["iaw_min"])
+                & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_cf_min"]))
+                |((lamAxisI > self.cfg["data"]["fit_rng"]["iaw_cf_max"])
+                & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_max"])),
                 sqdev["ion"],
                 0.0,
             )
             loss += jnp.sum(sqdev["ion"], axis=1)
             used_points += jnp.sum(
-                (lamAxisI > self.cfg["data"]["fit_rng"]["iaw_min"])
-                & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_max"])
+                ((lamAxisI > self.cfg["data"]["fit_rng"]["iaw_min"])
+                & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_cf_min"]))
+                |((lamAxisI > self.cfg["data"]["fit_rng"]["iaw_cf_max"])
+                & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_max"]))
             )
 
         if self.cfg["other"]["extraoptions"]["fit_EPWb"]:
@@ -162,12 +166,17 @@ class TSFitter:
         e_data = batch["e_data"]
         if self.cfg["other"]["extraoptions"]["fit_IAW"]:
             _error_ = jnp.square(i_data - ThryI) / denom[0]
+            #print(jnp.shape(_error_))
+            #print(jnp.shape(lamAxisI))
             _error_ = jnp.where(
-                (lamAxisI > self.cfg["data"]["fit_rng"]["iaw_min"])
-                & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_max"]),
+                ((lamAxisI > self.cfg["data"]["fit_rng"]["iaw_min"])
+                & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_cf_min"]))
+                |((lamAxisI > self.cfg["data"]["fit_rng"]["iaw_cf_max"])
+                & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_max"])),
                 _error_,
                 0.0,
             )
+            
             i_error += reduce_func(_error_)
 
         if self.cfg["other"]["extraoptions"]["fit_EPWb"]:

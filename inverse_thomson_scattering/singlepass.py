@@ -21,7 +21,7 @@ def calc_spec(config):
     stddev["spect_stddev_ele"] = 0.1#1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
     config["other"]["PhysParams"]["widIRF"] = stddev
     config["other"]["lamrangE"] = [400, 700]
-    config["other"]["lamrangI"] = [524, 529]
+    config["other"]["lamrangI"] = [524.27938, 528.755734]
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
     config["units"] = init_param_norm_and_shift(config)

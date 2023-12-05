@@ -129,7 +129,7 @@ other:
 plotting:
     n_sigmas: 3
     rolling_std_width: 5
-    data_cbar_u: 100
+    data_cbar_u: data
     data_cbar_l: 0
     
 
@@ -144,13 +144,15 @@ data:
         red_max: 650
         iaw_min: 525
         iaw_max: 528
+        iaw_cf_min: 526.4
+        iaw_cf_max: 526.6
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1
     ion_loss_scale: 1.0
     ele_t0: 0
     ion_t0_shift: 0.0
-    ele_lam_shift: -0.1
+    ele_lam_shift: 0.0
     probe_beam: P9
     dpixel: 3
     lineouts:
@@ -177,7 +179,7 @@ optimizer:
     x_norm: False
     grad_method: AD
     grad_scalar: 0.5
-    batch_size: 6
+    batch_size: 4
     num_epochs: 200
     learning_rate: 1.0e-4
     parameter_norm: True

@@ -85,6 +85,7 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         :return:
         """
 
+       #print(fe)
         Mi = jnp.array(A) * Mp  # ion mass
         re = 2.8179e-13  # classical electron radius cm
         Esq = Me * C**2 * re  # sq of the electron charge keV cm
@@ -100,12 +101,24 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         # calculate k and omega vectors
         omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
         omgs = omgs[jnp.newaxis, ..., jnp.newaxis]
+        #print("omgpe",omgpe)
+        #print("omgs",omgs)
         omg = omgs - omgL
 
         ks = jnp.sqrt(omgs**2 - omgpe**2) / C
         kL = jnp.sqrt(omgL**2 - omgpe**2) / C
         k = jnp.sqrt(ks**2 + kL**2 - 2 * ks * kL * jnp.cos(sarad))
-
+        #print("ks",ks[0,:,0])
+        #print("kL",kL[0,:,0])
+        #print("k",k[0,:,0])
+        #print("sarad",sarad)
+        #print("sa",sa)
+        #print(ks[0][-1])
+        #print(ks[0][-1]**2 + kL**2)
+        #print(jnp.cos(sarad))
+        #print(2 * ks[0][-1] *kL * jnp.cos(sarad)) 
+        #print(ks[0][-1]**2 + kL**2 - 2 * ks[0][-1] * kL * jnp.cos(sarad))
+        #print(jnp.sqrt(ks[0][-1]**2 + kL**2 - 2 * ks[0][-1] * kL * jnp.cos(sarad)))
         kdotv = k * Va
         omgdop = omg - kdotv
 
@@ -124,9 +137,13 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         ni = fract * ne[..., jnp.newaxis, jnp.newaxis, jnp.newaxis] / Zbar
         omgpi = constants * Z * jnp.sqrt(ni * Me / Mi)
 
+        #print("Ti", Ti)
+        #print("Mi", Mi)
         vTi = jnp.sqrt(Ti / Mi)  # ion thermal velocity
+        #print("vti", vTi)
         # kldi = jnp.transpose(vTi / omgpi, [1, 0, 2, 3]) * k
         kldi = (vTi / omgpi) * (k[..., jnp.newaxis])
+        #print("kldi",kldi[0,:,0])
         #print(vTi)
         #print(omgpi)
         #print(kldi)
@@ -138,10 +155,28 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         num_species = len(fract)
         num_ion_pts = jnp.shape(xii)
         chiI = jnp.zeros(num_ion_pts)
+        #print("xii",xii[0,:,0])
 
-        ZpiR = jnp.interp(xii, xi2, Zpi[0, :], left=0, right=0)  # , "cubic", bounds_error=False, fill_value=0)
+        
+        #print("xi2",xi2)
+        #print("Zpi", Zpi[0,:])
+        ZpiR = jnp.interp(xii, xi2, Zpi[0, :], left=xii**-2, right=xii**-2)  # , "cubic", bounds_error=False, fill_value=0)
+        #print(ZpiR[0,:,0,:])
+        #print("ZpiR 1", ZpiR[0,:,0,0])
+        #print("ZpiR 2", ZpiR[0,:,0,1])
+        #print(jnp.interp(5.68186301, xi2, Zpi[0, :], left=0, right=0))
         ZpiI = jnp.interp(xii, xi2, Zpi[1, :], left=0, right=0)  # , "cubic", bounds_error=False, fill_value=0)
+        #print("Zpi I?", Zpi[1,:])
+        #print("ZpiI",ZpiI[0,:,0,:])
+        #print("ZpiI 1", ZpiI[0,:,0,0])
+        #print("ZpiI 2", ZpiI[0,:,0,1])
+        #print((-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI))[0,:,0,:])
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
+        #print("chiI",chiI[0,:,0])
+        
+        #for i in range(num_species):
+        #    Zpi = zprimeMaxw(xii)
+        
         #print(ZpiR)
         #print(chiR)
 
@@ -154,6 +189,9 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         # if len(fe) == 2:
         DF, x = fe
         fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))
+        #print(fe_vphi[0,:,0])
+        #print(xie[0,:,0])
+        #print(klde[0,:,0])
         # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
 
         # elif len(fe) == 3:
@@ -182,7 +220,7 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
         df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
 
-        chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
+        chiEI = -jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
         ratmod = jnp.exp(jnp.interp(xi1, x, jnp.log(jnp.squeeze(DF))))  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
         ratdf = jnp.gradient(ratmod, xi1[1] - xi1[0])
@@ -197,30 +235,79 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         # else:
         #     chiERrat = jnp.interpn(jnp.arange(0, 2 * jnp.pi, 10**-1.2018), xi2, chiERratprim, beta, xie, "spline")
         chiERrat = -1.0 / (klde**2) * chiERrat
+        #from matplotlib import pyplot as plt
+        #fig,ax = plt.subplots()
+        #ax.plot(chiERrat[0,:,0])
+        #plt.show()
+        
         chiE = chiERrat + chiEI
         epsilon = 1.0 + chiE + chiI
-
+        #fig,ax = plt.subplots()
+        #ax.plot(jnp.real(chiE)[0,:,0])
+        #plt.show()
+        #fig,ax = plt.subplots()
+        #ax.plot(jnp.real(chiI)[0,:,0])
+        #plt.show()
+        #fig,ax = plt.subplots()
+        #ax.plot(jnp.imag(chiE)[0,:,0])
+        #plt.show()
+        #fig,ax = plt.subplots()
+        #ax.plot(jnp.imag(chiI)[0,:,0])
+        #plt.show()
+        
         # This line needs to be changed if ion distribution is changed!!!
         # ion_comp = Z. * sqrt(Te / Ti. * A * 1836) * (abs(chiE)). ^ 2. * exp(-(xii. ^ 2)) / sqrt(2 * pi);
         ion_comp_fact = jnp.transpose(fract * Z**2 / Zbar / vTi, [1, 0, 2, 3])
         ion_comp = ion_comp_fact * (
             (jnp.abs(chiE[..., jnp.newaxis])) ** 2.0 * jnp.exp(-(xii**2)) / jnp.sqrt(2 * jnp.pi)
         )
+        #print(ion_comp)
+        #fig,ax = plt.subplots()
+        #ax.plot(ion_comp[0,:,0,0])
+        #ax.plot(ion_comp[0,:,0,1])
+        #plt.show()
+
         ele_comp = (jnp.abs(1.0 + chiI)) ** 2.0 * fe_vphi / vTe
         # ele_compE = fe_vphi / vTe # commented because unused
 
-        SKW_ion_omg = (
-            2.0
-            * jnp.pi
-            * 1.0
-            / klde[..., jnp.newaxis]
-            * ion_comp
-            / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
-            * 1.0
-            / omgpe[..., jnp.newaxis]
-        )
+        #print(jnp.shape(k))
+        #fig,ax = plt.subplots()
+        #ax.plot((1.0 / k[..., jnp.newaxis] / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2))[0,:,0,0])
+        #ax.plot((1.0 / k[..., jnp.newaxis] / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2))[0,:,0,1])
+        #plt.show()
+        
+        #fig,ax = plt.subplots()
+        #ax.plot((1.0 / k[..., jnp.newaxis])[0,:,0,0])
+        #plt.show()
+        
+        #fig,ax = plt.subplots()
+        #ax.plot(jnp.imag(epsilon)[0,:,0])
+        #plt.show()
+        
+        #fig,ax = plt.subplots()
+        #ax.plot(( ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2))[0,:,0,0])
+        #plt.show()
+        
+        SKW_ion_omg = 1.0 / k[..., jnp.newaxis] * ion_comp / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
+        #SKW_ion_omg = (
+        #    2.0
+        #    * jnp.pi
+        #    * 1.0
+        #    / klde[..., jnp.newaxis]
+        #    * ion_comp
+        #    / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
+        #    * 1.0
+        #    / omgpe[..., jnp.newaxis]
+        #)
+        
+        #fig,ax = plt.subplots()
+        lams = 2 * jnp.pi * C / omgs
+        #ax.plot(lams[0,:,0],SKW_ion_omg[0,:,0,0])
+        #ax.plot(lams[0,:,0],SKW_ion_omg[0,:,0,1])
+        #plt.show()
         SKW_ion_omg = jnp.sum(SKW_ion_omg, 3)
-        SKW_ele_omg = 2 * jnp.pi * 1.0 / klde * (ele_comp) / ((jnp.abs(epsilon)) ** 2) * vTe / omgpe
+        #SKW_ele_omg = 2 * jnp.pi * 1.0 / klde * (ele_comp) / ((jnp.abs(epsilon)) ** 2) * vTe / omgpe
+        SKW_ele_omg = 1.0 / k * (ele_comp) / ((jnp.abs(epsilon)) ** 2)
         # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:,None,None]
@@ -231,6 +318,15 @@ def get_form_factor_fn(lamrang, npts, backend:str="jax"):
         # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam
         # formfactorE = PsLamE # commented because unused
+        #print("lams",lams)
+        #fig,ax = plt.subplots()
+        #ax.plot(lams[0,:,0],formfactor[0,:,0])
+        #plt.show()
+        
+        #fig,ax = plt.subplots()
+        #ax.plot(xie[0,:,0],formfactor[0,:,0])
+        #plt.show()
+        
         return formfactor, lams
 
     return nonMaxwThomson

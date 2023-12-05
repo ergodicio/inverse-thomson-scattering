@@ -21,6 +21,9 @@ def get_fit_model(config, sa, backend: str = "haiku"):
             if parameters["m"]["active"] and parameters["fe"]["active"]:
                 raise ValueError("m and fe cannot be actively fit at the same time")
             parameters["fe"]["val"] = jnp.log(num_dist_func(parameters["m"]["val"]))
+            #print("logfe", parameters["fe"]["val"])
+            #print("lin fe", jnp.exp(parameters["fe"]["val"]))
+            #print("max fe", jnp.max(jnp.exp(parameters["fe"]["val"])))
 
         # Add gradients to electron temperature and density just being applied to EPW
         cur_Te = jnp.linspace(
@@ -36,6 +39,8 @@ def get_fit_model(config, sa, backend: str = "haiku"):
 
         fecur = jnp.exp(parameters["fe"]["val"])
         vcur = config["velocity"]
+        #print(jnp.shape(vcur))
+        #print("int fe", jnp.trapz(fecur,vcur))
         if config["parameters"]["fe"]["symmetric"]:
             fecur = jnp.concatenate((jnp.flip(fecur[1:]),fecur))
             vcur = jnp.concatenate((-jnp.flip(vcur[1:]),vcur))
