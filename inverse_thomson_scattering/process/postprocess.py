@@ -31,13 +31,15 @@ def recalculate_with_chosen_weights(
     """
 
     all_params = {}
-    #print(np.shape(config["parameters"]["Z"]["val"]))
+    # print(np.shape(config["parameters"]["Z"]["val"]))
     for key in config["parameters"].keys():
         if config["parameters"][key]["active"]:
-            #all_params[key] = np.empty(np.shape(config["parameters"][key]["val"]))
-            all_params[key] = np.zeros((batch_indices.flatten()[-1] + 1,np.size(config["parameters"][key]["val"])), dtype=np.float64)
-            #print(np.shape(config["parameters"][key]["val"]))
-            #print(all_params)
+            # all_params[key] = np.empty(np.shape(config["parameters"][key]["val"]))
+            all_params[key] = np.zeros(
+                (batch_indices.flatten()[-1] + 1, np.size(config["parameters"][key]["val"])), dtype=np.float64
+            )
+            # print(np.shape(config["parameters"][key]["val"]))
+            # print(all_params)
     batch_indices.sort()
     losses = np.zeros(batch_indices.flatten()[-1] + 1, dtype=np.float64)
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
@@ -49,10 +51,10 @@ def recalculate_with_chosen_weights(
     fits["ele"] = np.zeros(all_data["e_data"].shape)
     sqdevs["ele"] = np.zeros(all_data["e_data"].shape)
 
-    num_params=0
+    num_params = 0
     for key, vec in all_params.items():
         num_params += np.shape(vec)[1]
-        
+
     if config["other"]["extraoptions"]["load_ion_spec"]:
         sigmas = np.zeros((all_data["i_data"].shape[0], num_params))
 
@@ -77,7 +79,7 @@ def recalculate_with_chosen_weights(
         sqdevs["ele"] = sqds["ele"]
 
         for k in all_params.keys():
-            #all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+            # all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
             all_params[k] = params[k].reshape(-1)
 
         if calc_sigma:
@@ -102,18 +104,15 @@ def recalculate_with_chosen_weights(
             else:
                 these_weights = best_weights[i_batch]
 
-            # loss, sqds, used_points, [ThryE, ThryI, params] = ts_fitter["array_loss_fn"](these_weights, batch)
             loss, sqds, used_points, [ThryE, ThryI, params] = ts_fitter.array_loss(these_weights, batch)
-            these_params = ts_fitter.get_active_params(these_weights, batch)
+            these_params = ts_fitter.weights_to_params(these_weights, static=False)
             if calc_sigma:
                 hess = ts_fitter.h_loss_wrt_params(these_params, batch)
-            # print(hess)
 
             losses[inds] = loss
             sqdevs["ele"][inds] = sqds["ele"]
             sqdevs["ion"][inds] = sqds["ion"]
             if calc_sigma:
-                # try:
                 sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
                 print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
 
@@ -121,12 +120,10 @@ def recalculate_with_chosen_weights(
             fits["ion"][inds] = ThryI
 
             for k in all_params.keys():
-                #all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1, np.size(config["parameters"][key]["val"]))])
                 if np.size(np.shape(params[k])) == 3:
                     all_params[k][inds] = np.squeeze(params[k][inds])
                 else:
                     all_params[k][inds] = params[k][inds]
-                
 
     return losses, sqdevs, used_points, fits, sigmas, all_params
 
@@ -195,10 +192,8 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             ts_fitter_refit = TSFitter(config, sa, batch)
             new_weights = np.zeros(ts_fitter_refit["init_weights"].shape)
 
-            for ii, key in enumerate(best_weights[i // true_batch_size]["ts_parameter_generator"].keys()):
-                new_weights[ii] = best_weights[(i - 1) // true_batch_size]["ts_parameter_generator"][key][
-                    (i - 1) % true_batch_size
-                ][0]
+            for ii, key in enumerate(best_weights[i // true_batch_size].keys()):
+                new_weights[ii] = best_weights[(i - 1) // true_batch_size][key][(i - 1) % true_batch_size][0]
 
             ts_fitter_refit["init_weights"] = new_weights
 
@@ -214,11 +209,11 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             )
             cur_result = ts_fitter_refit["unravel_pytree"](res["x"])
 
-            for key in best_weights[i // true_batch_size]["ts_parameter_generator"].keys():
-                cur_value = cur_result["ts_parameter_generator"][key][0, 0]
-                new_vals = best_weights[i // true_batch_size]["ts_parameter_generator"][key]
+            for key in best_weights[i // true_batch_size].keys():
+                cur_value = cur_result[key][0, 0]
+                new_vals = best_weights[i // true_batch_size][key]
                 new_vals = new_vals.at[tuple([i % true_batch_size, 0])].set(cur_value)
-                best_weights[i // true_batch_size]["ts_parameter_generator"][key] = new_vals
+                best_weights[i // true_batch_size][key] = new_vals
 
         config["optimizer"]["batch_size"] = true_batch_size
 
@@ -244,7 +239,18 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
             mlflow.set_tag("status", "plotting")
             t1 = time.time()
             final_params = plot_angular(
-                config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td, best_weights_val, best_weights_std
+                config,
+                losses,
+                all_params,
+                used_points,
+                all_axes,
+                fits,
+                all_data,
+                sqdevs,
+                sigmas,
+                td,
+                best_weights_val,
+                best_weights_std,
             )
         else:
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
@@ -270,7 +276,20 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, best_weig
     return final_params
 
 
-def plot_angular(config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td, best_weights_val, best_weights_std):
+def plot_angular(
+    config,
+    losses,
+    all_params,
+    used_points,
+    all_axes,
+    fits,
+    all_data,
+    sqdevs,
+    sigmas,
+    td,
+    best_weights_val,
+    best_weights_std,
+):
     all_params = best_weights_val
     for key in all_params.keys():
         all_params[key] = pandas.Series(all_params[key])
@@ -398,13 +417,13 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
     # store fitted parameters
     reshaped_params = {}
     for key in all_params.keys():
-        #cur_ind = 1
-        if np.shape(all_params[key])[1]>1:
+        # cur_ind = 1
+        if np.shape(all_params[key])[1] > 1:
             for i in range(np.shape(all_params[key])[1]):
-                reshaped_params[key+str(i)]=all_params[key][:,i]
+                reshaped_params[key + str(i)] = all_params[key][:, i]
         else:
-            reshaped_params[key]=all_params[key][:,0]
-        #all_params[key] = all_params[key].tolist()
+            reshaped_params[key] = all_params[key][:, 0]
+        # all_params[key] = all_params[key].tolist()
     final_params = pandas.DataFrame(reshaped_params)
     if config["other"]["extraoptions"]["load_ion_spec"]:
         final_params.insert(0,all_axes["x_label"],np.array(all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]]))
@@ -422,8 +441,8 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
     mlflow.log_metrics(
         {"number of fits above threshold after refit": int(np.sum(red_losses > config["other"]["refit_thresh"]))}
     )
-    
-        #make histogram    
+
+    # make histogram
     fig, ax = plt.subplots(1, 2, figsize=(12, 4), tight_layout=True)
     if "red_losses_init" not in locals():
         red_losses_init = red_losses
@@ -456,7 +475,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
 
     os.makedirs(os.path.join(td, "worst"))
     os.makedirs(os.path.join(td, "best"))
-    
+
     if config["other"]["extraoptions"]["load_ion_spec"]:
         coords = (all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]])), (
             "Wavelength",
@@ -487,13 +506,21 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
     if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
         fig, ax = plt.subplots(2, 2, figsize=(12, 12), tight_layout=True)
         ion_clevs = np.linspace(
-            np.amin(ion_dat["data"]) if config["plotting"]["data_cbar_l"] == "data" else config["plotting"]["data_cbar_l"],
-            np.amax(ion_dat["data"]) if config["plotting"]["data_cbar_u"] == "data" else config["plotting"]["data_cbar_u"],
+            np.amin(ion_dat["data"])
+            if config["plotting"]["data_cbar_l"] == "data"
+            else config["plotting"]["data_cbar_l"],
+            np.amax(ion_dat["data"])
+            if config["plotting"]["data_cbar_u"] == "data"
+            else config["plotting"]["data_cbar_u"],
             11,
         )
         ele_clevs = np.linspace(
-            np.amin(ele_dat["data"]) if config["plotting"]["data_cbar_l"] == "data" else config["plotting"]["data_cbar_l"],
-            np.amax(ele_dat["data"]) if config["plotting"]["data_cbar_u"] == "data" else config["plotting"]["data_cbar_u"],
+            np.amin(ele_dat["data"])
+            if config["plotting"]["data_cbar_l"] == "data"
+            else config["plotting"]["data_cbar_l"],
+            np.amax(ele_dat["data"])
+            if config["plotting"]["data_cbar_u"] == "data"
+            else config["plotting"]["data_cbar_u"],
             11,
         )
         # clevs = np.linspace(0, 300, 11)
@@ -502,7 +529,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
         ion_savedata["fit"].T.plot(ax=ax[1][0], cmap="gist_ncar", levels=ion_clevs)
         ion_savedata["data"].T.plot(ax=ax[1][1], cmap="gist_ncar", levels=ion_clevs)
         fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
-        
+
         plotters.model_v_actual(
             sorted_losses,
             [ele_sorted_data, ion_sorted_data],
@@ -515,19 +542,23 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
             [ele_sorted_sqdev, ion_sorted_sqdev],
             sorted_redchi,
         )
-        
+
     elif config["other"]["extraoptions"]["load_ion_spec"]:
         fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
         clevs = np.linspace(
-            np.amin(ion_savedata["data"]) if config["plotting"]["data_cbar_l"] == "data" else config["plotting"]["data_cbar_l"],
-            np.amax(ion_savedata["data"]) if config["plotting"]["data_cbar_u"] == "data" else config["plotting"]["data_cbar_u"],
+            np.amin(ion_savedata["data"])
+            if config["plotting"]["data_cbar_l"] == "data"
+            else config["plotting"]["data_cbar_l"],
+            np.amax(ion_savedata["data"])
+            if config["plotting"]["data_cbar_u"] == "data"
+            else config["plotting"]["data_cbar_u"],
             11,
         )
         # clevs = np.linspace(0, 300, 11)
         ion_savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
         ion_savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
         fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
-        
+
         plotters.model_v_actual(
             sorted_losses,
             ion_sorted_data,
@@ -540,19 +571,23 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
             ion_sorted_sqdev,
             sorted_redchi,
         )
-        
+
     elif config["other"]["extraoptions"]["load_ele_spec"]:
         fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
         clevs = np.linspace(
-            np.amin(ele_savedata["data"]) if config["plotting"]["data_cbar_l"] == "data" else config["plotting"]["data_cbar_l"],
-            np.amax(ele_savedata["data"]) if config["plotting"]["data_cbar_u"] == "data" else config["plotting"]["data_cbar_u"],
+            np.amin(ele_savedata["data"])
+            if config["plotting"]["data_cbar_l"] == "data"
+            else config["plotting"]["data_cbar_l"],
+            np.amax(ele_savedata["data"])
+            if config["plotting"]["data_cbar_u"] == "data"
+            else config["plotting"]["data_cbar_u"],
             11,
         )
         # clevs = np.linspace(0, 300, 11)
         ele_savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
         ele_savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
         fig.savefig(os.path.join(td, "fit_and_data.png"), bbox_inches="tight")
-        
+
         plotters.model_v_actual(
             sorted_losses,
             ele_sorted_data,
@@ -566,18 +601,17 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
             sorted_redchi,
         )
 
-
     sigmas_ds = xr.Dataset(
         {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(reshaped_params.keys())}
     )
     sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
 
     for param in reshaped_params.keys():
-        vals = pandas.Series(final_params[param],dtype=float)
+        vals = pandas.Series(final_params[param], dtype=float)
         fig, ax = plt.subplots(1, 1, figsize=(4, 4))
         lineouts = np.array(config["data"]["lineouts"]["val"])
         std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
-        
+
         ax.plot(lineouts, vals)
         ax.fill_between(
             lineouts,

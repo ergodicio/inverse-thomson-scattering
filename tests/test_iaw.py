@@ -7,7 +7,7 @@ from copy import deepcopy
 config.update("jax_enable_x64", True)
 from numpy.testing import assert_allclose
 from scipy.signal import find_peaks
-from inverse_thomson_scattering.model.physics.form_factor import get_form_factor_fn
+from inverse_thomson_scattering.model.physics.form_factor import FormFactor
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 
@@ -25,7 +25,7 @@ def test_iaw():
     re = 2.8179e-13  # classical electron radius cm
     Esq = Me * C**2 * re  # sq of the electron charge keV cm
 
-    nonMaxwThomsonI_jax = get_form_factor_fn([525, 528], npts=8192, backend="jax")
+    ion_form_factor = FormFactor([525, 528], npts=8192)
     xie = np.linspace(-7, 7, 1024)
     sa = np.array([60])
     num_dist_func = get_num_dist_func({"DLM": []}, xie)
@@ -33,11 +33,11 @@ def test_iaw():
     lam = 526.5
     constants = jnp.sqrt(4 * jnp.pi * Esq / Me)
 
-    inps = dict(
-        Te=0.5, Ti=0.2, Z=1, A=1, fract=1, ne=np.array([0.2 * 1e20]), Va=0, ud=0, sa=sa, fe=(fecur, xie), lam=lam
-    )
+    inps = dict(Ti=0.2, Z=1, A=1, fract=1, Va=0, ud=0)
+    cur_ne = np.array([0.2 * 1e20])
+    cur_Te = 0.5
 
-    ThryI, lamAxisI = jit(nonMaxwThomsonI_jax)(**inps)
+    ThryI, lamAxisI = jit(ion_form_factor)(inps, cur_ne, cur_Te, sa, (fecur, xie), lam)
 
     ThryI = jnp.real(ThryI)
     ThryI = jnp.mean(ThryI, axis=0)

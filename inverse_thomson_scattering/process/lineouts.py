@@ -10,7 +10,7 @@ def get_lineouts(
     # Convert lineout locations to pixel
     if config["data"]["lineouts"]["type"] == "ps" or config["data"]["lineouts"]["type"] == "um":
         LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
-        IAWtime = IAWtime/axisxI[1] #corrects the iontime to be in the same units as the lineout
+        IAWtime = IAWtime / axisxI[1]  # corrects the iontime to be in the same units as the lineout
         LineoutPixelI = [np.argmin(abs(axisxI - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
     elif config["data"]["lineouts"]["type"] == "pixel":
         LineoutPixelE = config["data"]["lineouts"]["val"]
@@ -19,8 +19,7 @@ def get_lineouts(
     LineoutPixelI = np.round(np.array(LineoutPixelI) - IAWtime).astype(int)
     config["data"]["lineouts"]["pixelE"] = LineoutPixelE
     config["data"]["lineouts"]["pixelI"] = LineoutPixelI
-    
-    
+
     if config["data"]["background"]["type"] == "ps":
         BackgroundPixel = np.argmin(abs(axisxE - config["data"]["background"]["slice"]))
     elif config["data"]["background"]["type"] == "pixel":
@@ -94,7 +93,7 @@ def get_lineouts(
     config["other"]["PhysParams"]["noiseE"] = noiseE
 
     all_data = defaultdict(list)
-    
+
     if config["other"]["extraoptions"]["load_ion_spec"]:
         all_data["i_data"] = LineoutTSI_norm
         all_data["i_amps"] = ampI
