@@ -19,6 +19,8 @@ More details on the numerics will be added soon.
    :caption: Contents:
 
    usage
+   input
+   fitting
 
 *What does TSADAR stand for?*
 
