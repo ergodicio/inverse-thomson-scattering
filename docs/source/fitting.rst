@@ -19,7 +19,7 @@ There are multiple options for background algorithms and types of fitting. These
         type: pixel
         slice: 900
 
-**Best operation for spatialy resolved data:**
+**Best operation for spatially resolved data:**
 
 .. code-block:: yaml
 
