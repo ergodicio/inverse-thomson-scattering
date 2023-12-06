@@ -10,6 +10,7 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
         LineoutPixelI = [np.argmin(abs(all_axes["iaw_x"] - loc - config["data"]["ele_t0"])) for loc in config["data"]["lineouts"]["val"]]
     elif config["data"]["lineouts"]["type"] == "pixel":
         LineoutPixelE = config["data"]["lineouts"]["val"]
+        LineoutPixelI = config["data"]["lineouts"]["val"]
         IAWtime = config["data"]["ion_t0_shift"]
     else:
         raise NotImplementedError

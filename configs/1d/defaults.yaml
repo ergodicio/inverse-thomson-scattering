@@ -141,6 +141,7 @@ data:
     ele_t0: 0
     ion_t0_shift: 0.0
     ele_lam_shift: -2.0
+    LineoutPixelI:
     dpixel: 2
     lineouts:
         type:
