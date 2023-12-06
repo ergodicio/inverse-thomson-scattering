@@ -14,6 +14,7 @@ def get_lineouts(
         LineoutPixelI = [np.argmin(abs(axisxI - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
     elif config["data"]["lineouts"]["type"] == "pixel":
         LineoutPixelE = config["data"]["lineouts"]["val"]
+        LineoutPixelI = config["data"]["lineouts"]["val"]
     else:
         raise NotImplementedError
     LineoutPixelI = np.round(np.array(LineoutPixelI) - IAWtime).astype(int)
