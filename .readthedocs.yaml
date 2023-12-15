@@ -19,10 +19,6 @@ build:
 sphinx:
    configuration: docs/source/conf.py
 
-nav:
-  Home: 'index.rst'
-  Getting Started: 'getting_started.md'
-  Input Deck: 'input_deck.md'
 # Optionally build your docs in additional formats such as PDF and ePub
 # formats:
 #    - pdf
