@@ -425,6 +425,12 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
             reshaped_params[key] = all_params[key][:, 0]
         # all_params[key] = all_params[key].tolist()
     final_params = pandas.DataFrame(reshaped_params)
+    if config["other"]["extraoptions"]["load_ion_spec"]:
+        final_params.insert(0,all_axes["x_label"],np.array(all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]]))
+        final_params.insert(0,"lineout pixel",config["data"]["lineouts"]["pixelI"])
+    else:
+        final_params.insert(0,all_axes["x_label"],np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]]))
+        final_params.insert(0,"lineout pixel",config["data"]["lineouts"]["pixelE"])
     final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
 
     losses[losses > 1e10] = 1e10

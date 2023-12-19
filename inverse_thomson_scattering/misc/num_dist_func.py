@@ -62,6 +62,8 @@ def get_num_dist_func(fe_type, xie):
     # nameCur = fe_type
     fe_type = list(fe_type.keys())[0]
     nameCur = fe_type
+    #print(nameCur)
+    #print(xs)
 
     
     

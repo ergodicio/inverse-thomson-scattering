@@ -7,6 +7,7 @@ pyhdf
 xlrd
 pyyaml
 mlflow
+mlflow_export_import
 boto3
 flatten-dict
 flatdict

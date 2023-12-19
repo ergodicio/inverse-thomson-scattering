@@ -30,6 +30,8 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
             eline, = ax.plot([all_axes["iaw_x"][LineoutPixelI[-1]], all_axes["iaw_x"][LineoutPixelI[-1]]], [all_axes["iaw_y"][0], all_axes["iaw_y"][-1]], lw=2, color = 'w')
             
             lamsline, = ax.plot([all_axes["iaw_x"][0], all_axes["iaw_x"][-1]], [config["data"]["fit_rng"]["iaw_min"], config["data"]["fit_rng"]["iaw_min"]], lw=2, color = 'w', linestyle = '--')
+            lamsline, = ax.plot([all_axes["iaw_x"][0], all_axes["iaw_x"][-1]], [config["data"]["fit_rng"]["iaw_cf_min"], config["data"]["fit_rng"]["iaw_cf_min"]], lw=2, color = 'w', linestyle = '--')
+            lamsline, = ax.plot([all_axes["iaw_x"][0], all_axes["iaw_x"][-1]], [config["data"]["fit_rng"]["iaw_cf_max"], config["data"]["fit_rng"]["iaw_cf_max"]], lw=2, color = 'w', linestyle = '--')
             lameline, = ax.plot([all_axes["iaw_x"][0], all_axes["iaw_x"][-1]], [config["data"]["fit_rng"]["iaw_max"], config["data"]["fit_rng"]["iaw_max"]], lw=2, color = 'w', linestyle = '--')
             ax.set_xlabel(all_axes["x_label"])
             ax.set_ylabel("Wavelength")

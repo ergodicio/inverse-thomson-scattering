@@ -7,8 +7,8 @@ Welcome to TSADAR!
 ==================================
 
 TSADAR is a Thomson scattering data analysis software written in Python. It helps determine plasma parameters given
-Thomson scattering measurements by fitting the observed spectra to known parameterized functional forms. More detail on
-the theory is provided elsewhere [1] and will be added to this documentation soon.
+Thomson scattering measurements by fitting the collisionless spectral density function to the observed spectra.
+More detail on the theory is provided elsewhere [1] and the specifics of implementation can be found in :doc:`math`.
 
 The fitting is performed via gradient descent. The gradients are acquired using automatic differentiation and JAX [2].
 More details on the numerics will be added soon.
@@ -18,13 +18,18 @@ More details on the numerics will be added soon.
    :maxdepth: 2
    :caption: Contents:
 
-   usage
-   input
-   fitting
-
+   getting_started
+   best_practice
+   examples
+   inputs
+   defaults
+   FAQ
+   math
+   contributing
+   
 *What does TSADAR stand for?*
 
-TBD
+Thomson Scattering with Automatic Differentiation for Analysis and Regression
 
 
 
