@@ -92,7 +92,7 @@ data:
             pixel
         start: 340
         end: 660
-        skip: 10
+        skip: 4
     background:
         type:
             Fit
@@ -104,8 +104,8 @@ other:
         load_ion_spec: True
         load_ele_spec: True
         fit_IAW: True
-        fit_EPWb: False
-        fit_EPWr: False
+        fit_EPWb: True
+        fit_EPWr: True
     refit: False
     refit_thresh: 5.0
     calc_sigmas: False

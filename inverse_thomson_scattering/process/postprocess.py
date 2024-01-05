@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 import time, tempfile, mlflow, os
 
@@ -10,7 +10,7 @@ from inverse_thomson_scattering.model.loss_function import TSFitter
 
 
 def recalculate_with_chosen_weights(
-    config: Dict, batch_indices, all_data: Dict, ts_fitter: TSFitter, calc_sigma, fitted_weights
+    config: Dict, batch_indices, all_data: Dict, ts_fitter: TSFitter, calc_sigma: bool, fitted_weights: Dict
 ):
     """
     Gets parameters and the result of the full forward pass i.e. fits
@@ -120,7 +120,20 @@ def recalculate_with_chosen_weights(
     return losses, sqdevs, used_points, fits, sigmas, all_params
 
 
-def get_sigmas(keys, hess, batch_size):
+def get_sigmas(keys: List, hess: Dict, batch_size: int) -> Dict:
+    """
+    Calculates the variance using the hessian with respect to the parameters and then using the hessian values
+    as the inverse of the covariance matrix and then inverting that
+
+
+    Args:
+        keys:
+        hess:
+        batch_size:
+
+    Returns:
+
+    """
     sizes = {key: hess[key][key].shape[1] for key in keys}
     actual_num_params = sum([v for k, v in sizes.items()])
     sigmas = np.zeros((batch_size, actual_num_params))
@@ -213,6 +226,8 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
 
     with tempfile.TemporaryDirectory() as td:
         os.makedirs(os.path.join(td, "plots"), exist_ok=True)
+        os.makedirs(os.path.join(td, "binary"), exist_ok=True)
+        os.makedirs(os.path.join(td, "csv"), exist_ok=True)
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
             best_weights_val = {}
             best_weights_std = {}

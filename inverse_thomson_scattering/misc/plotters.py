@@ -28,7 +28,7 @@ def plot_angular(
     for key in all_params.keys():
         all_params[key] = pandas.Series(all_params[key])
     final_params = pandas.DataFrame(all_params)
-    final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
+    final_params.to_csv(os.path.join(td, "csv", "learned_parameters.csv"))
 
     sigma_params = {}
     sizes = {key: all_params[key].shape[0] for key in all_params.keys()}
@@ -43,16 +43,16 @@ def plot_angular(
             param_ctr += sizes[k]
 
     sigma_params = best_weights_std
-    sigma_fe.to_netcdf(os.path.join(td, "sigma-fe.nc"))
+    sigma_fe.to_netcdf(os.path.join(td, "binary", "sigma-fe.nc"))
     sigma_params = xr.Dataset(sigma_params)
-    sigma_params.to_netcdf(os.path.join(td, "sigma-params.nc"))
+    sigma_params.to_netcdf(os.path.join(td, "binary", "sigma-params.nc"))
 
     dat = {
         "fit": fits["ele"],
         "data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
     }
     savedata = xr.Dataset({k: xr.DataArray(v) for k, v in dat.items()})
-    savedata.to_netcdf(os.path.join(td, "fit_and_data.nc"))
+    savedata.to_netcdf(os.path.join(td, "binary", "fit_and_data.nc"))
     savedata["data"] = savedata["data"].T
     savedata["fit"] = savedata["fit"].T
 
@@ -106,7 +106,7 @@ def plot_angular(
         ax[0].legend(fontsize=14)
         ax[0].grid()
         ax[1].plot(all_axes["epw_y"], np.squeeze(sqdevs["ele"][i, :]), label="Residual")
-        ax[1].set_ylabel("$\chi^2_i$")
+        ax[1].set_ylabel(r"$\chi^2_i$")
         ax[1].set_xlabel("Wavelength (nm)")
         ax[1].grid()
         fig.savefig(os.path.join(td, "lineouts", filename), bbox_inches="tight")
@@ -165,7 +165,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
     else:
         final_params.insert(0, all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]]))
         final_params.insert(0, "lineout pixel", config["data"]["lineouts"]["pixelE"])
-    final_params.to_csv(os.path.join(td, "learned_parameters.csv"))
+    final_params.to_csv(os.path.join(td, "csv","learned_parameters.csv"))
 
     losses[losses > 1e10] = 1e10
     red_losses = losses / (1.1 * (used_points - len(all_params)))
@@ -205,7 +205,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
             "reduced_losses": red_losses,
         }
     )
-    losses_ds.to_csv(os.path.join(td, "losses.csv"))
+    losses_ds.to_csv(os.path.join(td, "csv", "losses.csv"))
 
     os.makedirs(os.path.join(td, "worst"))
     os.makedirs(os.path.join(td, "best"))
@@ -222,7 +222,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
         ion_y_axis = all_axes["iaw_y"]
         # fit vs data storage and plot
         ion_savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in ion_dat.items()})
-        ion_savedata.to_netcdf(os.path.join(td, "ion_fit_and_data.nc"))
+        ion_savedata.to_netcdf(os.path.join(td, "binary", "ion_fit_and_data.nc"))
     if config["other"]["extraoptions"]["load_ele_spec"]:
         coords = (all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]])), (
             "Wavelength",
@@ -235,7 +235,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
         ele_y_axis = all_axes["epw_y"]
         # fit vs data storage and plot
         ele_savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in ele_dat.items()})
-        ele_savedata.to_netcdf(os.path.join(td, "ele_fit_and_data.nc"))
+        ele_savedata.to_netcdf(os.path.join(td, "binary", "ele_fit_and_data.nc"))
 
     if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
         fig, ax = plt.subplots(2, 2, figsize=(12, 12), tight_layout=True)
@@ -579,11 +579,11 @@ def ColorPlots(
     vmax=None,
     logplot=False,
     kaxis=[],
-    XLabel="\lambda_s (nm)",
-    YLabel="\theta (\circ)",
+    XLabel="$\lambda_s (nm)$",
+    YLabel=r"$\theta (\circ)$",
     CurveNames=[],
     Residuals=[],
-    title="EPW feature vs \theta",
+    title=r"EPW feature vs $\theta$",
 ):
     """
     This function plots a 2D color image, with the default behaviour based on ARTS data. Optional argmuents rescale to a log scale, add a residual plot, overplot lines, or add a second y-axis with k-vector information.
