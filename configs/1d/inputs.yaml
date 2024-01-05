@@ -86,17 +86,18 @@ parameters:
         symmetric: False
 
 data:
-    shotnum: 106315
+    shotnum: 101675
     lineouts:
         type:
-            um
-        start: -1000
-        end: 1000
-        skip: 20
+            pixel
+        start: 340
+        end: 660
+        skip: 10
     background:
         type:
             Fit
         slice: 900
+        show: False
 
 other:
     extraoptions:
@@ -107,7 +108,7 @@ other:
         fit_EPWr: False
     refit: False
     refit_thresh: 5.0
-    calc_sigmas: True
+    calc_sigmas: False
 
 
 mlflow:
