@@ -125,13 +125,6 @@ other:
     refit_thresh: 0.25
     calc_sigmas: False
 
-plotting:
-    n_sigmas: 3
-    rolling_std_width: 5
-    data_cbar_u: data
-    data_cbar_l: 0
-    
-
 data:
     shotnum: 101675
     shotDay: False

@@ -101,7 +101,7 @@ def _validate_inputs_(config: Dict) -> Dict:
     return config
 
 
-def scipy_angular_loop(config: Dict, all_data: Dict, best_weights, all_weights, sa):
+def scipy_angular_loop(config: Dict, all_data: Dict, sa):
     """
     Performs angular thomson scattering i.e. ARTEMIS fitting exercise using the SciPy optimizer routines
 
@@ -170,11 +170,8 @@ def scipy_angular_loop(config: Dict, all_data: Dict, best_weights, all_weights, 
             config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
         )
         config["units"] = init_param_norm_and_shift(config)
-        all_weights.append(best_weights)
-    raw_weights = ts_fitter.unravel_pytree(res["x"])
+
     overall_loss = res["fun"]
-    best_weights = all_weights
-    # print(best_weights)
 
     return best_weights, overall_loss, ts_fitter
 
@@ -436,7 +433,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     mlflow.set_tag("status", "minimizing")
 
     if "angular" in config["other"]["extraoptions"]["spectype"]:
-        fitted_weights, overall_loss, ts_fitter = angular_loop(config, all_data, sa, batch_indices, num_batches)
+        fitted_weights, overall_loss, ts_fitter = scipy_angular_loop(config, all_data, sa)
     else:
         fitted_weights, overall_loss, ts_fitter = one_d_loop(config, all_data, sa, batch_indices, num_batches)
 
