@@ -6,6 +6,7 @@ import scipy.optimize as spopt
 
 import jaxopt, mlflow, optax
 from tqdm import trange
+from jax.flatten_util import ravel_pytree
 
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.model.loss_function import TSFitter
@@ -178,9 +179,10 @@ def scipy_angular_loop(config: Dict, all_data: Dict, best_weights, all_weights, 
     return best_weights, overall_loss, ts_fitter
 
 
-def scipy_1d_loop(config, all_data, batch_indices, num_batches, best_weights, sa):
+def scipy_1d_loop(config, all_data, batch_indices, num_batches, sa):
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
     overall_loss = 0.0
+    all_weights = []
 
     previous_weights = None
     with trange(num_batches, unit="batch") as tbatch:
@@ -213,17 +215,17 @@ def scipy_1d_loop(config, all_data, batch_indices, num_batches, best_weights, sa
                 bounds=ts_fitter.bounds,
                 options={"disp": True, "maxiter": 100},
             )
-            best_weights[i_batch] = ts_fitter.unravel_pytree(res["x"])
+            all_weights.append(ts_fitter.unravel_pytree(res["x"]))
             overall_loss += res["fun"]
 
             if "sequential" in config["optimizer"]:
                 if config["optimizer"]["sequential"]:
                     previous_weights = res.x
 
-    return best_weights, overall_loss, ts_fitter
+    return all_weights, overall_loss, ts_fitter
 
 
-def adam_loop(config, all_data, sa, batch_indices, num_batches):
+def angular_adam(config, all_data, sa, batch_indices, num_batches):
     """
     This performs an SGD-like fitting routine. It is different than the SciPy routines primarily because we have to
     manage the number of iterations manually whereas the SciPy routines have their own convergence/termination process
@@ -239,72 +241,128 @@ def adam_loop(config, all_data, sa, batch_indices, num_batches):
 
     """
 
-    if config["other"]["extraoptions"]["spectype"] == "angular_full":
-        config["optimizer"]["batch_size"] = 1
-        test_batch = {
-            "e_data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
-            "e_amps": all_data["e_amps"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
-            "i_data": all_data["i_data"],
-            "i_amps": all_data["i_amps"],
-            "noise_e": config["other"]["PhysParams"]["noiseE"][
-                config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
-            ],
-            "noise_i": config["other"]["PhysParams"]["noiseI"][
-                config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
-            ],
-        }
-        func_dict = get_loss_function(config, sa, test_batch)
-        jaxopt_kwargs = dict(
-            fun=func_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
-        )
-        opt = optax.adam(config["optimizer"]["learning_rate"])
-        solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
+    config["optimizer"]["batch_size"] = 1
+    test_batch = {
+        "e_data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+        "e_amps": all_data["e_amps"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+        "i_data": all_data["i_data"],
+        "i_amps": all_data["i_amps"],
+        "noise_e": config["other"]["PhysParams"]["noiseE"][
+            config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+        ],
+        "noise_i": config["other"]["PhysParams"]["noiseI"][
+            config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+        ],
+    }
+    func_dict = get_loss_function(config, sa, test_batch)
+    jaxopt_kwargs = dict(
+        fun=func_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+    )
+    opt = optax.adam(config["optimizer"]["learning_rate"])
+    solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
 
-        weights = func_dict["init_weights"]
-        opt_state = solver.init_state(weights, batch=test_batch)
+    weights = func_dict["init_weights"]
+    opt_state = solver.init_state(weights, batch=test_batch)
 
-        # start train loop
-        t1 = time.time()
-        print("minimizing")
-        mlflow.set_tag("status", "minimizing")
+    # start train loop
+    t1 = time.time()
+    print("minimizing")
+    mlflow.set_tag("status", "minimizing")
 
-        best_loss = 1e16
-        for i_epoch in (pbar := trange(config["optimizer"]["num_epochs"])):
-            if config["nn"]["use"]:
-                np.random.shuffle(batch_indices)
-                # tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
-            epoch_loss = 0.0
-            weights, opt_state = solver.update(params=weights, state=opt_state, batch=test_batch)
-            epoch_loss += opt_state.value
-            pbar.set_description(f"Loss {epoch_loss:.2e}")
+    best_loss = 1e16
+    for i_epoch in (pbar := trange(config["optimizer"]["num_epochs"])):
+        if config["nn"]["use"]:
+            np.random.shuffle(batch_indices)
+            # tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
+        epoch_loss = 0.0
+        weights, opt_state = solver.update(params=weights, state=opt_state, batch=test_batch)
+        epoch_loss += opt_state.value
+        pbar.set_description(f"Loss {epoch_loss:.2e}")
 
-            # epoch_loss /= num_batches
-            if epoch_loss < best_loss:
-                best_loss = epoch_loss
-                best_weights = weights
+        # epoch_loss /= num_batches
+        if epoch_loss < best_loss:
+            best_loss = epoch_loss
+            best_weights = weights
 
-            mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
+        mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
 
+
+def _1d_adam_loop_(config, ts_fitter, previous_weights, batch, tbatch):
+    jaxopt_kwargs = dict(
+        fun=ts_fitter.vg_loss, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+    )
+    opt = optax.adam(config["optimizer"]["learning_rate"])
+    solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
+
+    if previous_weights is None:
+        init_weights = ts_fitter.pytree_weights["active"]
     else:
-        return adam_1d_loop(config, all_data, sa, batch_indices, num_batches)
+        init_weights = previous_weights
+
+    # if "sequential" in config["optimizer"]:
+    #     if config["optimizer"]["sequential"]:
+    #         if previous_weights is not None:
+    #             init_weights = previous_weights
+
+    opt_state = solver.init_state(init_weights, batch=batch)
+
+    best_loss = 1e16
+    epoch_loss = 1e19
+    for i_epoch in range(config["optimizer"]["num_epochs"]):
+        tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
+        # if config["nn"]["use"]:
+        #     np.random.shuffle(batch_indices)
+
+        init_weights, opt_state = solver.update(params=init_weights, state=opt_state, batch=batch)
+        epoch_loss = opt_state.value
+        if epoch_loss < best_loss:
+            best_loss = epoch_loss
+            best_weights = init_weights
+
+    return best_loss, best_weights
 
 
-def adam_1d_loop(config, all_data, sa, batch_indices, num_batches):
+def _1d_scipy_loop_(config, ts_fitter: TSFitter, previous_weights, batch, tbatch):
+    if previous_weights is None:  # if prev, then use that, if not then use flattened weights
+        init_weights = np.copy(ts_fitter.flattened_weights)
+    else:
+        init_weights = np.array(previous_weights)
+
+    # if "sequential" in config["optimizer"]:
+    #     if config["optimizer"]["sequential"]:
+    #         if previous_weights is not None:
+    #             init_weights = previous_weights
+
+    res = spopt.minimize(
+        ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
+        init_weights,
+        args=batch,
+        method=config["optimizer"]["method"],
+        jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+        bounds=ts_fitter.bounds,
+        options={"disp": True, "maxiter": 100},
+    )
+
+    best_loss = res["fun"]
+    best_weights = ts_fitter.unravel_pytree(res["x"])
+
+    return best_loss, best_weights
+
+
+def one_d_loop(config, all_data, sa, batch_indices, num_batches):
     sample = {k: v[: config["optimizer"]["batch_size"]] for k, v in all_data.items()}
     sample = {
         "noise_e": config["other"]["PhysParams"]["noiseE"][: config["optimizer"]["batch_size"]],
         "noise_i": config["other"]["PhysParams"]["noiseI"][: config["optimizer"]["batch_size"]],
     } | sample
     ts_fitter = TSFitter(config, sa, sample)
-    jaxopt_kwargs = dict(
-        fun=ts_fitter.vg_loss, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
-    )
 
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
     all_weights = []
     overall_loss = 0.0
+    previous_weights = None
     with trange(num_batches, unit="batch") as tbatch:
         for i_batch in tbatch:
             inds = batch_indices[i_batch]
@@ -317,44 +375,26 @@ def adam_1d_loop(config, all_data, sa, batch_indices, num_batches):
                 "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
             }
 
-            opt = optax.adam(config["optimizer"]["learning_rate"])
-            solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
-
-            weights = ts_fitter.pytree_weights["active"]
-            opt_state = solver.init_state(weights, batch=sample)
-
-            best_loss = 1e16
-            epoch_loss = 1e19
-            for i_epoch in range(config["optimizer"]["num_epochs"]):
-                tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
-                # if config["nn"]["use"]:
-                #     np.random.shuffle(batch_indices)
-
-                weights, opt_state = solver.update(params=weights, state=opt_state, batch=batch)
-                epoch_loss = opt_state.value
-                if epoch_loss < best_loss:
-                    best_loss = epoch_loss
-                    best_weights = weights
+            if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
+                best_loss, best_weights = _1d_adam_loop_(config, ts_fitter, previous_weights, batch, tbatch)
+            else:
+                # not sure why this is needed but something needs to be reset, either the weights or the bounds
+                ts_fitter = TSFitter(config, sa, batch)
+                best_loss, best_weights = _1d_scipy_loop_(config, ts_fitter, previous_weights, batch, tbatch)
 
             all_weights.append(best_weights)
             mlflow.log_metrics({"batch loss": float(best_loss)}, step=i_batch)
-
             overall_loss += best_loss
 
+            # ugly
+            if "sequential" in config["optimizer"]:
+                if config["optimizer"]["sequential"]:
+                    if config["optimizer"]["method"] == "adam":
+                        previous_weights = best_weights
+                    else:
+                        previous_weights, _ = ravel_pytree(best_weights)
+
     return all_weights, overall_loss, ts_fitter
-
-
-def scipy_loop(config, all_data, sa, batch_indices, num_batches):
-    best_weights = {}
-    all_weights = []
-    if config["other"]["extraoptions"]["spectype"] == "angular_full":
-        best_weights, overall_loss, ts_fitter = scipy_angular_loop(config, all_data, best_weights, all_weights, sa)
-    else:
-        best_weights, overall_loss, ts_fitter = scipy_1d_loop(
-            config, all_data, batch_indices, num_batches, best_weights, sa
-        )
-    mlflow.log_metrics({"overall loss": float(overall_loss)})
-    return best_weights, overall_loss, ts_fitter
 
 
 def fit(config) -> Tuple[pd.DataFrame, float]:
@@ -394,11 +434,13 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     # perform fit
     t1 = time.time()
     mlflow.set_tag("status", "minimizing")
-    if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
-        fitted_weights, overall_loss, ts_fitter = adam_loop(config, all_data, sa, batch_indices, num_batches)
-    else:
-        fitted_weights, overall_loss, ts_fitter = scipy_loop(config, all_data, sa, batch_indices, num_batches)
 
+    if "angular" in config["other"]["extraoptions"]["spectype"]:
+        fitted_weights, overall_loss, ts_fitter = angular_loop(config, all_data, sa, batch_indices, num_batches)
+    else:
+        fitted_weights, overall_loss, ts_fitter = one_d_loop(config, all_data, sa, batch_indices, num_batches)
+
+    mlflow.log_metrics({"overall loss": float(overall_loss)})
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
     mlflow.set_tag("status", "postprocessing")
 

@@ -30,7 +30,6 @@ class TSFitter:
 
         self.spec_calc = SpectrumCalculator(cfg, sas, dummy_batch)
 
-        rng_key = jax.random.PRNGKey(42)
         self._loss_ = jit(self.__loss__)
         self._vg_func_ = jit(value_and_grad(self.__loss__, argnums=0, has_aux=True))
         self._h_func_ = jit(jax.hessian(self._loss_for_hess_fn_, argnums=0))
@@ -65,7 +64,7 @@ class TSFitter:
             else:
                 raise NotImplementedError
         else:
-            print("\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n")
+            Warning("\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n")
 
     def smooth(self, distribution):
         s = jnp.r_[
@@ -239,7 +238,7 @@ class TSFitter:
         return fe_penalty
 
     def _loss_for_hess_fn_(self, params, batch):
-        params = {**params, **self.static_params}
+        params = params | self.static_params
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
         i_error, e_error = self.calc_ei_error(
             batch,
