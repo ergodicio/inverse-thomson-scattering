@@ -42,10 +42,10 @@ def plot_angular(
                 sigma_params[k] = xr.DataArray(val, coords=(("ind", [0]),))
             param_ctr += sizes[k]
 
-    sigma_params = best_weights_std
-    sigma_fe.to_netcdf(os.path.join(td, "binary", "sigma-fe.nc"))
-    sigma_params = xr.Dataset(sigma_params)
-    sigma_params.to_netcdf(os.path.join(td, "binary", "sigma-params.nc"))
+        sigma_params = best_weights_std
+        sigma_fe.to_netcdf(os.path.join(td, "binary", "sigma-fe.nc"))
+        sigma_params = xr.Dataset(sigma_params)
+        sigma_params.to_netcdf(os.path.join(td, "binary", "sigma-params.nc"))
 
     dat = {
         "fit": fits["ele"],
@@ -165,7 +165,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
     else:
         final_params.insert(0, all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]]))
         final_params.insert(0, "lineout pixel", config["data"]["lineouts"]["pixelE"])
-    final_params.to_csv(os.path.join(td, "csv","learned_parameters.csv"))
+    final_params.to_csv(os.path.join(td, "csv", "learned_parameters.csv"))
 
     losses[losses > 1e10] = 1e10
     red_losses = losses / (1.1 * (used_points - len(all_params)))
@@ -579,7 +579,7 @@ def ColorPlots(
     vmax=None,
     logplot=False,
     kaxis=[],
-    XLabel="$\lambda_s (nm)$",
+    XLabel="r$\lambda_s (nm)$",
     YLabel=r"$\theta (\circ)$",
     CurveNames=[],
     Residuals=[],
