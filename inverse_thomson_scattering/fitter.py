@@ -136,7 +136,7 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
     all_weights = {k: [] for k in ts_fitter.pytree_weights["active"].keys()}
 
     for i in range(config["optimizer"]["num_mins"]):
-        # ts_fitter = TSFitter(config, sa, batch)
+        ts_fitter = TSFitter(config, sa, batch)
         init_weights = copy.deepcopy(ts_fitter.flattened_weights)
 
         # ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
