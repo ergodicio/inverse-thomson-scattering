@@ -28,15 +28,11 @@ def recalculate_with_chosen_weights(
     """
 
     all_params = {}
-    # print(np.shape(config["parameters"]["Z"]["val"]))
     for key in config["parameters"].keys():
         if config["parameters"][key]["active"]:
-            # all_params[key] = np.empty(np.shape(config["parameters"][key]["val"]))
             all_params[key] = np.zeros(
                 (batch_indices.flatten()[-1] + 1, np.size(config["parameters"][key]["val"])), dtype=np.float64
             )
-            # print(np.shape(config["parameters"][key]["val"]))
-            # print(all_params)
     batch_indices.sort()
     losses = np.zeros(batch_indices.flatten()[-1] + 1, dtype=np.float64)
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
@@ -80,8 +76,9 @@ def recalculate_with_chosen_weights(
             all_params[k] = params[k].reshape(-1)
 
         if calc_sigma:
-            these_params = ts_fitter.get_active_params(fitted_weights, batch)
-            hess = ts_fitter.h_loss_wrt_params(these_params, batch)
+            # these_params = ts_fitter.get_active_params(fitted_weights, batch)
+            # hess = ts_fitter.h_loss_wrt_params(these_params, batch)
+            hess = ts_fitter.h_loss_wrt_params(params, batch)
             sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
             print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
 
