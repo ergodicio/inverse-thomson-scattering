@@ -116,13 +116,15 @@ def plot_angular(
     fig, ax = plt.subplots(1, 3, figsize=(15, 5))
     # lineouts = np.array(config["data"]["lineouts"]["val"])
     ax[0].plot(xie := np.linspace(-7, 7, config["parameters"]["fe"]["length"]), final_params["fe"])
-    ax[0].fill_between(
-        xie,
-        (final_params["fe"] - config["plotting"]["n_sigmas"] * sigma_fe.data),
-        (final_params["fe"] + config["plotting"]["n_sigmas"] * sigma_fe.data),
-        color="b",
-        alpha=0.1,
-    )
+
+    if config["other"]["calc_sigmas"]:
+        ax[0].fill_between(
+            xie,
+            (final_params["fe"] - config["plotting"]["n_sigmas"] * sigma_fe.data),
+            (final_params["fe"] + config["plotting"]["n_sigmas"] * sigma_fe.data),
+            color="b",
+            alpha=0.1,
+        )
 
     # no rolling sigma bc we use a smoothing kernel
     ax[0].set_xlabel("v/vth (points)", fontsize=14)
