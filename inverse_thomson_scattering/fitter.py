@@ -130,21 +130,24 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
             config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
         ],
     }
+    ts_fitter = TSFitter(config, sa, batch)
+    all_weights = []
+
     for i in range(config["optimizer"]["num_mins"]):
-        ts_fitter = TSFitter(config, sa, batch)
+        init_weights = np.copy(ts_fitter.flattened_weights)
         # ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
         #     0.97, 1.03, len(ts_fitter.flattened_weights)
         # )
         res = spopt.minimize(
             ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
-            ts_fitter.flattened_weights,
+            init_weights,
             args=batch,
             method=config["optimizer"]["method"],
             jac=True if config["optimizer"]["grad_method"] == "AD" else False,
             bounds=ts_fitter.bounds,
             options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
         )
-        best_weights = ts_fitter.unravel_pytree(res["x"])
+        all_weights.append(ts_fitter.unravel_pytree(res["x"]))
         if i == config["optimizer"]["num_mins"] - 1:
             break
         config["parameters"]["fe"]["length"] = (
@@ -154,12 +157,12 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
         if config["parameters"]["fe"]["symmetric"]:
             refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
 
-        refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(best_weights["fe"]))
+        refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(all_weights[-1]["fe"]))
 
         config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
         config["velocity"] = refined_v
-        config["parameters"]["ne"]["val"] = best_weights["ne"].squeeze()
-        config["parameters"]["Te"]["val"] = best_weights["Te"].squeeze()
+        config["parameters"]["ne"]["val"] = all_weights[-1]["ne"].squeeze()
+        config["parameters"]["Te"]["val"] = all_weights[-1]["Te"].squeeze()
 
         config["parameters"]["fe"]["ub"] = -0.5
         config["parameters"]["fe"]["lb"] = -50
@@ -172,8 +175,9 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
         config["units"] = init_param_norm_and_shift(config)
 
     overall_loss = res["fun"]
+    all_weights = {k: [v[k] for v in all_weights] for k in all_weights[0].items()}
 
-    return best_weights, overall_loss, ts_fitter
+    return all_weights, overall_loss, ts_fitter
 
 
 def scipy_1d_loop(config, all_data, batch_indices, num_batches, sa):
