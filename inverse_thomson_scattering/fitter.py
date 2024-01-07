@@ -1,3 +1,4 @@
+import copy
 from typing import Dict, Tuple
 import time
 import numpy as np
@@ -135,8 +136,8 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
     all_weights = {k: [] for k in ts_fitter.pytree_weights.keys()}
 
     for i in range(config["optimizer"]["num_mins"]):
-        ts_fitter = TSFitter(config, sa, batch)
-        init_weights = np.copy(ts_fitter.flattened_weights)
+        # ts_fitter = TSFitter(config, sa, batch)
+        init_weights = copy.deepcopy(ts_fitter.flattened_weights)
 
         # ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
         #     0.97, 1.03, len(ts_fitter.flattened_weights)
