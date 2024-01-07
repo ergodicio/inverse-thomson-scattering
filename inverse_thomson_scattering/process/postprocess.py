@@ -231,9 +231,9 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
             best_weights_val = {}
             best_weights_std = {}
-            for k in fitted_weights.keys():
-                best_weights_val[k] = np.average([val[k] for val in fitted_weights], axis=0)
-                best_weights_std[k] = np.std([val[k] for val in fitted_weights], axis=0)
+            for k, v in fitted_weights.items():
+                best_weights_val[k] = np.average(v, axis=0)
+                best_weights_std[k] = np.std(v, axis=0)
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
                 config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], fitted_weights
             )
