@@ -133,7 +133,7 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
     }
 
     ts_fitter = TSFitter(config, sa, batch)
-    all_weights = {k: [] for k in ts_fitter.pytree_weights.keys()}
+    all_weights = {k: [] for k in ts_fitter.pytree_weights["active"].keys()}
 
     for i in range(config["optimizer"]["num_mins"]):
         # ts_fitter = TSFitter(config, sa, batch)
