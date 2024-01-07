@@ -142,7 +142,7 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
             method=config["optimizer"]["method"],
             jac=True if config["optimizer"]["grad_method"] == "AD" else False,
             bounds=ts_fitter.bounds,
-            options={"disp": True, "maxiter": 1},
+            options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
         )
         best_weights = ts_fitter.unravel_pytree(res["x"])
         if i == config["optimizer"]["num_mins"] - 1:
