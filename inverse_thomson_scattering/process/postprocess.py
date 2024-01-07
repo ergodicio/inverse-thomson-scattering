@@ -76,9 +76,8 @@ def recalculate_with_chosen_weights(
             all_params[k] = params[k].reshape(-1)
 
         if calc_sigma:
-            # these_params = ts_fitter.get_active_params(fitted_weights, batch)
-            # hess = ts_fitter.h_loss_wrt_params(these_params, batch)
-            hess = ts_fitter.h_loss_wrt_params(params, batch)
+            active_params = ts_fitter.weights_to_params(fitted_weights, return_static_params=False)
+            hess = ts_fitter.h_loss_wrt_params(active_params, batch)
             sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
             print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
 
