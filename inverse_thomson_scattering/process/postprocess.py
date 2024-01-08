@@ -67,7 +67,9 @@ def recalculate_with_chosen_weights(
                 config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
             ],
         }
-        losses, sqds, used_points, [ThryE, _, params] = ts_fitter.array_loss(fitted_weights, batch)
+        losses, sqds, used_points, [ThryE, _, params] = ts_fitter.array_loss(
+            {k: v[0] for k, v in fitted_weights.items()}, batch
+        )
         fits["ele"] = ThryE
         sqdevs["ele"] = sqds["ele"]
 
