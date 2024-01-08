@@ -1,4 +1,8 @@
 parameters:
+    species1:
+        Ti:
+    species2:
+        ti:
     amp1:
         val: 1.
         active: True
@@ -37,7 +41,7 @@ parameters:
         ub: 1.0
     Z:
         val: [1., 6.]
-        active: False
+        active: [False, True]
         lb: 0.5
         ub: 7.0
     A:
@@ -45,9 +49,6 @@ parameters:
         active: False
         lb: 0.01
         ub: 3.
-    Z:
-        val: 8.
-        active: False
     ud:
         val: 0.0
         active: True
@@ -60,7 +61,7 @@ parameters:
         ub: 20.5
     ne:
         val: 0.35
-        active: False
+        active: True
         lb: 0.001
         ub: 1.0
     ne_gradient:
@@ -103,13 +104,15 @@ other:
         load_ion_spec: True
         load_ele_spec: True
         fit_IAW: True
-        fit_EPWb: False
-        fit_EPWr: False
+        fit_EPWb: True
+        fit_EPWr: True
     refit: False
     refit_thresh: 5.0
-    calc_sigmas: True
+    calc_sigmas: False
 
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: shot_106315_simul_f14_ion_only
+    run: shot_106315_simul_f15
+    
+machine: gpu
