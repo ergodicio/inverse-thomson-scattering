@@ -20,6 +20,15 @@ else:
 
 
 def load_and_make_folders(cfg_path):
+    """
+    This is used to queue runs on NERSC
+
+    Args:
+        cfg_path:
+
+    Returns:
+
+    """
     all_configs = {}
     basedir = os.path.join(os.getcwd(), f"{cfg_path}")
     for k in ["defaults", "inputs"]:
@@ -48,6 +57,16 @@ def load_and_make_folders(cfg_path):
 
 
 def run(cfg_path, mode):
+    """
+    Wrapper for lower level runner
+
+    Args:
+        cfg_path:
+        mode:
+
+    Returns:
+
+    """
     run_id, all_configs = load_and_make_folders(cfg_path)
     defaults = flatten(all_configs["defaults"])
     defaults.update(flatten(all_configs["inputs"]))
@@ -59,6 +78,18 @@ def run(cfg_path, mode):
 
 
 def _run_(config, mode="fit"):
+    """
+    Either performs a forward pass or an entire fitting routine
+
+    Relies on mlflow to log parameters, metrics, and artifacts
+
+    Args:
+        config:
+        mode:
+
+    Returns:
+
+    """
     utils.log_params(config)
     t0 = time.time()
     if mode == "fit":
@@ -71,6 +102,17 @@ def _run_(config, mode="fit"):
 
 
 def run_job(run_id, nested):
+    """
+    This is used to run queued runs on NERSC. It picks up the `run_id` and finds that using MLFlow and does the fitting
+
+
+    Args:
+        run_id:
+        nested:
+
+    Returns:
+
+    """
     with mlflow.start_run(run_id=run_id, nested=nested) as run:
         with tempfile.TemporaryDirectory(dir=BASE_TEMPDIR) as temp_path:
             all_configs = {}
@@ -82,7 +124,7 @@ def run_job(run_id, nested):
             defaults.update(flatten(all_configs["inputs"]))
             config = unflatten(defaults)
 
-        _run_(config, mode=mode)
+        _run_(config, mode="fit")
 
     if "MLFLOW_EXPORT" in os.environ:
         utils.export_run(run_id)

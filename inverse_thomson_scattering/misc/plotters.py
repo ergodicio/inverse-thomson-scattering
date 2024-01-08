@@ -24,11 +24,20 @@ def plot_angular(
     best_weights_val,
     best_weights_std,
 ):
-    all_params = best_weights_val
-    for key in all_params.keys():
-        all_params[key] = pandas.Series(all_params[key])
+    all_params = {}
+    dist = {}
+    for k, v in best_weights_val.items():
+        if k == "fe":
+            dist[k] = pandas.Series(v[0])
+            dist["v"] = pandas.Series(config["velocity"])
+        else:
+            all_params[k] = pandas.Series(v)
+
     final_params = pandas.DataFrame(all_params)
     final_params.to_csv(os.path.join(td, "csv", "learned_parameters.csv"))
+
+    final_dist = pandas.DataFrame(dist)
+    final_dist.to_csv(os.path.join(td, "csv", "learned_dist.csv"))
 
     sigma_params = {}
     sizes = {key: all_params[key].shape[0] for key in all_params.keys()}
@@ -115,7 +124,7 @@ def plot_angular(
     # Create fe image
     fig, ax = plt.subplots(1, 3, figsize=(15, 5))
     # lineouts = np.array(config["data"]["lineouts"]["val"])
-    ax[0].plot(xie := np.linspace(-7, 7, config["parameters"]["fe"]["length"]), final_params["fe"])
+    ax[0].plot(xie := np.linspace(-7, 7, config["parameters"]["fe"]["length"]), final_dist["fe"])
 
     if config["other"]["calc_sigmas"]:
         ax[0].fill_between(
@@ -132,19 +141,19 @@ def plot_angular(
     ax[0].grid()
     # ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
     ax[0].set_title("$f_e$", fontsize=14)
-    ax[1].plot(np.log10(np.exp(final_params["fe"])))
+    ax[1].plot(np.log10(np.exp(final_dist["fe"])))
     ax[1].set_xlabel("v/vth (points)", fontsize=14)
     ax[1].set_ylabel("f_e (log)")
     ax[1].grid()
     ax[1].set_ylim(-5, 0)
     ax[1].set_title("$f_e$", fontsize=14)
-    ax[2].plot(np.exp(final_params["fe"]))
+    ax[2].plot(np.exp(final_dist["fe"]))
     ax[2].set_xlabel("v/vth (points)", fontsize=14)
     ax[2].set_ylabel("f_e")
     ax[2].grid()
     fig.savefig(os.path.join(td, "plots", "fe_final.png"), bbox_inches="tight")
 
-    return final_params
+    return all_params | dist
 
 
 def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td):

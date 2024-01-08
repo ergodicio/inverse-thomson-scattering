@@ -107,7 +107,7 @@ other:
     lam_res_unit: 5
     refit: True
     refit_thresh: 0.25
-    calc_sigmas: True
+    calc_sigmas: False
 
 plotting:
     n_sigmas: 3
@@ -158,11 +158,11 @@ optimizer:
     grad_method: AD
     grad_scalar: 0.5
     batch_size: 5
-    num_epochs: 4
+    num_epochs: 2
     learning_rate: 1.0e-4
     parameter_norm: True
     refine_factor: 1
-    num_mins: 4
+    num_mins: 2
 
 nn:
     use: false
