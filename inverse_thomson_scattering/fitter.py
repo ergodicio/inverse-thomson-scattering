@@ -186,52 +186,6 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
     return all_weights, overall_loss, ts_fitter
 
 
-def scipy_1d_loop(config, all_data, batch_indices, num_batches, sa):
-    batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
-    overall_loss = 0.0
-    all_weights = []
-
-    previous_weights = None
-    with trange(num_batches, unit="batch") as tbatch:
-        for i_batch in tbatch:
-            inds = batch_indices[i_batch]
-            batch = {
-                "e_data": all_data["e_data"][inds],
-                "e_amps": all_data["e_amps"][inds],
-                "i_data": all_data["i_data"][inds],
-                "i_amps": all_data["i_amps"][inds],
-                "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
-                "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
-            }
-            ts_fitter = TSFitter(config, sa, batch)
-
-            if previous_weights is None:
-                init_weights = ts_fitter.flattened_weights
-
-            if "sequential" in config["optimizer"]:
-                if config["optimizer"]["sequential"]:
-                    if previous_weights is not None:
-                        init_weights = previous_weights
-
-            res = spopt.minimize(
-                ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
-                init_weights,
-                args=batch,
-                method=config["optimizer"]["method"],
-                jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-                bounds=ts_fitter.bounds,
-                options={"disp": True, "maxiter": 100},
-            )
-            all_weights.append(ts_fitter.unravel_pytree(res["x"]))
-            overall_loss += res["fun"]
-
-            if "sequential" in config["optimizer"]:
-                if config["optimizer"]["sequential"]:
-                    previous_weights = res.x
-
-    return all_weights, overall_loss, ts_fitter
-
-
 def angular_adam(config, all_data, sa, batch_indices, num_batches):
     """
     This performs an SGD-like fitting routine. It is different than the SciPy routines primarily because we have to
