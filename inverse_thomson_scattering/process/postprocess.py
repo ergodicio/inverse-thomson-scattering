@@ -67,9 +67,7 @@ def recalculate_with_chosen_weights(
                 config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
             ],
         }
-        losses, sqds, used_points, [ThryE, _, params] = ts_fitter.array_loss(
-            {k: v[0] for k, v in fitted_weights.items()}, batch
-        )
+        losses, sqds, used_points, [ThryE, _, params] = ts_fitter.array_loss(fitted_weights, batch)
         fits["ele"] = ThryE
         sqdevs["ele"] = sqds["ele"]
 
@@ -230,10 +228,10 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             best_weights_val = {}
             best_weights_std = {}
             for k, v in fitted_weights.items():
-                best_weights_val[k] = np.average(v, axis=0)
-                best_weights_std[k] = np.std(v, axis=0)
+                best_weights_val[k] = np.average(v, axis=0)[0, :]
+                best_weights_std[k] = np.std(v, axis=0)[0, :]
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
-                config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], fitted_weights
+                config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], best_weights_val
             )
             mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
             mlflow.set_tag("status", "plotting")

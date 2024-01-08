@@ -87,7 +87,7 @@ class TSFitter:
                     + self.cfg["units"]["shifts"][param_name]
                 )
                 if param_name == "fe":
-                    these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"][0]))[None, :])
+                    these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"])))
 
             else:
                 if return_static_params:
