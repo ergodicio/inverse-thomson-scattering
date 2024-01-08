@@ -162,7 +162,7 @@ optimizer:
     learning_rate: 1.0e-4
     parameter_norm: True
     refine_factor: 1
-    num_mins: 1
+    num_mins: 4
 
 nn:
     use: false
