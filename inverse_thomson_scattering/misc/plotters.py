@@ -31,7 +31,7 @@ def plot_angular(
             dist[k] = pandas.Series(v[0])
             dist["v"] = pandas.Series(config["velocity"])
         else:
-            all_params[k] = pandas.Series(v)
+            all_params[k] = pandas.Series(v.reshape(-1))
 
     final_params = pandas.DataFrame(all_params)
     final_params.to_csv(os.path.join(td, "csv", "learned_parameters.csv"))
