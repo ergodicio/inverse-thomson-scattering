@@ -34,7 +34,6 @@ def zprimeMaxw(xi):
     iZp = np.concatenate((0 * xi[ai], iinterp(xi), 0 * xi[bi]))
 
     Zp = np.vstack((rZp, iZp))
-    # print(jnp.shape(Zp))
     return Zp
 
 
@@ -119,7 +118,6 @@ class FormFactor:
 
         # ions
         Z = jnp.reshape(Z, [1, 1, 1, -1])
-        # A = jnp.reshape(A, [1, 1, 1, -1])
         Mi = jnp.reshape(Mi, [1, 1, 1, -1])
         fract = jnp.reshape(fract, [1, 1, 1, -1])
         Zbar = jnp.sum(Z * fract)
@@ -152,7 +150,6 @@ class FormFactor:
         # if len(fe) == 2:
         DF, x = fe
         fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))
-        # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
 
         # elif len(fe) == 3:
         #     [DF, x, thetaphi] = fe
@@ -180,11 +177,11 @@ class FormFactor:
         df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
         df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
 
-        chiEI = -jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
+        chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
         ratmod = jnp.exp(
             jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF)))
-        )  # , interpAlg, bounds_error=False, fill_value=-jnp.inf)
+        )
         ratdf = jnp.gradient(ratmod, self.xi1[1] - self.xi1[0])
 
         def this_ratintn(this_dx):
@@ -192,7 +189,6 @@ class FormFactor:
 
         chiERratprim = vmap(this_ratintn)(self.xi1[None, :] - self.xi2[:, None])
         # if len(fe) == 2:
-        # not sure about the extrapolation here
         chiERrat = jnp.reshape(jnp.interp(xie.flatten(), self.xi2, chiERratprim[:, 0]), xie.shape)
         # else:
         #     chiERrat = jnp.interpn(jnp.arange(0, 2 * jnp.pi, 10**-1.2018), xi2, chiERratprim, beta, xie, "spline")
@@ -202,7 +198,6 @@ class FormFactor:
         epsilon = 1.0 + chiE + chiI
         
         # This line needs to be changed if ion distribution is changed!!!
-        # ion_comp = Z. * sqrt(Te / Ti. * A * 1836) * (abs(chiE)). ^ 2. * exp(-(xii. ^ 2)) / sqrt(2 * pi);
         ion_comp_fact = jnp.transpose(fract * Z**2 / Zbar / vTi, [1, 0, 2, 3])
         ion_comp = ion_comp_fact * (
             (jnp.abs(chiE[..., jnp.newaxis])) ** 2.0 * jnp.exp(-(xii**2)) / jnp.sqrt(2 * jnp.pi)
@@ -212,26 +207,13 @@ class FormFactor:
         # ele_compE = fe_vphi / vTe # commented because unused
         
         SKW_ion_omg = 1.0 / k[..., jnp.newaxis] * ion_comp / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
-        #SKW_ion_omg = (
-        #    2.0
-        #    * jnp.pi
-        #    * 1.0
-        #    / klde[..., jnp.newaxis]
-        #    * ion_comp
-        #    / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
-        #    * 1.0
-        #    / omgpe[..., jnp.newaxis]
-        #)
         
-        lams = 2 * jnp.pi * C / omgs
 
         SKW_ion_omg = jnp.sum(SKW_ion_omg, 3)
-        #SKW_ele_omg = 2 * jnp.pi * 1.0 / klde * (ele_comp) / ((jnp.abs(epsilon)) ** 2) * vTe / omgpe
         SKW_ele_omg = 1.0 / k * (ele_comp) / ((jnp.abs(epsilon)) ** 2)
         # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:, None, None]
-        # PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne)
         # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * self.C / omgs
         PsLam = PsOmg * 2 * jnp.pi * self.C / lams**2

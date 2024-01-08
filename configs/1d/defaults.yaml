@@ -125,13 +125,6 @@ other:
     refit_thresh: 0.25
     calc_sigmas: False
 
-plotting:
-    n_sigmas: 3
-    rolling_std_width: 5
-    data_cbar_u: data
-    data_cbar_l: 0
-    
-
 data:
     shotnum: 101675
     shotDay: False
@@ -176,17 +169,18 @@ optimizer:
     # use adam for nn / stochastic gradient descent
     # use L-BFGS-B for full batch / parameter learning
     # although adam will work here too
-    method: l-bfgs-b
+    method: adam #l-bfgs-b
     hessian: False
     y_norm: True
     x_norm: False
     grad_method: AD
     batch_size: 4
-    num_epochs: 200
+    num_epochs: 1
     learning_rate: 1.0e-4
     parameter_norm: True
     refine_factor: 0
-    num_mins: 1
+    num_mins: 8
+    sequential: True
 
 nn:
     use: false
