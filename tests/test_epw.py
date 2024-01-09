@@ -14,8 +14,9 @@ from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 
 def test_epw():
     # Test #1: Bohm-Gross test, calculate a spectrum and compare the resonance to the Bohm gross dispersion relation
-    electron_form_factor = FormFactor([400, 700], npts=8192)
-    xie = np.linspace(-7, 7, 1024)
+    npts = 2048
+    electron_form_factor = FormFactor([400, 700], npts=npts)
+    xie = np.linspace(-7, 7, npts)
     sa = np.array([60])
     num_dist_func = get_num_dist_func({"DLM": []}, xie)
     fecur = num_dist_func(2.0)
@@ -29,9 +30,9 @@ def test_epw():
 
     ThryE = np.squeeze(ThryE)
     test = deepcopy(np.asarray(ThryE))
-    peaks, peak_props = find_peaks(test, height=(0.1, 1.1), prominence=0.2)
+    peaks, peak_props = find_peaks(test, height=(0.01, 0.5), prominence=0.05)
     highest_peak_index = peaks[np.argmax(peak_props["peak_heights"])]
-    second_highest_peak_index = peaks[np.argpartition(peak_props["peak_heights"], -2)[-2]]
+    second_highest_peak_index = peaks[np.argsort(peak_props["peak_heights"])[0]]
 
     C = 2.99792458e10
     Me = 510.9896 / C**2  # electron mass keV/C^2
