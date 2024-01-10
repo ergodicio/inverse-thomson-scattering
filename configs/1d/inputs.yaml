@@ -1,8 +1,4 @@
 parameters:
-    species1:
-        Ti:
-    species2:
-        ti:
     amp1:
         val: 1.
         active: True
@@ -24,7 +20,7 @@ parameters:
         lb: 523.0
         ub: 528.0
     Te:
-        val: .500
+        val: .64
         active: True
         lb: 0.01
         ub: 1.5
@@ -35,20 +31,21 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: 0.05
+        val: 0.16
         active: True
         lb: 0.001
         ub: 1.0
     Z:
-        val: [1., 6.]
-        active: [False, True]
+        val: [1., 14.]
+        active: True
         lb: 0.5
         ub: 7.0
     A:
-        val: [1., 14.]
+        val: [1., 40.]
         active: False
-        lb: 0.01
-        ub: 3.
+    fract:
+        val: [.95, .05]
+        active: False
     ud:
         val: 0.0
         active: True
@@ -60,7 +57,7 @@ parameters:
         lb: -20.5
         ub: 20.5
     ne:
-        val: 0.35
+        val: 0.23
         active: True
         lb: 0.001
         ub: 1.0
@@ -71,7 +68,7 @@ parameters:
         ub: 15.
         num_grad_points: 1
     m:
-        val: 2.4
+        val: 3
         active: False
         lb: 2.0
         ub: 5.0
@@ -114,6 +111,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: shot_106315_simul_f15
+    run: Ar-H2-05-95-t1000-corrected
     
 machine: gpu
