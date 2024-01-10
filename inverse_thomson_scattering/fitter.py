@@ -301,7 +301,7 @@ def _1d_scipy_loop_(config, ts_fitter: TSFitter, previous_weights, batch, tbatch
         method=config["optimizer"]["method"],
         jac=True if config["optimizer"]["grad_method"] == "AD" else False,
         bounds=ts_fitter.bounds,
-        options={"disp": True, "maxiter": 1},
+        options={"disp": True, "maxiter": 1000},
     )
 
     best_loss = res["fun"]
