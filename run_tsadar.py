@@ -3,7 +3,7 @@ import argparse, os
 from jax import config
 
 config.update("jax_enable_x64", True)
-# config.update("jax_disable_jit", True)
+#config.update("jax_disable_jit", True)
 
 from inverse_thomson_scattering.runner import run, run_job
 from inverse_thomson_scattering.misc.utils import export_run

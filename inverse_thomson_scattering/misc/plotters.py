@@ -304,7 +304,7 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
         ion_savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
         fig.savefig(os.path.join(td, "plots", "fit_and_data.png"), bbox_inches="tight")
 
-        plotters.model_v_actual(
+        model_v_actual(
             sorted_losses,
             ion_sorted_data,
             ion_sorted_fits,

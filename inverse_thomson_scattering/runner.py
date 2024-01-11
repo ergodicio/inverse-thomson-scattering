@@ -8,6 +8,7 @@ from flatten_dict import flatten, unflatten
 
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc.calibration import get_scattering_angles
+from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.model.loss_function import TSFitter
 from inverse_thomson_scattering.fitter import init_param_norm_and_shift
 from inverse_thomson_scattering.misc import utils
@@ -94,7 +95,7 @@ def _run_(config, mode="fit"):
     t0 = time.time()
     if mode == "fit":
         fit_results, loss = fitter.fit(config=config)
-    elif mode == "forward pass":
+    elif mode == "forward":
         calc_spec(config=config)
     metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
     mlflow.log_metrics(metrics=metrics_dict)
@@ -142,6 +143,13 @@ def calc_spec(config):
     config["other"]["lamrangI"] = [524, 529]
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+    if config["parameters"]["fe"]["symmetric"]:
+        config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+        
+    NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
+    if not config["parameters"]["fe"]["val"]:
+        config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+    
     config["units"] = init_param_norm_and_shift(config)
 
     sas = get_scattering_angles(config)
@@ -154,7 +162,8 @@ def calc_spec(config):
         "i_amps": 1,
     }
     ts_fitter = TSFitter(config, sas, dummy_batch)
-    ThryE, ThryI, lamAxisE, lamAxisI = ts_fitter.calculate_spectra(ts_fitter.pytree_weights, dummy_batch)
+    params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
+    ThryE, ThryI, lamAxisE, lamAxisI = ts_fitter.spec_calc(params, dummy_batch)
 
     fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
     ax[0].plot(lamAxisE, ThryE)

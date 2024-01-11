@@ -134,6 +134,7 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
 
     ts_fitter = TSFitter(config, sa, batch)
     all_weights = {k: [] for k in ts_fitter.pytree_weights["active"].keys()}
+    
     if config["optimizer"]["num_mins"] > 1:
         print(Warning("multiple num mins doesnt work. only running once"))
     for i in range(1):
@@ -247,7 +248,7 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
             best_weights = weights
 
         mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
-
+        
 
 def _1d_adam_loop_(config, ts_fitter, previous_weights, batch, tbatch):
     jaxopt_kwargs = dict(
@@ -282,8 +283,7 @@ def _1d_adam_loop_(config, ts_fitter, previous_weights, batch, tbatch):
             best_weights = init_weights
 
     return best_loss, best_weights
-
-
+  
 def _1d_scipy_loop_(config, ts_fitter: TSFitter, previous_weights, batch, tbatch):
     if previous_weights is None:  # if prev, then use that, if not then use flattened weights
         init_weights = np.copy(ts_fitter.flattened_weights)
@@ -302,9 +302,9 @@ def _1d_scipy_loop_(config, ts_fitter: TSFitter, previous_weights, batch, tbatch
         method=config["optimizer"]["method"],
         jac=True if config["optimizer"]["grad_method"] == "AD" else False,
         bounds=ts_fitter.bounds,
-        options={"disp": True, "maxiter": 100},
+        options={"disp": True, "maxiter": 1000},
     )
-
+    
     best_loss = res["fun"]
     best_weights = ts_fitter.unravel_pytree(res["x"])
 
