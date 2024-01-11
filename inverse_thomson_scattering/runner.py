@@ -139,8 +139,8 @@ def calc_spec(config):
     stddev["spect_stddev_ion"] = 0.015  # 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
     stddev["spect_stddev_ele"] = 0.1  # 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
     config["other"]["PhysParams"]["widIRF"] = stddev
-    config["other"]["lamrangE"] = [400, 700]
-    config["other"]["lamrangI"] = [524, 529]
+    config["other"]["lamrangE"] = [config["data"]["fit_rng"]["forward_epw_start"], config["data"]["fit_rng"]["forward_epw_end"]]
+    config["other"]["lamrangI"] = [config["data"]["fit_rng"]["forward_iaw_start"], config["data"]["fit_rng"]["forward_iaw_end"]]
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
     if config["parameters"]["fe"]["symmetric"]:

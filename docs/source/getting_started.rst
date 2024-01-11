@@ -29,7 +29,7 @@ Getting Started
 
 .. code-block:: bash
 
-   conda env create -f env-gpu.yml
+   conda env create -f env_gpu.yml
    conda activate tsadar-gpu
 
 **Run command**
@@ -50,6 +50,6 @@ And the other just performs a forward pass and gives you the spectra given some 
 
 
 The inputs for the code are stored in an input deck. The default location for this input deck and therefore
-the starting path for running jobs is :code:`inverse_thomson_scattering/config/1d`. These inputs should be
+the starting path for running jobs is :code:`inverse_thomson_scattering/configs/1d`. These inputs should be
 modified to change the specific to fit your analysis needs. More information on the Input deck can be found 
 on the :ref:`inputs` page.
