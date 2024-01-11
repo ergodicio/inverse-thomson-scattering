@@ -83,7 +83,7 @@ class FormFactor:
             cur_ne,
             params["Va"],
             params["ud"],
-            f_and_v,
+            f_and_v,#this is now a DistFunc object
         )
 
         Mi = jnp.array(A) * self.Mp  # ion mass

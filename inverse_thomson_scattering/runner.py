@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mlflow, tempfile, yaml
 import multiprocessing as mp
+import xarray as xr
 from flatten_dict import flatten, unflatten
 
 from inverse_thomson_scattering import fitter
@@ -178,7 +179,17 @@ def calc_spec(config):
     ax[1].set_xlabel("Wavelength (nm)")
     ax[1].grid()
 
+    coords_ion = (("Wavelength", lamAxisI),)
+    coords_ele = (("Wavelength", lamAxisE),)
+    ion_dat = {"Sim": ThryI}
+    ele_dat = {"Sim": ThryE}
+
+    ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
+    ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
+        
     with tempfile.TemporaryDirectory() as td:
+        ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
+        ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))
         fig.savefig(os.path.join(td, "simulated_data"), bbox_inches="tight")
         mlflow.log_artifacts(td)
     plt.close(fig)

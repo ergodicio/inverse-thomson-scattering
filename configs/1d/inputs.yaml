@@ -82,6 +82,7 @@ parameters:
         ub: -0.5
         fe_decrease_strict: False
         symmetric: False
+        dim: 1
 
 data:
     shotnum: 101675
