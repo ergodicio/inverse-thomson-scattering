@@ -1,4 +1,5 @@
 import time, os
+from typing import Dict, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,7 +10,7 @@ from flatten_dict import flatten, unflatten
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc.calibration import get_scattering_angles
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.model.loss_function import TSFitter
+from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.fitter import init_param_norm_and_shift
 from inverse_thomson_scattering.misc import utils
 
@@ -20,7 +21,7 @@ else:
     BASE_TEMPDIR = None
 
 
-def load_and_make_folders(cfg_path):
+def load_and_make_folders(cfg_path: str) -> Tuple[str, Dict]:
     """
     This is used to queue runs on NERSC
 
@@ -57,7 +58,7 @@ def load_and_make_folders(cfg_path):
     return mlflow_run.info.run_id, all_configs
 
 
-def run(cfg_path, mode):
+def run(cfg_path: str, mode: str) -> str:
     """
     Wrapper for lower level runner
 
@@ -78,7 +79,7 @@ def run(cfg_path, mode):
     return run_id
 
 
-def _run_(config, mode="fit"):
+def _run_(config: Dict, mode: str = "fit"):
     """
     Either performs a forward pass or an entire fitting routine
 
@@ -102,7 +103,7 @@ def _run_(config, mode="fit"):
     mlflow.set_tag("status", "completed")
 
 
-def run_job(run_id, nested):
+def run_job(run_id: str, nested: bool):
     """
     This is used to run queued runs on NERSC. It picks up the `run_id` and finds that using MLFlow and does the fitting
 
@@ -131,7 +132,17 @@ def run_job(run_id, nested):
         utils.export_run(run_id)
 
 
-def calc_spec(config):
+def calc_spec(config: Dict):
+    """
+    Just performs a forward pass
+
+
+    Args:
+        config:
+
+    Returns:
+
+    """
     # get scattering angles and weights
     config["optimizer"]["batch_size"] = 1
     config["other"]["extraoptions"]["spectype"] = "temporal"
@@ -145,11 +156,11 @@ def calc_spec(config):
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
     if config["parameters"]["fe"]["symmetric"]:
         config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-        
+
     NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
     if not config["parameters"]["fe"]["val"]:
         config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
-    
+
     config["units"] = init_param_norm_and_shift(config)
 
     sas = get_scattering_angles(config)

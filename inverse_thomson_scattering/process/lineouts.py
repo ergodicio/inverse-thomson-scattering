@@ -1,3 +1,5 @@
+from typing import Dict
+
 from collections import defaultdict
 
 import numpy as np
@@ -6,7 +8,7 @@ from inverse_thomson_scattering.process.evaluate_background import get_lineout_b
 
 def get_lineouts(
     elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, shift_zero, IAWtime, xlab, sa, config
-):
+) -> Dict:
     # Convert lineout locations to pixel
     if config["data"]["lineouts"]["type"] == "ps" or config["data"]["lineouts"]["type"] == "um":
         LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
@@ -65,15 +67,7 @@ def get_lineouts(
 
     # Find background signal combining information from a background shot and background lineout
     [noiseE, noiseI] = get_lineout_bg(
-        config,
-        elecData,
-        ionData,
-        BGele,
-        BGion,
-        LineoutTSE_smooth,
-        BackgroundPixel,
-        LineoutPixelE,
-        LineoutPixelI,
+        config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, BackgroundPixel, LineoutPixelE, LineoutPixelI
     )
 
     # Find data amplitudes
