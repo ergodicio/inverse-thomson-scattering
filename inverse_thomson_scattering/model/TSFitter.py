@@ -13,7 +13,23 @@ from inverse_thomson_scattering.model.spectrum import SpectrumCalculator
 
 
 class TSFitter:
+    """
+    This class is responsible for handling the forward pass and using that to create a loss function
+
+    Args:
+            cfg: Configuration dictionary
+            sas: TODO
+            dummy_batch: Dictionary of dummy data
+
+    """
     def __init__(self, cfg: Dict, sas, dummy_batch):
+        """
+
+        Args:
+            cfg: Configuration dictionary
+            sas: TODO
+            dummy_batch: Dictionary of dummy data
+        """
         self.cfg = cfg
 
         if cfg["optimizer"]["y_norm"]:

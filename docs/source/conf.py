@@ -152,8 +152,8 @@ def linkcode_resolve(domain, info):
 
 # numpydoc_class_members_toctree = False
 # Napoleon settings
-napoleon_google_docstring = False
-napoleon_numpy_docstring = True
+napoleon_google_docstring = True
+napoleon_numpy_docstring = False
 napoleon_include_init_with_doc = False
 napoleon_include_private_with_doc = False
 napoleon_include_special_with_doc = True
@@ -206,22 +206,22 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "README.rst"]
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#
-# html_theme_options = {
-#     #    'canonical_url': '',
-#     #    'analytics_id': 'UA-XXXXXXX-1',  #  Provided by Google in your dashboard
-#     "logo_only": True,
-#     "display_version": True,
-#     "prev_next_buttons_location": "both",
-#     "style_external_links": False,
-#     "style_nav_header_background": "#3c4142",
-#     # Toc options
-#     "collapse_navigation": True,
-#     "sticky_navigation": True,
-#     "navigation_depth": 2,
-#     "includehidden": True,
-#     "titles_only": False,
-# }
+
+html_theme_options = {
+    #    'canonical_url': '',
+    #    'analytics_id': 'UA-XXXXXXX-1',  #  Provided by Google in your dashboard
+    "logo_only": True,
+    "display_version": True,
+    "prev_next_buttons_location": "both",
+    "style_external_links": False,
+    "style_nav_header_background": "#3c4142",
+    # Toc options
+    "collapse_navigation": True,
+    "sticky_navigation": True,
+    "navigation_depth": 2,
+    "includehidden": True,
+    "titles_only": False,
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
