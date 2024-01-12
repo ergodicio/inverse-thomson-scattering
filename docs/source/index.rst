@@ -26,6 +26,7 @@ More details on the numerics will be added soon.
    FAQ
    math
    contributing
+   api_main
    
 *What does TSADAR stand for?*
 

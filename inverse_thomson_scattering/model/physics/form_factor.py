@@ -54,7 +54,12 @@ class FormFactor:
 
     def __call__(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
         """
-        NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions and scattering angles. The spectral density function is calculated with and without the ion contribution which can be set to an independent grid from the electron contribution. Distribution functions can be one or two dimensional and the appropriate susceptibility is calculated with the rational integration.
+        Calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions
+        and scattering angles. The spectral density function is calculated with and without the ion contribution
+        which can be set to an independent grid from the electron contribution. Distribution functions can be one or
+        two dimensional and the appropriate susceptibility is calculated with the rational integration.
+
+        In angular, `fe` is a Tuple, Distribution function (DF), normalized velocity (x), and angles from k_L to f1 in radians
 
 
 
@@ -69,8 +74,8 @@ class FormFactor:
         :param lamrang: wavelength range in nm [1 by 2]
         :param lam: probe wavelength in nm
         :param sa: scattering angle in degrees [1 by n]
-        :param fe: Distribution function (DF) and normalized velocity (x) for 1D distributions and
-        Distribution function (DF), normalized velocity (x), and angles from k_L to f1 in radians
+        :param fe: Distribution function (DF) and normalized velocity (x) for 1D distributions
+
         :return:
         """
 

@@ -13,7 +13,23 @@ from inverse_thomson_scattering.model.spectrum import SpectrumCalculator
 
 
 class TSFitter:
+    """
+    This class is responsible for handling the forward pass and using that to create a loss function
+
+    Args:
+            cfg: Configuration dictionary
+            sas: TODO
+            dummy_batch: Dictionary of dummy data
+
+    """
     def __init__(self, cfg: Dict, sas, dummy_batch):
+        """
+
+        Args:
+            cfg: Configuration dictionary
+            sas: TODO
+            dummy_batch: Dictionary of dummy data
+        """
         self.cfg = cfg
 
         if cfg["optimizer"]["y_norm"]:
@@ -64,9 +80,24 @@ class TSFitter:
             else:
                 raise NotImplementedError
         else:
-            Warning("\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n")
+            Warning(
+                "\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n"
+            )
 
-    def smooth(self, distribution):
+    def smooth(self, distribution: jnp.ndarray) -> jnp.ndarray:
+        """
+        This method is used to smooth the distribution function. It sits right in between the optimization algorithm
+        that provides the weights/values of the distribution function and the fitting code that uses it.
+
+        Because the optimizer is not constrained to provide a smooth distribution function, this operation smoothens
+        the output. This is a differentiable operation and we train/fit our weights through this.
+
+        Args:
+            distribution:
+
+        Returns:
+
+        """
         s = jnp.r_[
             distribution[self.smooth_window_len - 1 : 0 : -1],
             distribution,
@@ -76,7 +107,20 @@ class TSFitter:
             self.smooth_window_len - 1 : -(self.smooth_window_len - 1)
         ]
 
-    def weights_to_params(self, these_params, return_static_params=True):
+    def weights_to_params(self, these_params: Dict, return_static_params: bool = True) -> Dict:
+        """
+        This function creates the physical parameters used in the TS algorithm from the weights.
+
+        This could be a 1:1 mapping, or it could be a linear transformation e.g. "normalized" parameters, or it could
+        be something else altogether e.g. a neural network
+
+        Args:
+            these_params:
+            return_static_params:
+
+        Returns:
+
+        """
         for param_name, param_config in self.cfg["parameters"].items():
             if param_config["active"]:
                 # if self.cfg["optimizer"]["method"] == "adam":
@@ -95,7 +139,19 @@ class TSFitter:
 
         return these_params
 
-    def _array_loss_fn_(self, weights, batch):
+    def _array_loss_fn_(self, weights: Dict, batch: Dict):
+        """
+        This is similar to the _loss_ function but it calculates the loss per slice without doing a batch-wise mean
+        calculation at the end. There might be a better way to write this
+
+
+        Args:
+            weights:
+            batch:
+
+        Returns:
+
+        """
         # Used for postprocessing
         params = self.weights_to_params(weights)
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
@@ -212,7 +268,17 @@ class TSFitter:
 
         return i_error, e_error
 
-    def moment_loss(self, params):
+    def _moment_loss_(self, params):
+        """
+        This function calculates the loss associated with regularizing the moments of the distribution function i.e.
+        the density should be 1, the temperature should be 1, and momentum should be 0.
+
+        Args:
+            params:
+
+        Returns:
+
+        """
         dv = self.cfg["velocity"][1] - self.cfg["velocity"][0]
         if self.cfg["parameters"]["fe"]["symmetric"]:
             density_loss = jnp.mean(jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
@@ -264,16 +330,25 @@ class TSFitter:
             denom=[jnp.square(self.i_norm), jnp.square(self.e_norm)],
             reduce_func=jnp.mean,
         )
-        density_loss, temperature_loss, momentum_loss = self.moment_loss(params)
+        density_loss, temperature_loss, momentum_loss = self._moment_loss_(params)
         # other_losses = calc_other_losses(params)
-        normed_batch = self.get_normed_batch(batch)
+        normed_batch = self._get_normed_batch_(batch)
         normed_e_data = normed_batch["e_data"]
         ion_error = self.cfg["data"]["ion_loss_scale"] * i_error
 
         total_loss = ion_error + e_error + density_loss + temperature_loss + momentum_loss
         return total_loss, [ThryE, normed_e_data, params]
 
-    def get_normed_batch(self, batch):
+    def _get_normed_batch_(self, batch):
+        """
+        Normalizes the batch
+
+        Args:
+            batch:
+
+        Returns:
+
+        """
         normed_batch = copy.deepcopy(batch)
         normed_batch["i_data"] = normed_batch["i_data"] / self.i_input_norm
         normed_batch["e_data"] = normed_batch["e_data"] / self.e_input_norm
@@ -287,7 +362,22 @@ class TSFitter:
         else:
             return self._loss_(weights, batch)
 
-    def vg_loss(self, weights, batch):
+    def vg_loss(self, weights: Dict, batch: Dict):
+        """
+        This is the primary workhorse high level function. This function returns the value of the loss function which
+        is used to assess goodness-of-fit and the gradient of that value with respect to the weights, which is used to
+        update the weights
+
+        This function is used by both optimization methods. It performs the necessary pre-/post- processing that is
+        needed to work with the optimization software.
+
+        Args:
+            weights:
+            batch:
+
+        Returns:
+
+        """
         if self.cfg["optimizer"]["method"] == "l-bfgs-b":
             pytree_weights = self.unravel_pytree(weights)
             (value, aux), grad = self._vg_func_(pytree_weights, batch)

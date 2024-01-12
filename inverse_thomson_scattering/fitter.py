@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 import time
 import numpy as np
 import pandas as pd
@@ -10,7 +10,7 @@ from tqdm import trange
 from jax.flatten_util import ravel_pytree
 
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.model.loss_function import TSFitter
+from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.process import prepare, postprocess
 
 
@@ -102,7 +102,7 @@ def _validate_inputs_(config: Dict) -> Dict:
     return config
 
 
-def scipy_angular_loop(config: Dict, all_data: Dict, sa):
+def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, TSFitter]:
     """
     Performs angular thomson scattering i.e. ARTEMIS fitting exercise using the SciPy optimizer routines
 
@@ -134,7 +134,7 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa):
 
     ts_fitter = TSFitter(config, sa, batch)
     all_weights = {k: [] for k in ts_fitter.pytree_weights["active"].keys()}
-    
+
     if config["optimizer"]["num_mins"] > 1:
         print(Warning("multiple num mins doesnt work. only running once"))
     for i in range(1):
@@ -248,9 +248,11 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
             best_weights = weights
 
         mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
-        
 
-def _1d_adam_loop_(config, ts_fitter, previous_weights, batch, tbatch):
+
+def _1d_adam_loop_(
+    config: Dict, ts_fitter: TSFitter, previous_weights: np.ndarray, batch: Dict, tbatch
+) -> Tuple[float, Dict]:
     jaxopt_kwargs = dict(
         fun=ts_fitter.vg_loss, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
     )
@@ -283,8 +285,9 @@ def _1d_adam_loop_(config, ts_fitter, previous_weights, batch, tbatch):
             best_weights = init_weights
 
     return best_loss, best_weights
-  
-def _1d_scipy_loop_(config, ts_fitter: TSFitter, previous_weights, batch, tbatch):
+
+
+def _1d_scipy_loop_(config: Dict, ts_fitter: TSFitter, previous_weights: np.ndarray, batch: Dict) -> Tuple[float, Dict]:
     if previous_weights is None:  # if prev, then use that, if not then use flattened weights
         init_weights = np.copy(ts_fitter.flattened_weights)
     else:
@@ -304,14 +307,33 @@ def _1d_scipy_loop_(config, ts_fitter: TSFitter, previous_weights, batch, tbatch
         bounds=ts_fitter.bounds,
         options={"disp": True, "maxiter": 1000},
     )
-    
+
     best_loss = res["fun"]
     best_weights = ts_fitter.unravel_pytree(res["x"])
 
     return best_loss, best_weights
 
 
-def one_d_loop(config, all_data, sa, batch_indices, num_batches):
+def one_d_loop(
+    config: Dict, all_data: Dict, sa: Tuple, batch_indices: np.ndarray, num_batches: int
+) -> Tuple[List, float, TSFitter]:
+    """
+    This is the higher level wrapper that prepares the data and the fitting code for the 1D fits
+
+    This function branches out into the various optimization routines for fitting.
+
+    For now, this is either running the ADAM loop or the SciPy optimizer loop
+
+    Args:
+        config:
+        all_data:
+        sa:
+        batch_indices:
+        num_batches:
+
+    Returns:
+
+    """
     sample = {k: v[: config["optimizer"]["batch_size"]] for k, v in all_data.items()}
     sample = {
         "noise_e": config["other"]["PhysParams"]["noiseE"][: config["optimizer"]["batch_size"]],
@@ -342,7 +364,7 @@ def one_d_loop(config, all_data, sa, batch_indices, num_batches):
             else:
                 # not sure why this is needed but something needs to be reset, either the weights or the bounds
                 ts_fitter = TSFitter(config, sa, batch)
-                best_loss, best_weights = _1d_scipy_loop_(config, ts_fitter, previous_weights, batch, tbatch)
+                best_loss, best_weights = _1d_scipy_loop_(config, ts_fitter, previous_weights, batch)
 
             all_weights.append(best_weights)
             mlflow.log_metrics({"batch loss": float(best_loss)}, step=i_batch)

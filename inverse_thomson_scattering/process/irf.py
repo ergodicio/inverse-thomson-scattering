@@ -1,7 +1,25 @@
+from typing import Tuple
 from jax import numpy as jnp
 
 
-def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam):
+def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    """
+    Angular Thomson Scattering IRF
+
+    todo: improve doc and typehints
+
+    Args:
+        config:
+        sas:
+        lamAxisE:
+        modlE:
+        amps:
+        TSins:
+        lam:
+
+    Returns:
+
+    """
     stddev_lam = config["other"]["PhysParams"]["widIRF"]["spect_FWHM_ele"] / 2.3548
     stddev_ang = config["other"]["PhysParams"]["widIRF"]["ang_FWHM_ele"] / 2.3548
     # Conceptual_origin so the convolution donsn't shift the signal
@@ -31,7 +49,22 @@ def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam):
     return lamAxisE, ThryE
 
 
-def add_ion_IRF(config, lamAxisI, modlI, amps, TSins):
+def add_ion_IRF(config, lamAxisI, modlI, amps, TSins) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    """
+    Ion IRF (Instrument Response Function?)
+
+    todo: improve doc and typehints
+
+    Args:
+        config:
+        lamAxisI:
+        modlI:
+        amps:
+        TSins:
+
+    Returns:
+
+    """
     stddevI = config["other"]["PhysParams"]["widIRF"]["spect_stddev_ion"]
     if stddevI:
         originI = (jnp.amax(lamAxisI) + jnp.amin(lamAxisI)) / 2.0
@@ -53,7 +86,23 @@ def add_ion_IRF(config, lamAxisI, modlI, amps, TSins):
     return lamAxisI, ThryI
 
 
-def add_electron_IRF(config, lamAxisE, modlE, amps, TSins, lam):
+def add_electron_IRF(config, lamAxisE, modlE, amps, TSins, lam) -> Tuple[jnp.ndarray, jnp.ndarray]:
+    """
+    electron IRF (Instrument Response Function?)
+
+    todo: improve doc and typehints
+
+    Args:
+        config:
+        lamAxisE:
+        modlE:
+        amps:
+        TSins:
+        lam:
+
+    Returns:
+
+    """
     stddevE = config["other"]["PhysParams"]["widIRF"]["spect_stddev_ele"]
     # Conceptual_origin so the convolution doesn't shift the signal
     originE = (jnp.amax(lamAxisE) + jnp.amin(lamAxisE)) / 2.0
