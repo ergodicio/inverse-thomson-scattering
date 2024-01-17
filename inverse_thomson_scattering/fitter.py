@@ -134,16 +134,16 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
 
     ts_fitter = TSFitter(config, sa, batch)
     all_weights = {k: [] for k in ts_fitter.pytree_weights["active"].keys()}
-
+    overall_loss = []
     if config["optimizer"]["num_mins"] > 1:
         print(Warning("multiple num mins doesnt work. only running once"))
-    for i in range(1):
+    for i in range(config["optimizer"]["ensemble_size"]):
         ts_fitter = TSFitter(config, sa, batch)
         init_weights = copy.deepcopy(ts_fitter.flattened_weights)
 
-        # ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
-        #     0.97, 1.03, len(ts_fitter.flattened_weights)
-        # )
+        ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
+            0.97, 1.03, len(ts_fitter.flattened_weights)
+        )
         res = spopt.minimize(
             ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
             init_weights,
@@ -154,38 +154,39 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
             options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
         )
         these_weights = ts_fitter.unravel_pytree(res["x"])
+
         for k in all_weights.keys():
             all_weights[k].append(these_weights[k])
 
-        if i == config["optimizer"]["num_mins"] - 1:
-            break
-        config["parameters"]["fe"]["length"] = (
-            config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
-        )
-        refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-        if config["parameters"]["fe"]["symmetric"]:
-            refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+        # if i == config["optimizer"]["num_mins"] - 1:
+        #     break
+        # config["parameters"]["fe"]["length"] = (
+        #     config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
+        # )
+        # refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+        # if config["parameters"]["fe"]["symmetric"]:
+        #     refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+        #
+        # refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(these_weights["fe"]))
+        #
+        # config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
+        # config["velocity"] = refined_v
+        # config["parameters"]["ne"]["val"] = these_weights["ne"].squeeze()
+        # config["parameters"]["Te"]["val"] = these_weights["Te"].squeeze()
+        #
+        # config["parameters"]["fe"]["ub"] = -0.5
+        # config["parameters"]["fe"]["lb"] = -50
+        # config["parameters"]["fe"]["lb"] = np.multiply(
+        #     config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
+        # )
+        # config["parameters"]["fe"]["ub"] = np.multiply(
+        #     config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
+        # )
+        # config["units"] = init_param_norm_and_shift(config)
 
-        refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(these_weights["fe"]))
+        overall_loss.append(res["fun"])
 
-        config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
-        config["velocity"] = refined_v
-        config["parameters"]["ne"]["val"] = these_weights["ne"].squeeze()
-        config["parameters"]["Te"]["val"] = these_weights["Te"].squeeze()
-
-        config["parameters"]["fe"]["ub"] = -0.5
-        config["parameters"]["fe"]["lb"] = -50
-        config["parameters"]["fe"]["lb"] = np.multiply(
-            config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
-        )
-        config["parameters"]["fe"]["ub"] = np.multiply(
-            config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
-        )
-        config["units"] = init_param_norm_and_shift(config)
-
-    overall_loss = res["fun"]
-
-    return all_weights, overall_loss, ts_fitter
+    return all_weights, np.mean(overall_loss), ts_fitter
 
 
 def angular_adam(config, all_data, sa, batch_indices, num_batches):
@@ -428,6 +429,6 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
     mlflow.set_tag("status", "postprocessing")
 
-    final_params = postprocess.postprocess(config, batch_indices, all_data, all_axes, ts_fitter, sa, fitted_weights)
+    final_params = postprocess.postprocess(config, batch_indices, all_data, all_axes, ts_fitter, fitted_weights)
 
     return final_params, float(overall_loss)

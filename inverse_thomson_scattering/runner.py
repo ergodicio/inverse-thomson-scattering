@@ -76,6 +76,9 @@ def run(cfg_path: str, mode: str) -> str:
     with mlflow.start_run(run_id=run_id) as mlflow_run:
         _run_(config, mode=mode)
 
+    if "MLFLOW_EXPORT" in os.environ:
+        utils.export_run(run_id)
+
     return run_id
 
 
