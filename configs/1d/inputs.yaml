@@ -106,7 +106,7 @@ other:
         fit_EPWr: True
     refit: False
     refit_thresh: 5.0
-    calc_sigmas: False
+    calc_sigmas: True
 
 
 mlflow:

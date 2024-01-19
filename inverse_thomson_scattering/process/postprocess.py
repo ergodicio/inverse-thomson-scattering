@@ -101,7 +101,7 @@ def recalculate_with_chosen_weights(
             sqdevs["ion"][inds] = sqds["ion"]
             if calc_sigma:
                 sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-                print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
+                print(f"Number of 0s in sigma: {len(np.where(sigmas[inds]==0)[0])}")
 
             fits["ele"][inds] = ThryE
             fits["ion"][inds] = ThryI
@@ -110,7 +110,10 @@ def recalculate_with_chosen_weights(
                 if np.size(np.shape(params[k])) == 3:
                     all_params[k][inds] = np.squeeze(params[k][inds])
                 else:
-                    all_params[k][inds] = params[k][inds]
+                    if len(params[k].shape) > 0:
+                        all_params[k][inds] = params[k][inds]
+                    else:
+                        all_params[k][inds] = params[k]
 
     return losses, sqdevs, used_points, fits, sigmas, all_params
 
@@ -152,11 +155,10 @@ def get_sigmas(keys: List, hess: Dict, batch_size: int) -> Dict:
         # print(inv)
 
         for k1, param in enumerate(keys):
-            sigmas[i, xc : xc + sizes[param]] = np.diag(
-                np.sign(inv[xc : xc + sizes[param], xc : xc + sizes[param]])
-                * np.sqrt(np.abs(inv[xc : xc + sizes[param], xc : xc + sizes[param]]))
-            )
-            # print(sigmas[i, k1])
+            inv_slice = inv[k1, k1]
+            temp = np.sign(inv_slice) * np.sqrt(np.abs(inv_slice))
+            sigmas[i, k1] = temp
+            print(sigmas[i, k1])
 
     return sigmas
 
@@ -188,8 +190,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
 
     mlflow.log_metrics({"refitting time": round(time.time() - t1, 2)})
 
-    final_params = _plots_(config, fitted_weights, batch_indices, all_data, ts_fitter, all_axes)
-    mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
+    final_params = _sigmas_and_plots_(config, fitted_weights, batch_indices, all_data, ts_fitter, all_axes)
 
     mlflow.set_tag("status", "done plotting")
 
@@ -252,7 +253,8 @@ def _get_refitted_1d_weights(config, batch_indices, all_data, ts_fitter, fitted_
     return fitted_weights
 
 
-def _plots_(config, fitted_weights, batch_indices, all_data, ts_fitter, all_axes):
+def _sigmas_and_plots_(config, fitted_weights, batch_indices, all_data, ts_fitter, all_axes):
+    t1 = time.time()
     with tempfile.TemporaryDirectory() as td:
         os.makedirs(os.path.join(td, "plots"), exist_ok=True)
         os.makedirs(os.path.join(td, "binary"), exist_ok=True)
@@ -283,6 +285,7 @@ def _plots_(config, fitted_weights, batch_indices, all_data, ts_fitter, all_axes
                 best_weights_val,
                 best_weights_std,
             )
+            mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
         else:
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
                 config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], fitted_weights
@@ -293,6 +296,7 @@ def _plots_(config, fitted_weights, batch_indices, all_data, ts_fitter, all_axes
             final_params = plotters.plot_regular(
                 config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td
             )
+            mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
         mlflow.log_artifacts(td)
 
     return final_params

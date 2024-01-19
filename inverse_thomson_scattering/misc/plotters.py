@@ -630,13 +630,7 @@ def ColorPlots(
         C = np.log(C)
 
     im = ax0.imshow(
-        C,
-        cmap,
-        interpolation="none",
-        extent=[x[0], x[-1], y[-1], y[0]],
-        aspect="auto",
-        vmin=vmin,
-        vmax=vmax,
+        C, cmap, interpolation="none", extent=[x[0], x[-1], y[-1], y[0]], aspect="auto", vmin=vmin, vmax=vmax
     )
     ax0.set_title(
         title,

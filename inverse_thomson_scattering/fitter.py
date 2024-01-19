@@ -63,6 +63,11 @@ def _validate_inputs_(config: Dict) -> Dict:
     Returns: Dict
 
     """
+    if config["other"]["calc_sigmas"]:
+        if config["optimizer"]["batch_size"] > 1:
+            print("batch size must be 1 to calculate sigmas")
+            config["optimizer"]["batch_size"] = 1
+
     # get derived quantities
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
     if config["parameters"]["fe"]["symmetric"]:
