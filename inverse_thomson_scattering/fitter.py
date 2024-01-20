@@ -65,8 +65,12 @@ def _validate_inputs_(config: Dict) -> Dict:
     """
     if config["other"]["calc_sigmas"]:
         if config["optimizer"]["batch_size"] > 1:
-            print("batch size must be 1 to calculate sigmas")
+            print("batch size must be 1 to calculate sigmas, setting batch_size to 1")
             config["optimizer"]["batch_size"] = 1
+
+    if "spectype" in config["other"]["extraoptions"]:
+        if config["other"]["extraoptions"]["spectype"] == "angular":
+            print("Running Angular, setting batch_size to 1")
 
     # get derived quantities
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
@@ -122,7 +126,7 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
     Returns:
 
     """
-    print("Running Angular, setting batch_size to 1")
+
     config["optimizer"]["batch_size"] = 1
     batch = {
         "e_data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
@@ -311,7 +315,7 @@ def _1d_scipy_loop_(config: Dict, ts_fitter: TSFitter, previous_weights: np.ndar
         method=config["optimizer"]["method"],
         jac=True if config["optimizer"]["grad_method"] == "AD" else False,
         bounds=ts_fitter.bounds,
-        options={"disp": True, "maxiter": 1000},
+        options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
     )
 
     best_loss = res["fun"]

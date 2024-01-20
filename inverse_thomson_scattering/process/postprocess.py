@@ -78,7 +78,7 @@ def recalculate_with_chosen_weights(
             active_params = ts_fitter.weights_to_params(fitted_weights, return_static_params=False)
             hess = ts_fitter.h_loss_wrt_params(active_params, batch)
             sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-            print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
+            # print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
 
     else:
         for i_batch, inds in enumerate(batch_indices):
@@ -158,7 +158,6 @@ def get_sigmas(keys: List, hess: Dict, batch_size: int) -> Dict:
             inv_slice = inv[k1, k1]
             temp = np.sign(inv_slice) * np.sqrt(np.abs(inv_slice))
             sigmas[i, k1] = temp
-            print(sigmas[i, k1])
 
     return sigmas
 
