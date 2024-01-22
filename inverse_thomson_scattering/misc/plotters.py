@@ -22,7 +22,6 @@ def plot_angular(
     sigmas,
     td,
     best_weights_val,
-    best_weights_std,
 ):
     all_params = {}
     dist = {}
@@ -40,18 +39,17 @@ def plot_angular(
     final_dist.to_csv(os.path.join(td, "csv", "learned_dist.csv"))
 
     sigma_params = {}
-    sizes = {key: all_params[key].shape[0] for key in all_params.keys()}
-    param_ctr = 0
-    if config["other"]["calc_sigmas"]:
-        for i, k in enumerate(all_params.keys()):
-            val = sigmas[0, param_ctr : param_ctr + sizes[k]]
-            if k == "fe":
-                sigma_fe = xr.DataArray(val, coords=(("v", np.linspace(-7, 7, len(val))),))
-            else:
-                sigma_params[k] = xr.DataArray(val, coords=(("ind", [0]),))
-            param_ctr += sizes[k]
 
-        sigma_params = best_weights_std
+    # param_ctr = 0
+    if config["other"]["calc_sigmas"]:
+        for i, (k, val) in enumerate(sigmas.items()):
+            # val = sigmas[0, param_ctr : param_ctr + sizes[k]]
+            if k == "fe":
+                sigma_fe = xr.DataArray(np.squeeze(val, axis=0), coords=(("v", config["velocity"]),))
+            else:
+                sigma_params[k] = xr.DataArray(np.squeeze(val, axis=0), coords=(("ind", [0]),))
+            # param_ctr += sizes[k]
+
         sigma_fe.to_netcdf(os.path.join(td, "binary", "sigma-fe.nc"))
         sigma_params = xr.Dataset(sigma_params)
         sigma_params.to_netcdf(os.path.join(td, "binary", "sigma-params.nc"))
@@ -129,8 +127,8 @@ def plot_angular(
     if config["other"]["calc_sigmas"]:
         ax[0].fill_between(
             xie,
-            (final_params["fe"] - config["plotting"]["n_sigmas"] * sigma_fe.data),
-            (final_params["fe"] + config["plotting"]["n_sigmas"] * sigma_fe.data),
+            (best_weights_val["fe"][0] - sigma_fe.data),
+            (best_weights_val["fe"][0] + sigma_fe.data),
             color="b",
             alpha=0.1,
         )
@@ -141,13 +139,13 @@ def plot_angular(
     ax[0].grid()
     # ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
     ax[0].set_title("$f_e$", fontsize=14)
-    ax[1].plot(np.log10(np.exp(final_dist["fe"])))
+    ax[1].plot(np.log10(np.exp(best_weights_val["fe"][0])))
     ax[1].set_xlabel("v/vth (points)", fontsize=14)
     ax[1].set_ylabel("f_e (log)")
     ax[1].grid()
     ax[1].set_ylim(-5, 0)
     ax[1].set_title("$f_e$", fontsize=14)
-    ax[2].plot(np.exp(final_dist["fe"]))
+    ax[2].plot(np.exp(best_weights_val["fe"][0]))
     ax[2].set_xlabel("v/vth (points)", fontsize=14)
     ax[2].set_ylabel("f_e")
     ax[2].grid()

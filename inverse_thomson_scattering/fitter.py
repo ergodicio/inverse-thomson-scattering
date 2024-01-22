@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import scipy.optimize as spopt
 
+# import parsl
+
 import jaxopt, mlflow, optax
 from tqdm import trange
 from jax.flatten_util import ravel_pytree
@@ -111,6 +113,25 @@ def _validate_inputs_(config: Dict) -> Dict:
     return config
 
 
+# @parsl.python_app
+def _run_one_angular_(init_weights, config, sa, batch):
+    """
+    This is a wrapper function to allow for the SciPy optimizer to be run in parallel
+
+    """
+    ts_fitter = TSFitter(config, sa, batch)
+    res = spopt.minimize(
+        ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
+        init_weights,
+        args=batch,
+        method=config["optimizer"]["method"],
+        jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+        bounds=ts_fitter.bounds,
+        options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
+    )
+    return ts_fitter.unravel_pytree(res["x"])
+
+
 def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, TSFitter]:
     """
     Performs angular thomson scattering i.e. ARTEMIS fitting exercise using the SciPy optimizer routines
@@ -144,26 +165,11 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
     ts_fitter = TSFitter(config, sa, batch)
     all_weights = {k: [] for k in ts_fitter.pytree_weights["active"].keys()}
     overall_loss = []
-    if config["optimizer"]["num_mins"] > 1:
-        print(Warning("multiple num mins doesnt work. only running once"))
+    # if config["optimizer"]["num_mins"] > 1:
+    # print(Warning("multiple num mins doesnt work. only running once"))
     for i in range(config["optimizer"]["ensemble_size"]):
-        ts_fitter = TSFitter(config, sa, batch)
-        init_weights = copy.deepcopy(ts_fitter.flattened_weights)
-
-        ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
-            0.97, 1.03, len(ts_fitter.flattened_weights)
-        )
-        res = spopt.minimize(
-            ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
-            init_weights,
-            args=batch,
-            method=config["optimizer"]["method"],
-            jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-            bounds=ts_fitter.bounds,
-            options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
-        )
-        these_weights = ts_fitter.unravel_pytree(res["x"])
-
+        init_weights = ts_fitter.flattened_weights * (1 + 0.01 * np.random.uniform(ts_fitter.flattened_weights.size))
+        these_weights = _run_one_angular_(init_weights, config, sa, batch)
         for k in all_weights.keys():
             all_weights[k].append(these_weights[k])
 

@@ -74,12 +74,6 @@ def recalculate_with_chosen_weights(
         for k in all_params.keys():
             all_params[k] = params[k].reshape(-1)
 
-        if calc_sigma:
-            active_params = ts_fitter.weights_to_params(fitted_weights, return_static_params=False)
-            hess = ts_fitter.h_loss_wrt_params(active_params, batch)
-            sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-            # print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
-
     else:
         for i_batch, inds in enumerate(batch_indices):
             batch = {
@@ -259,13 +253,13 @@ def _sigmas_and_plots_(config, fitted_weights, batch_indices, all_data, ts_fitte
         os.makedirs(os.path.join(td, "binary"), exist_ok=True)
         os.makedirs(os.path.join(td, "csv"), exist_ok=True)
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
-            best_weights_val = {}
-            best_weights_std = {}
+            mean_vals = {}
+            sigmas = {}
             for k, v in fitted_weights.items():
-                best_weights_val[k] = np.average(v, axis=0)  # [0, :]
-                best_weights_std[k] = np.std(v, axis=0)  # [0, :]
-            losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
-                config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], best_weights_val
+                mean_vals[k] = np.average(v, axis=0)
+                sigmas[k] = np.std(v, axis=0)
+            losses, sqdevs, used_points, fits, _, all_params = recalculate_with_chosen_weights(
+                config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], mean_vals
             )
             mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
             mlflow.set_tag("status", "plotting")
@@ -281,8 +275,7 @@ def _sigmas_and_plots_(config, fitted_weights, batch_indices, all_data, ts_fitte
                 sqdevs,
                 sigmas,
                 td,
-                best_weights_val,
-                best_weights_std,
+                mean_vals,
             )
             mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
         else:
