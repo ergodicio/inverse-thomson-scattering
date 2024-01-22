@@ -183,11 +183,11 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
 
     mlflow.log_metrics({"refitting time": round(time.time() - t1, 2)})
 
-    final_params = _sigmas_and_plots_(config, fitted_weights, batch_indices, all_data, ts_fitter, all_axes)
+    final_params, sigmas = _sigmas_and_plots_(config, fitted_weights, batch_indices, all_data, ts_fitter, all_axes)
 
     mlflow.set_tag("status", "done plotting")
 
-    return final_params
+    return final_params, sigmas
 
 
 def _get_refitted_1d_weights(config, batch_indices, all_data, ts_fitter, fitted_weights):
@@ -291,4 +291,4 @@ def _sigmas_and_plots_(config, fitted_weights, batch_indices, all_data, ts_fitte
             mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
         mlflow.log_artifacts(td)
 
-    return final_params
+    return final_params, sigmas

@@ -98,7 +98,7 @@ def _run_(config: Dict, mode: str = "fit"):
     utils.log_params(config)
     t0 = time.time()
     if mode == "fit":
-        fit_results, loss = fitter.fit(config=config)
+        fit_results, sigmas, loss = fitter.fit(config=config)
     elif mode == "forward":
         calc_spec(config=config)
     metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}

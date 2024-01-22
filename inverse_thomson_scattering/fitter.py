@@ -129,7 +129,7 @@ def _run_one_angular_(init_weights, config, sa, batch):
         bounds=ts_fitter.bounds,
         options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
     )
-    return ts_fitter.unravel_pytree(res["x"])
+    return res
 
 
 def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, TSFitter]:
@@ -169,7 +169,8 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
     # print(Warning("multiple num mins doesnt work. only running once"))
     for i in range(config["optimizer"]["ensemble_size"]):
         init_weights = ts_fitter.flattened_weights * (1 + 0.01 * np.random.uniform(ts_fitter.flattened_weights.size))
-        these_weights = _run_one_angular_(init_weights, config, sa, batch)
+        res = _run_one_angular_(init_weights, config, sa, batch)
+        these_weights = ts_fitter.unravel_pytree(res["x"])
         for k in all_weights.keys():
             all_weights[k].append(these_weights[k])
 
@@ -397,7 +398,7 @@ def one_d_loop(
     return all_weights, overall_loss, ts_fitter
 
 
-def fit(config) -> Tuple[pd.DataFrame, float]:
+def fit(config) -> Tuple[pd.DataFrame, Dict, float]:
     """
     This function fits the Thomson scattering spectral density function to experimental data, or plots specified spectra. All inputs are derived from the input dictionary config.
 
@@ -444,6 +445,6 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
     mlflow.set_tag("status", "postprocessing")
 
-    final_params = postprocess.postprocess(config, batch_indices, all_data, all_axes, ts_fitter, fitted_weights)
+    final_params, sigmas = postprocess.postprocess(config, batch_indices, all_data, all_axes, ts_fitter, fitted_weights)
 
-    return final_params, float(overall_loss)
+    return final_params, sigmas, float(overall_loss)
