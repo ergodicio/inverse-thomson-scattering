@@ -45,6 +45,8 @@ parameters.
 
 - ``m`` is the electron distribution function super-Gaussian parameter
 
+- ``fe`` contains additional options for controlling the distribution function *more info to come*
+
 
 MLFlow
 --------------
@@ -85,7 +87,7 @@ The ``data:`` section contains the specifics on which shot and what region of th
 Other options
 --------------------
  
-The ``other:`` section includes options specifieying the types of data that are being fit and other options 
+The ``other:`` section includes options specifying the types of data that are being fit and other options
 on how to perform the fit.
 
 - ``load_ion_spec`` is a boolean determining if IAW data will be loaded.
