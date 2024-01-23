@@ -20,8 +20,8 @@ def _queue_run_(machine, run_id):
         base_job = fh.read()
 
     with open(os.path.join(os.getcwd(), "new_job.sh"), "w") as job_file:
-        job_file.write(base_job)
-        job_file.writelines(f"srun python run_tsadar.py --type remote --run_id {run_id}")
+        job_file.write(base_job + "\n")
+        job_file.writelines(f"srun python run_tsadar.py --mode fit --run_id {run_id}")
 
     os.system(f"sbatch new_job.sh")
     time.sleep(0.1)
