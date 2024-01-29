@@ -62,11 +62,9 @@ def get_num_dist_func(fe_type, xie):
     # nameCur = fe_type
     fe_type = list(fe_type.keys())[0]
     nameCur = fe_type
-    #print(nameCur)
-    #print(xs)
+    # print(nameCur)
+    # print(xs)
 
-    
-    
     # # Generate Table Name
     # if len(args) == 0:
     #     args = tuple([nameCur])
@@ -112,7 +110,7 @@ def get_num_dist_func(fe_type, xie):
         # elif len(curDist) == 2:
         # X1, X2 = np.meshgrid(xs[ci], m)
 
-        #raise NameError("Table names with non-default values is currently not supported")
+        # raise NameError("Table names with non-default values is currently not supported")
         m_float_inds = jnp.array(jnp.interp(m, params["m"], np.linspace(0, params["m"].size - 1, params["m"].size)))
         m_float_inds = m_float_inds.reshape((1,))
         ind_x_mesh, ind_m_mesh = jnp.meshgrid(x_float_inds, m_float_inds)
