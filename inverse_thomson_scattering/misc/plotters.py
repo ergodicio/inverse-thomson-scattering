@@ -31,7 +31,7 @@ def plot_angular(
             dist[k] = pandas.Series(v[0])
             dist["v"] = pandas.Series(config["velocity"])
         else:
-            all_params[k] = pandas.Series(v)
+            all_params[k] = pandas.Series(v.reshape(-1))
 
     final_params = pandas.DataFrame(all_params)
     final_params.to_csv(os.path.join(td, "csv", "learned_parameters.csv"))
@@ -439,22 +439,22 @@ def model_v_actual(
     sorted_losses, sorted_data, sorted_fits, num_plots, td, config, loss_inds, yaxis, sorted_sqdev, sorted_red_losses
 ):
     if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
-        ele_s_ind = np.argmin(np.abs(yaxis[0] - config["other"]["ele_window_start"]))
-        ele_e_ind = np.argmin(np.abs(yaxis[0] - config["other"]["ele_window_end"]))
-        ion_s_ind = np.argmin(np.abs(yaxis[1] - config["other"]["ion_window_start"]))
-        ion_e_ind = np.argmin(np.abs(yaxis[1] - config["other"]["ion_window_end"]))
+        ele_s_ind = np.argmin(np.abs(yaxis[0] - config["plotting"]["ele_window_start"]))
+        ele_e_ind = np.argmin(np.abs(yaxis[0] - config["plottting"]["ele_window_end"]))
+        ion_s_ind = np.argmin(np.abs(yaxis[1] - config["plottting"]["ion_window_start"]))
+        ion_e_ind = np.argmin(np.abs(yaxis[1] - config["plottting"]["ion_window_end"]))
         s_ind = [ele_s_ind, ion_s_ind]
         e_ind = [ele_e_ind, ion_e_ind]
     elif config["other"]["extraoptions"]["load_ion_spec"]:
-        s_ind = [np.argmin(np.abs(yaxis - config["other"]["ion_window_start"]))]
-        e_ind = [np.argmin(np.abs(yaxis - config["other"]["ion_window_end"]))]
+        s_ind = [np.argmin(np.abs(yaxis - config["plottting"]["ion_window_start"]))]
+        e_ind = [np.argmin(np.abs(yaxis - config["plottting"]["ion_window_end"]))]
         sorted_data = [sorted_data]
         sorted_fits = [sorted_fits]
         sorted_sqdev = [sorted_sqdev]
 
     elif config["other"]["extraoptions"]["load_ele_spec"]:
-        s_ind = [np.argmin(np.abs(yaxis - config["other"]["ele_window_start"]))]
-        e_ind = [np.argmin(np.abs(yaxis - config["other"]["ele_window_end"]))]
+        s_ind = [np.argmin(np.abs(yaxis - config["plottting"]["ele_window_start"]))]
+        e_ind = [np.argmin(np.abs(yaxis - config["plottting"]["ele_window_end"]))]
         sorted_data = [sorted_data]
         sorted_fits = [sorted_fits]
         sorted_sqdev = [sorted_sqdev]

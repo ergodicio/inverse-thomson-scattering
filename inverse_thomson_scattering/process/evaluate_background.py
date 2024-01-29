@@ -1,4 +1,5 @@
-# Contains two functions one which quantifies the background for full images and one whcih quantifies the background for individual lineouts
+from typing import Tuple
+
 import numpy as np
 import scipy.optimize as spopt
 import matplotlib.pyplot as plt
@@ -10,6 +11,17 @@ from inverse_thomson_scattering.process.correct_throughput import correctThrough
 
 
 def get_shot_bg(config, axisyE, elecData):
+    """
+    Quantify the background for full images
+
+    Args:
+        config:
+        axisyE:
+        elecData:
+
+    Returns:
+
+    """
     if config["data"]["background"]["type"] == "Shot":
         [BGele, BGion, _, _] = loadData(
             config["data"]["background"]["slice"], config["data"]["shotDay"], config["other"]["extraoptions"]
@@ -62,23 +74,32 @@ def get_shot_bg(config, axisyE, elecData):
 
 def get_lineout_bg(
     config, elecData, ionData, BGele, BGion, LineoutTSE_smooth, BackgroundPixel, LineoutPixelE, LineoutPixelI
-):
+) -> Tuple[np.ndarray, np.ndarray]:
     """
-    This function generates noise or background profiles to based off the data or background data. Electron spectra have 2 options "Fit" and "pixel". These specify how forground data is treated. Noise is then the sum of forground and background noise. Ions only have one background option as the background is usualy very small
-    
-    "Fit" : fits a rational model against the edges of the lineout to produce a background, the model can be changed. This option functions differently for angular data and is handled by the function get_shot_bg. This option makes no attempt to remove a background shot, using both can result in double counting. This option is best for imaging data.
-    
-    "pixel : the other options "ps" and "auto" are aliases for "pixel" where the background pixel is instead idenitifed by a time ("ps") or set to 100 pixels past the lineout ("auto"). This method uses another linout of the data that is smoothed to act as the background. If included a background shot is removed to prevent double counting. This option is best for time resolved data.
+    This function generates noise or background profiles to based off the data or background data.
+    Electron spectra have 2 options "Fit" and "pixel". These specify how foreground data is treated.
+    Noise is then the sum of foreground and background noise. Ions only have one background option as the background is
+    usually very small
+
+    "Fit" : fits a rational model against the edges of the lineout to produce a background, the model can be changed.
+    This option functions differently for angular data and is handled by the function get_shot_bg. This option makes no
+    attempt to remove a background shot, using both can result in double counting. This option is best for imaging data.
+
+    "pixel : the other options "ps" and "auto" are aliases for "pixel" where the background pixel is instead identified
+    by a time ("ps") or set to 100 pixels past the lineout ("auto"). This method uses another lint of the data that is
+     smoothed to act as the background. If included a background shot is removed to prevent double counting. This option
+      is best for time resolved data.
     """
     span = 2 * config["data"]["dpixel"] + 1  # (span must be odd)
 
     if config["data"]["background"]["type"] not in ["Fit", "Shot", "pixel"]:
         raise NotImplementedError("Background type must be: 'Fit', 'Shot', or 'pixel'")
-    
+
     if config["other"]["extraoptions"]["load_ele_spec"]:
         if config["data"]["background"]["type"] == "Fit":
             if config["other"]["extraoptions"]["spectype"] != "angular":
-                # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but should be checked in more situations
+                # exp2 bg seems to be the best for some imaging data while rat11 is better in other cases but
+                # should be checked in more situations
                 bgfitx = np.hstack([np.arange(100, 200), np.arange(800, 1023)])
 
                 def exp2(x, a, b, c, d):
@@ -106,9 +127,9 @@ def get_lineout_bg(
                         plt.plot(rat11(np.arange(1024), *rat1bg))
                         plt.plot(LineoutTSE_smooth[i])
                         plt.show()
-                    
+
                     LineoutBGE.append(rat11(np.arange(1024), *rat1bg))
-        #if not fit
+        # if not fit
         else:
             # quantify a background lineout
             LineoutBGE = np.mean(
@@ -130,7 +151,7 @@ def get_lineout_bg(
                 )  # this is specificaly targeted at streaked data, removes the fiducials at top and bottom and notch filter
                 bgfitx2 = np.hstack([np.arange(250, 300), np.arange(700, 900)])
                 plt.plot(bgfitx, LineoutBGE[bgfitx])
-                
+
                 [expbg, _] = spopt.curve_fit(exp2, bgfitx, LineoutBGE[bgfitx], p0=[200, 0.001, 200, 0.001])
                 LineoutBGE = config["data"]["bgscaleE"] * exp2(np.arange(1024), *expbg)
 
@@ -152,7 +173,7 @@ def get_lineout_bg(
                 #     plt.plot(bgfitx, lin[bgfitx])
                 #     plt.show()
 
-        #add background from background shot is applicable
+        # add background from background shot is applicable
         if np.shape(BGele) == tuple(config["other"]["CCDsize"]):
             LineoutBGE2 = [
                 np.mean(BGele[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1)
@@ -161,19 +182,18 @@ def get_lineout_bg(
             noiseE = LineoutBGE + np.array(LineoutBGE2)
         else:
             noiseE = LineoutBGE * np.ones((len(LineoutPixelE), 1))
-            
+
         # constant addition to the background
         noiseE += config["other"]["flatbg"]
 
     else:
         noiseE = np.zeros(len(config["data"]["lineouts"]["val"]))
-    
-    
+
     if config["other"]["extraoptions"]["load_ion_spec"]:
-        #Due to the low background associated with IAWs the fitted background is only performed for the EPW
+        # Due to the low background associated with IAWs the fitted background is only performed for the EPW
         if config["data"]["background"]["type"] == "Fit":
             BackgroundPixel = config["data"]["background"]["slice"]
-        
+
         # quantify a uniform background
         noiseI = np.mean(
             (ionData - BGion)[
@@ -189,9 +209,7 @@ def get_lineout_bg(
         # add the uniform background to the background from the background shot
         if np.shape(BGion) == tuple(config["other"]["CCDsize"]):
             LineoutBGI = [
-                np.mean(
-                    BGion[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1
-                )
+                np.mean(BGion[:, a - config["data"]["dpixel"] : a + config["data"]["dpixel"]], axis=1)
                 for a in LineoutPixelI
             ]
             noiseI = noiseI + LineoutBGI

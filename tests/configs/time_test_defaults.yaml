@@ -95,14 +95,6 @@ parameters:
         active: False
 
 other:
-    crop_window: 256
-    ion_window_start: 525
-    ion_window_end: 528
-    ele_window_start: 425
-    ele_window_end: 625
-    BinWidth: 10
-    NumBinInRng: 0
-    TotalNumBin: 1023
     expandedions: False
     extraoptions:
         load_ion_spec: False
@@ -159,6 +151,10 @@ plotting:
     rolling_std_width: 5
     data_cbar_u: 10
     data_cbar_l: 0
+    ion_window_start: 525
+    ion_window_end: 528
+    ele_window_start: 425
+    ele_window_end: 625
     
 optimizer:
     # use adam for nn / stochastic gradient descent

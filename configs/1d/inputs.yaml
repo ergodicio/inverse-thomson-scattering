@@ -20,7 +20,7 @@ parameters:
         lb: 523.0
         ub: 528.0
     Te:
-        val: .600
+        val: .64
         active: True
         lb: 0.01
         ub: 1.5
@@ -31,20 +31,20 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: 0.060
+        val: 0.16
         active: True
         lb: 0.001
         ub: 1.0
     Z:
-        val: [14., 1.]
+        val: [1., 14.]
         active: True
         lb: 0.5
         ub: 7.0
     A:
-        val: [40., 1.]
+        val: [1., 40.]
         active: False
     fract:
-        val: [.05, .95]
+        val: [.95, .05]
         active: False
     ud:
         val: 0.0
@@ -112,6 +112,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: Ar-H2-05-96-Z14-Te600-Ti60
-    
+    run: Ar-H2-05-95-t1000-corrected
+
 machine: gpu

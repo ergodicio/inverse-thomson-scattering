@@ -1,7 +1,8 @@
 Best practices for fitting
 ---------------------------------
 
-It is recommended start fitting data with a coarse resolution in order to identify the rough plasma conditions. These conditions can then be used as the initial conditions for a fine resolution fit.
+It is recommended start fitting data with a coarse resolution in order to identify the rough plasma conditions.
+These conditions can then be used as the initial conditions for a fine resolution fit.
 
 
 
@@ -9,7 +10,8 @@ It is recommended start fitting data with a coarse resolution in order to identi
 Background and lineout selection
 ---------------------------------
 
-There are multiple options for background algorithms and types of fitting. These tend to be the best options for various data types. All of these options are editable in the input deck.
+There are multiple options for background algorithms and types of fitting. These tend to be the best options for various
+data types. All of these options are editable in the input deck.
 
 **Best operation for time resolved data:**
 

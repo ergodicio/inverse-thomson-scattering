@@ -4,9 +4,24 @@ from jax import vmap
 from inverse_thomson_scattering.model.physics.generate_spectra import FitModel
 from inverse_thomson_scattering.process import irf
 
+"""
+This is the class that generates the spectrum (?)
+
+TODO 
+
+"""
 
 class SpectrumCalculator:
+    """
+    TODO
+
+    Args:
+        cfg:
+        sas:
+        dummy_batch:
+    """
     def __init__(self, cfg, sas, dummy_batch):
+
         super().__init__()
         self.cfg = cfg
         self.sas = sas
@@ -26,6 +41,20 @@ class SpectrumCalculator:
             self.vmap_postprocess_thry = vmap(self.postprocess_thry)
 
     def postprocess_thry(self, modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
+        """
+        TODO
+
+        Args:
+            modlE:
+            modlI:
+            lamAxisE:
+            lamAxisI:
+            amps:
+            TSins:
+
+        Returns:
+
+        """
         if self.cfg["other"]["extraoptions"]["load_ion_spec"]:
             lamAxisI, ThryI = irf.add_ion_IRF(self.cfg, lamAxisI, modlI, amps["i_amps"], TSins)
         else:
@@ -45,6 +74,18 @@ class SpectrumCalculator:
         return ThryE, ThryI, lamAxisE, lamAxisI
 
     def reduce_ATS_to_resunit(self, ThryE, lamAxisE, TSins, batch):
+        """
+        TODO
+
+        Args:
+            ThryE:
+            lamAxisE:
+            TSins:
+            batch:
+
+        Returns:
+
+        """
         lam_step = round(ThryE.shape[1] / batch["e_data"].shape[1])
         ang_step = round(ThryE.shape[0] / self.cfg["other"]["CCDsize"][0])
 
@@ -60,6 +101,16 @@ class SpectrumCalculator:
         return ThryE, lamAxisE
 
     def __call__(self, params, batch):
+        """
+        TODO
+
+        Args:
+            params:
+            batch:
+
+        Returns:
+
+        """
         modlE, modlI, lamAxisE, lamAxisI, live_TSinputs = self.vmap_forward_pass(params)  # , sas["weights"])
         ThryE, ThryI, lamAxisE, lamAxisI = self.vmap_postprocess_thry(
             modlE, modlI, lamAxisE, lamAxisI, {"e_amps": batch["e_amps"], "i_amps": batch["i_amps"]}, live_TSinputs

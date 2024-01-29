@@ -26,3 +26,4 @@ dependencies:
       - tqdm
       - xarray
       - mlflow_export_import
+      - pandas

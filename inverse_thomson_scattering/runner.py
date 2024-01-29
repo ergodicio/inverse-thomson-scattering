@@ -1,4 +1,5 @@
 import time, os
+from typing import Dict, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,7 +11,7 @@ from flatten_dict import flatten, unflatten
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc.calibration import get_scattering_angles
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.model.loss_function import TSFitter
+from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.fitter import init_param_norm_and_shift
 from inverse_thomson_scattering.misc import utils
 
@@ -21,7 +22,7 @@ else:
     BASE_TEMPDIR = None
 
 
-def load_and_make_folders(cfg_path):
+def load_and_make_folders(cfg_path: str) -> Tuple[str, Dict]:
     """
     This is used to queue runs on NERSC
 
@@ -58,7 +59,7 @@ def load_and_make_folders(cfg_path):
     return mlflow_run.info.run_id, all_configs
 
 
-def run(cfg_path, mode):
+def run(cfg_path: str, mode: str) -> str:
     """
     Wrapper for lower level runner
 
@@ -79,7 +80,7 @@ def run(cfg_path, mode):
     return run_id
 
 
-def _run_(config, mode="fit"):
+def _run_(config: Dict, mode: str = "fit"):
     """
     Either performs a forward pass or an entire fitting routine
 
@@ -105,7 +106,7 @@ def _run_(config, mode="fit"):
     mlflow.set_tag("status", "completed")
 
 
-def run_job(run_id, nested):
+def run_job(run_id: str, nested: bool):
     """
     This is used to run queued runs on NERSC. It picks up the `run_id` and finds that using MLFlow and does the fitting
 
@@ -134,7 +135,17 @@ def run_job(run_id, nested):
         utils.export_run(run_id)
 
 
-def calc_spec(config):
+def calc_spec(config: Dict):
+    """
+    Just performs a forward pass
+
+
+    Args:
+        config:
+
+    Returns:
+
+    """
     # get scattering angles and weights
     config["optimizer"]["batch_size"] = 1
     config["other"]["extraoptions"]["spectype"] = "temporal"
@@ -148,11 +159,11 @@ def calc_spec(config):
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
     if config["parameters"]["fe"]["symmetric"]:
         config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-        
+
     NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
     if not config["parameters"]["fe"]["val"]:
         config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
-    
+
     config["units"] = init_param_norm_and_shift(config)
 
     sas = get_scattering_angles(config)
@@ -188,7 +199,7 @@ def calc_spec(config):
 
     ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
     ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
-        
+
     with tempfile.TemporaryDirectory() as td:
         ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
         ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))
@@ -196,7 +207,7 @@ def calc_spec(config):
         mlflow.log_artifacts(td)
     plt.close(fig)
 
-    
+
 def calc_series(config):
     # get scattering angles and weights
     config["optimizer"]["batch_size"] = 1
@@ -211,11 +222,11 @@ def calc_series(config):
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
     if config["parameters"]["fe"]["symmetric"]:
         config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-        
+
     NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
     if not config["parameters"]["fe"]["val"]:
         config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
-    
+
     config["units"] = init_param_norm_and_shift(config)
 
     sas = get_scattering_angles(config)
@@ -227,14 +238,14 @@ def calc_series(config):
         "e_amps": 1,
         "i_amps": 1,
     }
-    
+
     ThryE=[None]*len(config["series"]["vals"])
     ThryI=[None]*len(config["series"]["vals"])
     lamAxisE=[None]*len(config["series"]["vals"])
     lamAxisI=[None]*len(config["series"]["vals"])
     for i,val in enumerate(config["series"]["vals"]):
         config["parameters"][config["series"]["param"]]["val"] = val
-        
+
         ts_fitter = TSFitter(config, sas, dummy_batch)
         params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
         ThryE[i], ThryI[i], lamAxisE[i], lamAxisI[i] = ts_fitter.spec_calc(params, dummy_batch)
@@ -243,7 +254,7 @@ def calc_series(config):
     ThryI = np.array(ThryI)
     lamAxisE = np.array(lamAxisE)
     lamAxisI = np.array(lamAxisI)
-    
+
     fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
     ax[0].plot(lamAxisE.transpose(), ThryE.transpose())
     ax[0].set_title("Simulated Data, fontsize=14")
@@ -271,7 +282,7 @@ def calc_series(config):
     ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
     ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
     #ion_data = xr.Dataset(
-        
+
     with tempfile.TemporaryDirectory() as td:
         ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
         ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))

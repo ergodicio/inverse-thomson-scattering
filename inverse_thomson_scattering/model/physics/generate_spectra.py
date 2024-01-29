@@ -1,3 +1,5 @@
+from typing import Dict
+
 from inverse_thomson_scattering.model.physics.form_factor import FormFactor
 #from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
@@ -6,14 +8,32 @@ from jax import numpy as jnp
 
 
 class FitModel:
-    def __init__(self, config, sa):
+    """
+    TODO
+
+    Args:
+        config:
+        sa:
+    """
+
+    def __init__(self, config: Dict, sa):
         self.config = config
         self.sa = sa
         self.electron_form_factor = FormFactor(config["other"]["lamrangE"], npts=config["other"]["npts"])
         self.ion_form_factor = FormFactor(config["other"]["lamrangI"], npts=config["other"]["npts"])
         self.num_dist_func = DistFunc(config)
 
-    def __call__(self, all_params):
+    def __call__(self, all_params: Dict):
+        """
+        TODO
+
+
+        Args:
+            all_params:
+
+        Returns:
+
+        """
         for key in self.config["parameters"].keys():
             if key != "fe":
                 all_params[key] = jnp.squeeze(all_params[key])
