@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import scipy.optimize as spopt
 
+# import parsl
+
 import jaxopt, mlflow, optax
 from tqdm import trange
 from jax.flatten_util import ravel_pytree
@@ -63,6 +65,15 @@ def _validate_inputs_(config: Dict) -> Dict:
     Returns: Dict
 
     """
+    if config["other"]["calc_sigmas"]:
+        if config["optimizer"]["batch_size"] > 1:
+            print("batch size must be 1 to calculate sigmas, setting batch_size to 1")
+            config["optimizer"]["batch_size"] = 1
+
+    if "spectype" in config["other"]["extraoptions"]:
+        if config["other"]["extraoptions"]["spectype"] == "angular":
+            print("Running Angular, setting batch_size to 1")
+
     # get derived quantities
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
     if config["parameters"]["fe"]["symmetric"]:
@@ -102,6 +113,25 @@ def _validate_inputs_(config: Dict) -> Dict:
     return config
 
 
+# @parsl.python_app
+def _run_one_angular_(init_weights, config, sa, batch):
+    """
+    This is a wrapper function to allow for the SciPy optimizer to be run in parallel
+
+    """
+    ts_fitter = TSFitter(config, sa, batch)
+    res = spopt.minimize(
+        ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
+        init_weights,
+        args=batch,
+        method=config["optimizer"]["method"],
+        jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+        bounds=ts_fitter.bounds,
+        options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
+    )
+    return res
+
+
 def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, TSFitter]:
     """
     Performs angular thomson scattering i.e. ARTEMIS fitting exercise using the SciPy optimizer routines
@@ -117,7 +147,7 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
     Returns:
 
     """
-    print("Running Angular, setting batch_size to 1")
+
     config["optimizer"]["batch_size"] = 1
     batch = {
         "e_data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
@@ -134,58 +164,45 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
 
     ts_fitter = TSFitter(config, sa, batch)
     all_weights = {k: [] for k in ts_fitter.pytree_weights["active"].keys()}
-
-    if config["optimizer"]["num_mins"] > 1:
-        print(Warning("multiple num mins doesnt work. only running once"))
-    for i in range(1):
-        ts_fitter = TSFitter(config, sa, batch)
-        init_weights = copy.deepcopy(ts_fitter.flattened_weights)
-
-        # ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
-        #     0.97, 1.03, len(ts_fitter.flattened_weights)
-        # )
-        res = spopt.minimize(
-            ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
-            init_weights,
-            args=batch,
-            method=config["optimizer"]["method"],
-            jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-            bounds=ts_fitter.bounds,
-            options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
-        )
+    overall_loss = []
+    # if config["optimizer"]["num_mins"] > 1:
+    # print(Warning("multiple num mins doesnt work. only running once"))
+    for i in range(config["optimizer"]["ensemble_size"]):
+        init_weights = ts_fitter.flattened_weights * (1 + 0.01 * np.random.uniform(ts_fitter.flattened_weights.size))
+        res = _run_one_angular_(init_weights, config, sa, batch)
         these_weights = ts_fitter.unravel_pytree(res["x"])
         for k in all_weights.keys():
             all_weights[k].append(these_weights[k])
 
-        if i == config["optimizer"]["num_mins"] - 1:
-            break
-        config["parameters"]["fe"]["length"] = (
-            config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
-        )
-        refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-        if config["parameters"]["fe"]["symmetric"]:
-            refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+        # if i == config["optimizer"]["num_mins"] - 1:
+        #     break
+        # config["parameters"]["fe"]["length"] = (
+        #     config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
+        # )
+        # refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+        # if config["parameters"]["fe"]["symmetric"]:
+        #     refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+        #
+        # refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(these_weights["fe"]))
+        #
+        # config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
+        # config["velocity"] = refined_v
+        # config["parameters"]["ne"]["val"] = these_weights["ne"].squeeze()
+        # config["parameters"]["Te"]["val"] = these_weights["Te"].squeeze()
+        #
+        # config["parameters"]["fe"]["ub"] = -0.5
+        # config["parameters"]["fe"]["lb"] = -50
+        # config["parameters"]["fe"]["lb"] = np.multiply(
+        #     config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
+        # )
+        # config["parameters"]["fe"]["ub"] = np.multiply(
+        #     config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
+        # )
+        # config["units"] = init_param_norm_and_shift(config)
 
-        refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(these_weights["fe"]))
+        overall_loss.append(res["fun"])
 
-        config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
-        config["velocity"] = refined_v
-        config["parameters"]["ne"]["val"] = these_weights["ne"].squeeze()
-        config["parameters"]["Te"]["val"] = these_weights["Te"].squeeze()
-
-        config["parameters"]["fe"]["ub"] = -0.5
-        config["parameters"]["fe"]["lb"] = -50
-        config["parameters"]["fe"]["lb"] = np.multiply(
-            config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
-        )
-        config["parameters"]["fe"]["ub"] = np.multiply(
-            config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
-        )
-        config["units"] = init_param_norm_and_shift(config)
-
-    overall_loss = res["fun"]
-
-    return all_weights, overall_loss, ts_fitter
+    return all_weights, np.mean(overall_loss), ts_fitter
 
 
 def angular_adam(config, all_data, sa, batch_indices, num_batches):
@@ -305,7 +322,7 @@ def _1d_scipy_loop_(config: Dict, ts_fitter: TSFitter, previous_weights: np.ndar
         method=config["optimizer"]["method"],
         jac=True if config["optimizer"]["grad_method"] == "AD" else False,
         bounds=ts_fitter.bounds,
-        options={"disp": True, "maxiter": 1000},
+        options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
     )
 
     best_loss = res["fun"]
@@ -381,7 +398,7 @@ def one_d_loop(
     return all_weights, overall_loss, ts_fitter
 
 
-def fit(config) -> Tuple[pd.DataFrame, float]:
+def fit(config) -> Tuple[pd.DataFrame, Dict, float]:
     """
     This function fits the Thomson scattering spectral density function to experimental data, or plots specified spectra. All inputs are derived from the input dictionary config.
 
@@ -428,6 +445,6 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
     mlflow.set_tag("status", "postprocessing")
 
-    final_params = postprocess.postprocess(config, batch_indices, all_data, all_axes, ts_fitter, sa, fitted_weights)
+    final_params, sigmas = postprocess.postprocess(config, batch_indices, all_data, all_axes, ts_fitter, fitted_weights)
 
-    return final_params, float(overall_loss)
+    return final_params, sigmas, float(overall_loss)

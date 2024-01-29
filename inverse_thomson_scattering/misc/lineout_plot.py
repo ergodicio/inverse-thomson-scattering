@@ -4,6 +4,23 @@ import os
 
 
 def lineout_plot(sorted_data, sorted_fits, sorted_sqdev, yaxis, s_ind, e_ind, titlestr, filename, td, tag):
+    """
+    This is used to plot the lineouts of the data, fits, and residuals
+    Args:
+        sorted_data:
+        sorted_fits:
+        sorted_sqdev:
+        yaxis:
+        s_ind:
+        e_ind:
+        titlestr:
+        filename:
+        td:
+        tag:
+
+    Returns:
+
+    """
     if len(sorted_data) == 2:
         num_col = 2
     else:

@@ -9,6 +9,10 @@ from inverse_thomson_scattering.process.evaluate_background import get_lineout_b
 def get_lineouts(
     elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, shift_zero, IAWtime, xlab, sa, config
 ) -> Dict:
+    """
+    This function extracts the lineouts from the data and finds the background signal
+
+    """
     # Convert lineout locations to pixel
     if config["data"]["lineouts"]["type"] == "ps" or config["data"]["lineouts"]["type"] == "um":
         LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]

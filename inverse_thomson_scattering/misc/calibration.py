@@ -1,12 +1,24 @@
-# Supplies wavelength, space, time, and throughput calibrations based off of shot numbers including historical values
-# new calibration values should be added here as they are calculated
+from typing import Dict
 import numpy as np
 import scipy.io as sio
-from os.path import join, exists
+from os.path import join
 
 from inverse_thomson_scattering.misc.sa_table import sa_lookup
 
+
 def get_calibrations(shotNum, tstype, CCDsize):
+    """
+    Supplies wavelength, space, time, and throughput calibrations based off of shot numbers including historical values
+    new calibration values should be added here as they are calculated
+
+    Args:
+        shotNum:
+        tstype:
+        CCDsize:
+
+    Returns:
+
+    """
     stddev = dict()
     # Dispersions and calibrations
     if tstype == "angular":
@@ -29,7 +41,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         stddev["spect_FWHM_ele"] = 0.9  # nominally this is ~.8 or .9 for h2
         stddev["spect_stddev_ele"] = stddev["spect_FWHM_ele"] / 2.3548  # dummy
         stddev["ang_FWHM_ele"] = 1  # see Joe's FDR slides ~1-1.2
-        #IAWtime = 0  # means nothing here just kept to allow one code to be used for both
+        # IAWtime = 0  # means nothing here just kept to allow one code to be used for both
 
     elif tstype == "temporal":
         if shotNum < 105000:
@@ -45,8 +57,8 @@ def get_calibrations(shotNum, tstype, CCDsize):
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
 
-        elif shotNum <108950:
-            #these are calibrations for shot 108135
+        elif shotNum < 108950:
+            # these are calibrations for shot 108135
             EPWDisp = 0.4104
             IAWDisp = 0.005749
             EPWoff = 319.3
@@ -57,9 +69,9 @@ def get_calibrations(shotNum, tstype, CCDsize):
             # Sweep speed calculated from 5 Ghz comb (should be updated, date unknown)
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
-        
-        elif shotNum <108990:
-            #these are calibrations for shots 108964-
+
+        elif shotNum < 108990:
+            # these are calibrations for shots 108964-
             EPWDisp = 0.4104
             IAWDisp = 0.00959
             EPWoff = 135.0
@@ -84,7 +96,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
 
-       # IAWtime = 0  # temporal offset between EPW ross and IAW ross (varies shot to shot, can potentially add a fix based off the fiducials)
+    # IAWtime = 0  # temporal offset between EPW ross and IAW ross (varies shot to shot, can potentially add a fix based off the fiducials)
 
     else:
         if shotNum < 104000:
@@ -103,21 +115,21 @@ def get_calibrations(shotNum, tstype, CCDsize):
             IAWtcc = 1024 - 519  # 469;
 
         elif 106303 <= shotNum <= 106321:
-            #refractive teloscope used on 11/8/22
+            # refractive teloscope used on 11/8/22
             EPWDisp = 0.27594
             IAWDisp = 0.00437
-            EPWoff = 388.256  #390.256 worked for 106317
+            EPWoff = 388.256  # 390.256 worked for 106317
             IAWoff = 524.345
 
             stddev["spect_stddev_ion"] = 0.028  # needs to be checked
             stddev["spect_stddev_ele"] = 1.4365  # needs to be checked
 
-            magI = 2.89/.3746 *1.118  # um / px times strech factor accounting for tilt in view
-            magE = 5.13/.36175*1.118  # um / px times strech factor accounting for tilt in view
+            magI = 2.89 / 0.3746 * 1.118  # um / px times strech factor accounting for tilt in view
+            magE = 5.13 / 0.36175 * 1.118  # um / px times strech factor accounting for tilt in view
 
             EPWtcc = 1024 - 503  # 562;
             IAWtcc = 1024 - 578  # 469;
-            
+
         else:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.27093
@@ -128,13 +140,13 @@ def get_calibrations(shotNum, tstype, CCDsize):
             stddev["spect_stddev_ion"] = 0.028  # needs to be checked
             stddev["spect_stddev_ele"] = 1.4365  # needs to be checked
 
-            magI = 2.89 *1.079  # um / px times strech factor accounting for tilt in view
-            magE = 5.13 *1.079 # um / px times strech factor accounting for tilt in view
+            magI = 2.89 * 1.079  # um / px times strech factor accounting for tilt in view
+            magE = 5.13 * 1.079  # um / px times strech factor accounting for tilt in view
 
             EPWtcc = 1024 - 516  # 562;
             IAWtcc = 1024 - 450  # 469;
 
-        #IAWtime = 0  # means nothing here just kept to allow one code to be used for both
+        # IAWtime = 0  # means nothing here just kept to allow one code to be used for both
 
     ## Apply calibrations
     axisy = np.arange(1, CCDsize[0] + 1)
@@ -148,7 +160,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         if tstype == "imaging":
             axisxE = axisxE - EPWtcc * magE
             axisxI = axisxI - IAWtcc * magI
-            #axisxI = axisxI + 200
+            # axisxI = axisxI + 200
     else:
         imp = sio.loadmat(join("files", "angsFRED.mat"), variable_names="angsFRED")
         axisxE = imp["angsFRED"][0, :]
@@ -158,7 +170,15 @@ def get_calibrations(shotNum, tstype, CCDsize):
     return axisxE, axisxI, axisyE, axisyI, magE, stddev
 
 
-def get_scattering_angles(config):
+def get_scattering_angles(config: Dict) -> Dict:
+    """
+    Gets the scattering angles and weights for the given probe beam
+    Args:
+        config:
+
+    Returns:
+
+    """
     if config["other"]["extraoptions"]["spectype"] != "angular":
         sa = sa_lookup(config["data"]["probe_beam"])
     else:

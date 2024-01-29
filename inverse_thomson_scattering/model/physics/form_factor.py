@@ -38,6 +38,14 @@ def zprimeMaxw(xi):
 
 
 class FormFactor:
+    """
+    This class calculates the form factor for a given set of plasma conditions and scattering angles.
+
+    Args:
+        lamrang:
+        npts:
+    """
+
     def __init__(self, lamrang, npts):
         # basic quantities
         self.C = 2.99792458e10
@@ -138,12 +146,8 @@ class FormFactor:
         num_species = len(fract)
         num_ion_pts = jnp.shape(xii)
         chiI = jnp.zeros(num_ion_pts)
-        ZpiR = jnp.interp(
-            xii, self.xi2, self.Zpi[0, :], left=xii**-2, right=xii**-2
-        )
-        ZpiI = jnp.interp(
-            xii, self.xi2, self.Zpi[1, :], left=0, right=0
-        )
+        ZpiR = jnp.interp(xii, self.xi2, self.Zpi[0, :], left=xii**-2, right=xii**-2)
+        ZpiI = jnp.interp(xii, self.xi2, self.Zpi[1, :], left=0, right=0)
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
 
         # electron susceptibility
@@ -184,9 +188,7 @@ class FormFactor:
 
         chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
-        ratmod = jnp.exp(
-            jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF)))
-        )
+        ratmod = jnp.exp(jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF))))
         ratdf = jnp.gradient(ratmod, self.xi1[1] - self.xi1[0])
 
         def this_ratintn(this_dx):
@@ -198,10 +200,10 @@ class FormFactor:
         # else:
         #     chiERrat = jnp.interpn(jnp.arange(0, 2 * jnp.pi, 10**-1.2018), xi2, chiERratprim, beta, xie, "spline")
         chiERrat = -1.0 / (klde**2) * chiERrat
-        
+
         chiE = chiERrat + chiEI
         epsilon = 1.0 + chiE + chiI
-        
+
         # This line needs to be changed if ion distribution is changed!!!
         ion_comp_fact = jnp.transpose(fract * Z**2 / Zbar / vTi, [1, 0, 2, 3])
         ion_comp = ion_comp_fact * (
@@ -210,9 +212,8 @@ class FormFactor:
 
         ele_comp = (jnp.abs(1.0 + chiI)) ** 2.0 * fe_vphi / vTe
         # ele_compE = fe_vphi / vTe # commented because unused
-        
+
         SKW_ion_omg = 1.0 / k[..., jnp.newaxis] * ion_comp / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
-        
 
         SKW_ion_omg = jnp.sum(SKW_ion_omg, 3)
         SKW_ele_omg = 1.0 / k * (ele_comp) / ((jnp.abs(epsilon)) ** 2)
@@ -226,5 +227,4 @@ class FormFactor:
         formfactor = PsLam
         # formfactorE = PsLamE # commented because unused
 
-        
         return formfactor, lams

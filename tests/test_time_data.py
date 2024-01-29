@@ -1,7 +1,7 @@
-import time, pytest
+import time, pytest, itertools
 import multiprocessing as mp
 import yaml
-import mlflow
+import mlflow, numpy as np
 from flatten_dict import flatten, unflatten
 from numpy.testing import assert_allclose
 from jax import config
@@ -14,8 +14,8 @@ from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc import utils
 
 
-@pytest.mark.parametrize("nn", [False])
-def test_data(nn):
+@pytest.mark.parametrize("nn, method", itertools.product([False], ["adam", "l-bfgs-b"]))
+def test_data(nn, method):
     # Test #3: Data test, compare fit to a preknown fit result
     # currently just runs one line of shot 101675 for the electron, should be expanded in the future
 
@@ -33,6 +33,7 @@ def test_data(nn):
     config["parameters"]["Te"]["val"] = 0.5
     config["parameters"]["ne"]["val"] = 0.2  # 0.25
     config["parameters"]["m"]["val"] = 3.0  # 2.2
+    config["optimizer"]["method"] = method
 
     mlflow.set_experiment(config["mlflow"]["experiment"])
 
@@ -41,11 +42,12 @@ def test_data(nn):
         config["num_cores"] = int(mp.cpu_count())
 
         t0 = time.time()
-        fit_results, loss = fitter.fit(config=config)
+        fit_results, sigmas, loss = fitter.fit(config=config)
         metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
         mlflow.log_metrics(metrics=metrics_dict)
         mlflow.set_tag("status", "completed")
 
+        assert np.any(sigmas == 0) == False
         assert_allclose(fit_results["amp1"][0], 0.9257, rtol=1e-1)
         assert_allclose(fit_results["amp2"][0], 0.6727, rtol=1e-1)  # 0.98734!
         assert_allclose(fit_results["lam"][0], 524.2455, rtol=5e-3)

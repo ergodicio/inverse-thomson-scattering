@@ -76,6 +76,9 @@ def run(cfg_path: str, mode: str) -> str:
     with mlflow.start_run(run_id=run_id) as mlflow_run:
         _run_(config, mode=mode)
 
+    if "MLFLOW_EXPORT" in os.environ:
+        utils.export_run(run_id)
+
     return run_id
 
 
@@ -95,7 +98,7 @@ def _run_(config: Dict, mode: str = "fit"):
     utils.log_params(config)
     t0 = time.time()
     if mode == "fit":
-        fit_results, loss = fitter.fit(config=config)
+        fit_results, sigmas, loss = fitter.fit(config=config)
     elif mode == "forward":
         calc_spec(config=config)
     metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}

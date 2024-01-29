@@ -1,6 +1,16 @@
 import numpy as np
 
-def sa_lookup(beam):
+
+def sa_lookup(beam) -> dict:
+    """
+    Gets the scattering angles and weights for the given probe beam
+
+    Args:
+        beam:
+
+    Returns:
+
+    """
     if beam == "P9":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(
@@ -154,6 +164,6 @@ def sa_lookup(beam):
             ),
         )
     else:
-        raise NotImplmentedError("Other probe geometrries are not yet supported")
-    
+        raise NotImplementedError("Other probe geometrries are not yet supported")
+
     return sa
