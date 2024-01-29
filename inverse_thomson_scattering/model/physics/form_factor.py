@@ -223,3 +223,218 @@ class FormFactor:
 
         
         return formfactor, lams
+
+    
+    def calc_in_2D(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
+        """
+        NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions and scattering angles. The spectral density function is calculated with and without the ion contribution which can be set to an independent grid from the electron contribution. Distribution functions can be one or two dimensional and the appropriate susceptibility is calculated with the rational integration.
+
+
+
+        :param Te: electron temperature in keV [1 by number of plasma conditions]
+        :param Ti: ion temperature in keV [1 by number of ion species]
+        :param Z: ionization state [1 by number of ion species]
+        :param A: atomic mass [1 by number of ion species]
+        :param fract: relative ion composition [1 by number of ion species]
+        :param ne: electron density in 1e20 cm^-3 [1 by number of plasma conditions]
+        :param Va: flow velocity 2D vector
+        :param ud: drift velocity 2D vector
+        :param lamrang: wavelength range in nm [1 by 2]
+        :param lam: probe wavelength in nm
+        :param sa: scattering angle in degrees [1 by n]
+        :param fe: Distribution function (DF) and normalized velocity (x) for 1D distributions and
+        Distribution function (DF), normalized velocity (x), and angles from k_L to f1 in radians
+        :return:
+        """
+
+        Te, Ti, Z, A, fract, ne, Va, ud, fe = (
+            cur_Te,
+            params["Ti"],
+            params["Z"],
+            params["A"],
+            params["fract"],
+            cur_ne,
+            params["Va"],
+            params["ud"],
+            f_and_v,#this is now a DistFunc object
+        )
+
+        Mi = jnp.array(A) * self.Mp  # ion mass
+        re = 2.8179e-13  # classical electron radius cm
+        Esq = self.Me * self.C**2 * re  # sq of the electron charge keV cm
+        constants = jnp.sqrt(4 * jnp.pi * Esq / self.Me)
+        sarad = sa * jnp.pi / 180  # scattering angle in radians
+        sarad = jnp.reshape(sarad, [1, 1, -1])
+
+        Va = Va * 1e6  # flow velocity in 1e6 cm/s
+        ud = ud * 1e6  # drift velocity in 1e6 cm/s
+
+        omgL, omgs, lamAxis, _ = lam_parse.lamParse(self.lamrang, lam, npts=self.npts)  # , True)
+
+        # calculate k and omega vectors
+        omgpe = constants * jnp.sqrt(ne[..., jnp.newaxis, jnp.newaxis])  # plasma frequency Rad/cm
+        omgs = omgs[jnp.newaxis, ..., jnp.newaxis]
+        omg = omgs - omgL
+
+        kL = (jnp.sqrt(omgL**2 - omgpe**2) / self.C, jnp.zeros_like(omgpe)) #defined to be along the x axis
+        ks_mag = jnp.sqrt(omgs**2 - omgpe**2) / self.C
+        ks = (jnp.cos(sarad) * ks_mag, jnp.sin(sarad) * ks_mag)
+        k = vsub(ks, kL)#(ks[0]-kl[0], ks[1]-kl[1])
+
+        #kdotv = k * Va
+        omgdop = omg - vdot(k,Va)
+
+        # plasma parameters
+
+        # electrons
+        vTe = jnp.sqrt(Te[..., jnp.newaxis, jnp.newaxis] / self.Me)  # electron thermal velocity
+        klde = vdot((vTe / omgpe), k)
+
+        # ions
+        Z = jnp.reshape(Z, [1, 1, 1, -1])
+        Mi = jnp.reshape(Mi, [1, 1, 1, -1])
+        fract = jnp.reshape(fract, [1, 1, 1, -1])
+        Zbar = jnp.sum(Z * fract)
+        ni = fract * ne[..., jnp.newaxis, jnp.newaxis, jnp.newaxis] / Zbar
+        omgpi = constants * Z * jnp.sqrt(ni * self.Me / Mi)
+
+        vTi = jnp.sqrt(Ti / Mi)  # ion thermal velocity
+        #kldi = (vTi / omgpi) * (k[..., jnp.newaxis])
+        kldi = vdot((vTi / omgpi), v_add_dim(k))
+        
+        # ion susceptibilities
+        # finding derivative of plasma dispersion function along xii array
+        # proper handeling of multiple ion temperatures is not implemented
+        xii = vdot(1.0 / jnp.transpose((jnp.sqrt(2.0) * vTi), [1, 0, 2, 3]), vdiv(omgdop, v_add_dim(k))) #v0s
+        num_species = len(fract)
+        num_ion_pts = jnp.shape(xii[0])
+        chiI = jnp.zeros(num_ion_pts)
+        ZpiR = jnp.interp(
+            xii, self.xi2, self.Zpi[0, :], left=xii**-2, right=xii**-2
+        )
+        ZpiI = jnp.interp(
+            xii, self.xi2, self.Zpi[1, :], left=0, right=0
+        )
+        chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
+
+        # electron susceptibility
+        # calculating normilized phase velcoity(xi's) for electrons
+        xie = vsub(vdiv(omgdop, vdot(k, vTe)), vdiv(ud, vTe))
+
+        
+        DF, x = fe
+        
+        #for each vector in xie 
+        for element in xie:
+            #find the 1D coordinate for every point in the 2D velocity grid
+            element_mag = jnp.sqrt(vdot(element, element))
+            x_kspace = vdot(element, x) / element_mag
+            #take the weighted histogram in the region delta v
+            jnp.histogram(x_kspace, bins = [element_mag - weights = DF, 
+        x_kspace = vdot(xie, x) / jnp.sqrt(vdot(xie, xie))
+        
+        fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))
+
+        # elif len(fe) == 3:
+        #     [DF, x, thetaphi] = fe
+        #     # the angle each k makes with the anisotropy is calculated
+        #     thetak = jnp.pi - jnp.arcsin((ks / k) * jnp.sin(sarad))
+        #     thetak[:, omg < 0, :] = -jnp.arcsin((ks[omg < 0] / k[:, omg < 0, :]) * jnp.sin(sarad))
+        #     # arcsin can only return values from -pi / 2 to pi / 2 this attempts to find the real value
+        #     theta90 = jnp.arcsin((ks / k) * jnp.sin(sarad))
+        #     ambcase = bool((ks > kL / jnp.cos(sarad)) * (sarad < jnp.pi / 2))
+        #     thetak[ambcase] = theta90[ambcase]
+        #
+        #     beta = jnp.arccos(
+        #         jnp.sin(thetaphi[1]) * jnp.sin(thetaphi[0]) * jnp.sin(thetak) + jnp.cos(thetaphi[0]) * jnp.cos(thetak)
+        #     )
+        #
+        #     # here the abs(xie) handles the double counting of the direction of k changing and delta omega being negative
+        #     fe_vphi = jnp.exp(
+        #         jnp.interpn(
+        #             jnp.arange(0, 2 * jnp.pi, 10**-1.2018), x, jnp.log(DF), beta, jnp.abs(xie), interpAlg, -jnp.inf
+        #         )
+        #     )
+        #
+        #     fe_vphi[jnp.isnan(fe_vphi)] = 0
+
+        df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
+        df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
+
+        chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
+
+        ratmod = jnp.exp(
+            jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF)))
+        )
+        ratdf = jnp.gradient(ratmod, self.xi1[1] - self.xi1[0])
+
+        def this_ratintn(this_dx):
+            return jnp.real(ratintn.ratintn(ratdf, this_dx, self.xi1))
+
+        chiERratprim = vmap(this_ratintn)(self.xi1[None, :] - self.xi2[:, None])
+        # if len(fe) == 2:
+        chiERrat = jnp.reshape(jnp.interp(xie.flatten(), self.xi2, chiERratprim[:, 0]), xie.shape)
+        # else:
+        #     chiERrat = jnp.interpn(jnp.arange(0, 2 * jnp.pi, 10**-1.2018), xi2, chiERratprim, beta, xie, "spline")
+        chiERrat = -1.0 / (klde**2) * chiERrat
+        
+        chiE = chiERrat + chiEI
+        epsilon = 1.0 + chiE + chiI
+        
+        # This line needs to be changed if ion distribution is changed!!!
+        ion_comp_fact = jnp.transpose(fract * Z**2 / Zbar / vTi, [1, 0, 2, 3])
+        ion_comp = ion_comp_fact * (
+            (jnp.abs(chiE[..., jnp.newaxis])) ** 2.0 * jnp.exp(-(xii**2)) / jnp.sqrt(2 * jnp.pi)
+        )
+
+        ele_comp = (jnp.abs(1.0 + chiI)) ** 2.0 * fe_vphi / vTe
+        # ele_compE = fe_vphi / vTe # commented because unused
+        
+        SKW_ion_omg = 1.0 / k[..., jnp.newaxis] * ion_comp / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
+        
+
+        SKW_ion_omg = jnp.sum(SKW_ion_omg, 3)
+        SKW_ele_omg = 1.0 / k * (ele_comp) / ((jnp.abs(epsilon)) ** 2)
+        # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
+
+        PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:, None, None]
+        # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
+        lams = 2 * jnp.pi * self.C / omgs
+        PsLam = PsOmg * 2 * jnp.pi * self.C / lams**2
+        # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
+        formfactor = PsLam
+        # formfactorE = PsLamE # commented because unused
+
+        
+        return formfactor, lams
+
+    def vadd(a,b):
+        #custom function for vector addition where a and b are tuples of ND-arrays with the first element being the ND-array of x-values and the second element being the ND-array of y-values
+        return (a[0]+b[0], a[1]+b[1])
+    
+    def vsub(a,b):
+        #custom function for vector subtraction where a and b are tuples of ND-arrays with the first element being the ND-array of x-values and the second element being the ND-array of y-values
+        return (a[0]-b[0], a[1]-b[1])
+    
+    def vdot(a,b):
+        #custom function for vector addition where a and b are tuples of ND-arrays with the first element being the ND-array of x-values and the second element being the ND-array of y-values
+        if a is tuple:
+            if b is tuple:
+                return a[0]*b[0] + a[1]*b[1]
+            else:
+                return (a[0]*b, a[1]*b)
+        else:
+            return (a*b[0], a*b[1])
+        
+    def vdiv(a,b):
+        #custom function for vector addition where a and b are tuples of ND-arrays with the first element being the ND-array of x-values and the second element being the ND-array of y-values
+        if a is tuple:
+            if b is tuple:
+                return a[0]/b[0] + a[1]/b[1]
+            else:
+                return (a[0]/b, a[1]/b)
+        else:
+            return (a/b[0], a/b[1])
+        
+    def v_add_dim(a):
+        return (a[0][..., jnp.newaxis], a[1][..., jnp.newaxis])
