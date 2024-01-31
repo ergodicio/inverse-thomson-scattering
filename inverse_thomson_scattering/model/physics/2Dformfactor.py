@@ -46,11 +46,11 @@ class FormFactor:
         self.Mp = self.Me * 1836.1  # proton mass keV/C^2
         self.lamrang = lamrang
         self.npts = npts
-        h = 0.01
+        self.h = 0.01
         minmax = 8.2
         h1 = 1024
         self.xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
-        self.xi2 = jnp.array(jnp.arange(-minmax, minmax, h))
+        self.xi2 = jnp.array(jnp.arange(-minmax, minmax, self.h))
         self.Zpi = jnp.array(zprimeMaxw(self.xi2))
 
     def __call__(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
@@ -277,16 +277,17 @@ class FormFactor:
         kL = (jnp.sqrt(omgL**2 - omgpe**2) / self.C, jnp.zeros_like(omgpe))  # defined to be along the x axis
         ks_mag = jnp.sqrt(omgs**2 - omgpe**2) / self.C
         ks = (jnp.cos(sarad) * ks_mag, jnp.sin(sarad) * ks_mag)
-        k = vsub(ks, kL)  # (ks[0]-kl[0], ks[1]-kl[1])
+        k = vsub(ks, kL)  # 2D
+        k_mag = jnp.sqrt(vdot(k, k))  # 1D
 
         # kdotv = k * Va
-        omgdop = omg - vdot(k, Va)
+        omgdop = omg - vdot(k, Va)  # 1D
 
         # plasma parameters
 
         # electrons
         vTe = jnp.sqrt(Te[..., jnp.newaxis, jnp.newaxis] / self.Me)  # electron thermal velocity
-        klde = vdot((vTe / omgpe), k)
+        klde_mag = (vTe / omgpe) * (k_mag[..., jnp.newaxis])  # 1D
 
         # ions
         Z = jnp.reshape(Z, [1, 1, 1, -1])
@@ -297,8 +298,8 @@ class FormFactor:
         omgpi = constants * Z * jnp.sqrt(ni * self.Me / Mi)
 
         vTi = jnp.sqrt(Ti / Mi)  # ion thermal velocity
-        # kldi = (vTi / omgpi) * (k[..., jnp.newaxis])
-        kldi = vdot((vTi / omgpi), v_add_dim(k))
+        kldi = (vTi / omgpi) * (k_mag[..., jnp.newaxis])
+        # kldi = vdot((vTi / omgpi), v_add_dim(k))
 
         # ion susceptibilities
         # finding derivative of plasma dispersion function along xii array
@@ -306,7 +307,7 @@ class FormFactor:
         xii = vdot(1.0 / jnp.transpose((jnp.sqrt(2.0) * vTi), [1, 0, 2, 3]), vdiv(omgdop, v_add_dim(k)))  # v0s
         num_species = len(fract)
         num_ion_pts = jnp.shape(xii[0])
-        chiI = jnp.zeros(num_ion_pts)
+        # chiI = jnp.zeros(num_ion_pts)
         ZpiR = jnp.interp(xii, self.xi2, self.Zpi[0, :], left=xii**-2, right=xii**-2)
         ZpiI = jnp.interp(xii, self.xi2, self.Zpi[1, :], left=0, right=0)
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
@@ -314,65 +315,53 @@ class FormFactor:
         # electron susceptibility
         # calculating normilized phase velcoity(xi's) for electrons
         xie = vsub(vdiv(omgdop, vdot(k, vTe)), vdiv(ud, vTe))
+        xie_mag = jnp.sqrt(vdot(xie, xie))
 
-        DF, x = fe
+        DF, (x, y) = fe
+
+        # for a run or 2 can try plotiing out a histogram of all the angles to see if we can do some predefinitions
+        # or calculate a smaller set and inperpolate from there
 
         # for each vector in xie
-        # find the rotation angle beta
+        # find the rotation angle beta, the heaviside changes the angles to [0, 2pi)
+        beta = jnp.arctan(xie[1] / xie[0]) + jnp.pi * (-jnp.heaviside(xie[0], 1) + 1)
 
-        for element in xie:
-            # find the 1D coordinate for every point in the 2D velocity grid
-            element_mag = jnp.sqrt(vdot(element, element))
-            x_kspace = vdot(element, x) / element_mag
-            # take the weighted histogram in the region delta v
-            (fe_vphi[element], _) = jnp.histogram(
-                x_kspace, bins=[element_mag - fe.velocity_res, element_mag + fe.velocity_res], weights=DF
-            )
+        # preallocate chiEI and chiER and fe
+        chiEI = jnp.zeros_like(beta)
+        chiERrat = jnp.zeros_like(beta)
+        fe_vphi = jnp.zeros_like(beta)
 
-        # x_kspace = vdot(xie, x) / jnp.sqrt(vdot(xie, xie))
+        # for each rotation or element of vector in xie
+        for ind, element in jnp.ndenumerate(beta):
+            # create the grid in k-space
+            xp = x * jnp.cos(element) - y * jnp.sin(element)
+            yp = x * jnp.sin(element) + y * jnp.cos(element)
 
-        # fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))
+            # interpolate fe onto the grid aligned to k
+            interp = sp.RegularGridInterpolator((xp, yp), DF)  # may need to switch into interpolation in the log space
+            fe_2D_k = interp(jnp.meshgrid(self.xi2, self.xi2))  # this may need to be indexed 'ij'
 
-        # elif len(fe) == 3:
-        #     [DF, x, thetaphi] = fe
-        #     # the angle each k makes with the anisotropy is calculated
-        #     thetak = jnp.pi - jnp.arcsin((ks / k) * jnp.sin(sarad))
-        #     thetak[:, omg < 0, :] = -jnp.arcsin((ks[omg < 0] / k[:, omg < 0, :]) * jnp.sin(sarad))
-        #     # arcsin can only return values from -pi / 2 to pi / 2 this attempts to find the real value
-        #     theta90 = jnp.arcsin((ks / k) * jnp.sin(sarad))
-        #     ambcase = bool((ks > kL / jnp.cos(sarad)) * (sarad < jnp.pi / 2))
-        #     thetak[ambcase] = theta90[ambcase]
-        #
-        #     beta = jnp.arccos(
-        #         jnp.sin(thetaphi[1]) * jnp.sin(thetaphi[0]) * jnp.sin(thetak) + jnp.cos(thetaphi[0]) * jnp.cos(thetak)
-        #     )
-        #
-        #     # here the abs(xie) handles the double counting of the direction of k changing and delta omega being negative
-        #     fe_vphi = jnp.exp(
-        #         jnp.interpn(
-        #             jnp.arange(0, 2 * jnp.pi, 10**-1.2018), x, jnp.log(DF), beta, jnp.abs(xie), interpAlg, -jnp.inf
-        #         )
-        #     )
-        #
-        #     fe_vphi[jnp.isnan(fe_vphi)] = 0
+            # integrate over the k-perp direction
+            fe_1D_k = sum(fe_2D_k, axis=1) * self.h
+            # find the location of xie in axis array
+            loc = jnp.argmin(jnp.abs(self.xi2 - xie_mag[ind]))
+            # add the value of fe to the fe container
+            fe_vphi[ind] = fe_1D_k[loc]
 
-        df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
-        df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
+            # derivative of f along k
+            df = jnp.diff(fe_1D_k) / self.h
+            # df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
+            # df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
 
-        chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
+            # Chi is really chi evaluated at the points xie
+            # so the imaginary part is
+            chiEI[ind] = jnp.pi / (klde_mag[ind] ** 2) * jnp.sqrt(-1 + 0j) * df[ind]
 
-        ratmod = jnp.exp(jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF))))
-        ratdf = jnp.gradient(ratmod, self.xi1[1] - self.xi1[0])
-
-        def this_ratintn(this_dx):
-            return jnp.real(ratintn.ratintn(ratdf, this_dx, self.xi1))
-
-        chiERratprim = vmap(this_ratintn)(self.xi1[None, :] - self.xi2[:, None])
-        # if len(fe) == 2:
-        chiERrat = jnp.reshape(jnp.interp(xie.flatten(), self.xi2, chiERratprim[:, 0]), xie.shape)
-        # else:
-        #     chiERrat = jnp.interpn(jnp.arange(0, 2 * jnp.pi, 10**-1.2018), xi2, chiERratprim, beta, xie, "spline")
-        chiERrat = -1.0 / (klde**2) * chiERrat
+            # the real part is solved with rational integration
+            # giving the value at a single point where the pole is located at xie_mag[ind]
+            chiERrat[ind] = (
+                -1.0 / (klde_mag**2) * ratintn.ratintn(df, self.xi2 - xie_mag[ind], self.xi2)
+            )  # this may need to be downsampled for run time
 
         chiE = chiERrat + chiEI
         epsilon = 1.0 + chiE + chiI
@@ -384,7 +373,6 @@ class FormFactor:
         )
 
         ele_comp = (jnp.abs(1.0 + chiI)) ** 2.0 * fe_vphi / vTe
-        # ele_compE = fe_vphi / vTe # commented because unused
 
         SKW_ion_omg = 1.0 / k[..., jnp.newaxis] * ion_comp / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
 
