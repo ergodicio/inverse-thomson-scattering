@@ -243,6 +243,7 @@ class FormFactor:
         Distribution function (DF), normalized velocity (x), and angles from k_L to f1 in radians
         :return:
         """
+        # trying with rotations this time
 
         Te, Ti, Z, A, fract, ne, Va, ud, fe = (
             cur_Te,
@@ -317,6 +318,8 @@ class FormFactor:
         DF, x = fe
 
         # for each vector in xie
+        # find the rotation angle beta
+
         for element in xie:
             # find the 1D coordinate for every point in the 2D velocity grid
             element_mag = jnp.sqrt(vdot(element, element))
