@@ -22,6 +22,7 @@ class TSFitter:
             dummy_batch: Dictionary of dummy data
 
     """
+
     def __init__(self, cfg: Dict, sas, dummy_batch):
         """
 
@@ -67,22 +68,22 @@ class TSFitter:
             flattened_ub, _ = ravel_pytree(ub)
             self.bounds = zip(flattened_lb, flattened_ub)
 
-        if "dist_fit" in cfg:
-            self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
-            self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
-
-            if cfg["dist_fit"]["window"]["type"] == "hamming":
-                self.w = jnp.hamming(self.smooth_window_len)
-            elif cfg["dist_fit"]["window"]["type"] == "hann":
-                self.w = jnp.hanning(self.smooth_window_len)
-            elif cfg["dist_fit"]["window"]["type"] == "bartlett":
-                self.w = jnp.bartlett(self.smooth_window_len)
-            else:
-                raise NotImplementedError
-        else:
-            Warning(
-                "\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n"
-            )
+        # if "dist_fit" in cfg:
+        #     self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
+        #     self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
+        #
+        #     if cfg["dist_fit"]["window"]["type"] == "hamming":
+        #         self.w = jnp.hamming(self.smooth_window_len)
+        #     elif cfg["dist_fit"]["window"]["type"] == "hann":
+        #         self.w = jnp.hanning(self.smooth_window_len)
+        #     elif cfg["dist_fit"]["window"]["type"] == "bartlett":
+        #         self.w = jnp.bartlett(self.smooth_window_len)
+        #     else:
+        #         raise NotImplementedError
+        # else:
+        #     Warning(
+        #         "\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n"
+        #     )
 
     def smooth(self, distribution: jnp.ndarray) -> jnp.ndarray:
         """

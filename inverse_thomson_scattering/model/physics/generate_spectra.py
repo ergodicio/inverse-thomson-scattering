@@ -1,7 +1,8 @@
 from typing import Dict
 
 from inverse_thomson_scattering.model.physics.form_factor import FormFactor
-#from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
+
+# from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
 
 from jax import numpy as jnp
@@ -34,12 +35,13 @@ class FitModel:
         Returns:
 
         """
+
         for key in self.config["parameters"].keys():
             if key != "fe":
                 all_params[key] = jnp.squeeze(all_params[key])
 
         if self.config["parameters"]["m"]["active"]:
-            all_params["fe"] = jnp.log(self.num_dist_func(config))
+            all_params["fe"] = jnp.log(self.num_dist_func(self.config))
             if self.config["parameters"]["m"]["active"] and self.config["parameters"]["fe"]["active"]:
                 raise ValueError("m and fe cannot be actively fit at the same time")
 
@@ -77,14 +79,26 @@ class FitModel:
             lamAxisI = []
 
         if self.config["other"]["extraoptions"]["load_ele_spec"]:
-            ThryE, lamAxisE = self.electron_form_factor(
-                all_params,
-                cur_ne * jnp.array([1e20]),
-                cur_Te,
-                self.sa["sa"],
-                (fecur, vcur),
-                lam + self.config["data"]["ele_lam_shift"],
-            )
+            if self.num_dist_func.dim == 1:
+                ThryE, lamAxisE = self.electron_form_factor(
+                    all_params,
+                    cur_ne * jnp.array([1e20]),
+                    cur_Te,
+                    self.sa["sa"],
+                    (fecur, vcur),
+                    lam + self.config["data"]["ele_lam_shift"],
+                )
+            else:
+                ThryE, lamAxisE = self.electron_form_factor.calc_in_2D(
+                    all_params,
+                    self.config["parameters"]["ud"]["angle"],
+                    self.config["parameters"]["ud"]["angle"],
+                    cur_ne * jnp.array([1e20]),
+                    cur_Te,
+                    self.sa["sa"],
+                    (fecur, vcur),
+                    lam + self.config["data"]["ele_lam_shift"],
+                )
 
             # remove extra dimensions and rescale to nm
             lamAxisE = jnp.squeeze(lamAxisE) * 1e7  # TODO hardcoded

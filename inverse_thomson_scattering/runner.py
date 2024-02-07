@@ -10,7 +10,9 @@ from flatten_dict import flatten, unflatten
 
 from inverse_thomson_scattering import fitter
 from inverse_thomson_scattering.misc.calibration import get_scattering_angles
-from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
+
+# from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
+from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.fitter import init_param_norm_and_shift
 from inverse_thomson_scattering.misc import utils
@@ -153,16 +155,26 @@ def calc_spec(config: Dict):
     stddev["spect_stddev_ion"] = 0.015  # 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
     stddev["spect_stddev_ele"] = 0.1  # 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
     config["other"]["PhysParams"]["widIRF"] = stddev
-    config["other"]["lamrangE"] = [config["data"]["fit_rng"]["forward_epw_start"], config["data"]["fit_rng"]["forward_epw_end"]]
-    config["other"]["lamrangI"] = [config["data"]["fit_rng"]["forward_iaw_start"], config["data"]["fit_rng"]["forward_iaw_end"]]
+    config["other"]["lamrangE"] = [
+        config["data"]["fit_rng"]["forward_epw_start"],
+        config["data"]["fit_rng"]["forward_epw_end"],
+    ]
+    config["other"]["lamrangI"] = [
+        config["data"]["fit_rng"]["forward_iaw_start"],
+        config["data"]["fit_rng"]["forward_iaw_end"],
+    ]
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
-    config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-    if config["parameters"]["fe"]["symmetric"]:
-        config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+    # config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+    # if config["parameters"]["fe"]["symmetric"]:
+    #    config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
 
-    NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
-    if not config["parameters"]["fe"]["val"]:
-        config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+    dist_obj = DistFunc(config)
+    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(
+        config["parameters"]["fe"], config["parameters"]["m"]
+    )
+    config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
+    # if not config["parameters"]["fe"]["val"]:
+    #    config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
 
     config["units"] = init_param_norm_and_shift(config)
 
@@ -216,8 +228,14 @@ def calc_series(config):
     stddev["spect_stddev_ion"] = 0.015  # 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
     stddev["spect_stddev_ele"] = 0.1  # 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
     config["other"]["PhysParams"]["widIRF"] = stddev
-    config["other"]["lamrangE"] = [config["data"]["fit_rng"]["forward_epw_start"], config["data"]["fit_rng"]["forward_epw_end"]]
-    config["other"]["lamrangI"] = [config["data"]["fit_rng"]["forward_iaw_start"], config["data"]["fit_rng"]["forward_iaw_end"]]
+    config["other"]["lamrangE"] = [
+        config["data"]["fit_rng"]["forward_epw_start"],
+        config["data"]["fit_rng"]["forward_epw_end"],
+    ]
+    config["other"]["lamrangI"] = [
+        config["data"]["fit_rng"]["forward_iaw_start"],
+        config["data"]["fit_rng"]["forward_iaw_end"],
+    ]
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
     if config["parameters"]["fe"]["symmetric"]:
@@ -239,11 +257,11 @@ def calc_series(config):
         "i_amps": 1,
     }
 
-    ThryE=[None]*len(config["series"]["vals"])
-    ThryI=[None]*len(config["series"]["vals"])
-    lamAxisE=[None]*len(config["series"]["vals"])
-    lamAxisI=[None]*len(config["series"]["vals"])
-    for i,val in enumerate(config["series"]["vals"]):
+    ThryE = [None] * len(config["series"]["vals"])
+    ThryI = [None] * len(config["series"]["vals"])
+    lamAxisE = [None] * len(config["series"]["vals"])
+    lamAxisI = [None] * len(config["series"]["vals"])
+    for i, val in enumerate(config["series"]["vals"]):
         config["parameters"][config["series"]["param"]]["val"] = val
 
         ts_fitter = TSFitter(config, sas, dummy_batch)
@@ -271,17 +289,17 @@ def calc_series(config):
     ax[1].grid()
 
     if config["series"]["param"] == "fract":
-        coords_ion = (("series",np.array(config["series"]["vals"])[:,0]),("Wavelength", lamAxisI[0,:]))
-        coords_ele = (("series",np.array(config["series"]["vals"])[:,0]),("Wavelength", lamAxisE[0,:]))
+        coords_ion = (("series", np.array(config["series"]["vals"])[:, 0]), ("Wavelength", lamAxisI[0, :]))
+        coords_ele = (("series", np.array(config["series"]["vals"])[:, 0]), ("Wavelength", lamAxisE[0, :]))
     else:
-        coords_ion = (("series",config["series"]["vals"]),("Wavelength", lamAxisI[0,:]))
-        coords_ele = (("series",config["series"]["vals"]),("Wavelength", lamAxisE[0,:]))
+        coords_ion = (("series", config["series"]["vals"]), ("Wavelength", lamAxisI[0, :]))
+        coords_ele = (("series", config["series"]["vals"]), ("Wavelength", lamAxisE[0, :]))
     ion_dat = {"Sim": ThryI}
     ele_dat = {"Sim": ThryE}
 
     ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
     ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
-    #ion_data = xr.Dataset(
+    # ion_data = xr.Dataset(
 
     with tempfile.TemporaryDirectory() as td:
         ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))

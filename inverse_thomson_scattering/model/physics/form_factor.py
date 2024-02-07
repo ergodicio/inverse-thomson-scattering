@@ -3,6 +3,7 @@ from jax import vmap
 
 import scipy.interpolate as sp
 import numpy as np
+from interpax import Interpolator2D
 
 from inverse_thomson_scattering.model.physics import ratintn
 from inverse_thomson_scattering.misc import lam_parse
@@ -46,11 +47,11 @@ class FormFactor:
         self.Mp = self.Me * 1836.1  # proton mass keV/C^2
         self.lamrang = lamrang
         self.npts = npts
-        h = 0.01
+        self.h = 0.01
         minmax = 8.2
         h1 = 1024
         self.xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
-        self.xi2 = jnp.array(jnp.arange(-minmax, minmax, h))
+        self.xi2 = jnp.array(jnp.arange(-minmax, minmax, self.h))
         self.Zpi = jnp.array(zprimeMaxw(self.xi2))
 
     def __call__(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
@@ -222,7 +223,45 @@ class FormFactor:
 
         return formfactor, lams
 
-    def calc_in_2D(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
+    def calc_chi_vals(self, x, y, element, DF, xie_mag_at, klde_mag_at):
+        # create the grid in k-space
+        xp = x * jnp.cos(element) - y * jnp.sin(element)
+        yp = x * jnp.sin(element) + y * jnp.cos(element)
+
+        # interpolate fe onto the grid aligned to k
+        interp = Interpolator2D(
+            xp, yp, DF, method="nearest", derivative=1, extrap=(0, 0)
+        )  # may need to switch into interpolation in the log space
+        newgrid = jnp.array(jnp.meshgrid(self.xi1, self.xi1))
+        newpoints = jnp.reshape(newgrid, (2, -1))
+        fe_2D_k = interp(newpoints[0, :], newpoints[1, :])  # this may need to be indexed 'ij'
+        fe_2D_k = fe_2D_k.reshape(newgrid[0].shape)
+
+        # integrate over the k-perp direction
+        fe_1D_k = jnp.sum(fe_2D_k, axis=1) * self.h
+        # find the location of xie in axis array
+        loc = jnp.argmin(jnp.abs(self.xi2 - xie_mag_at))
+        # add the value of fe to the fe container
+        fe_vphi = fe_1D_k[loc]
+
+        # derivative of f along k
+        # df = jnp.diff(fe_1D_k) / self.h
+        df = jnp.real(jnp.gradient(fe_1D_k, self.xi1[1] - self.xi1[0]))
+        # df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
+        # df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
+
+        # Chi is really chi evaluated at the points xie
+        # so the imaginary part is
+        chiEI = jnp.pi / (klde_mag_at**2) * df[loc]
+
+        # the real part is solved with rational integration
+        # giving the value at a single point where the pole is located at xie_mag[ind]
+        chiERrat = (
+            -1.0 / (klde_mag_at**2) * jnp.real(ratintn.ratintn(df, self.xi1 - xie_mag_at, self.xi1))
+        )  # this may need to be downsampled for run time
+        return fe_vphi, chiEI[0], chiERrat[0]
+
+    def calc_in_2D(self, params, ud_ang, va_ang, cur_ne, cur_Te, sa, f_and_v, lam):
         """
         NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions and scattering angles. The spectral density function is calculated with and without the ion contribution which can be set to an independent grid from the electron contribution. Distribution functions can be one or two dimensional and the appropriate susceptibility is calculated with the rational integration.
 
@@ -265,7 +304,11 @@ class FormFactor:
         sarad = jnp.reshape(sarad, [1, 1, -1])
 
         Va = Va * 1e6  # flow velocity in 1e6 cm/s
+        # convert Va from mag, angle to x,y
+        Va = (Va * jnp.cos(va_ang * jnp.pi / 180), Va * jnp.sin(va_ang * jnp.pi / 180))
         ud = ud * 1e6  # drift velocity in 1e6 cm/s
+        # convert ua from mag, angle to x,y
+        ud = (ud * jnp.cos(ud_ang * jnp.pi / 180), ud * jnp.sin(ud_ang * jnp.pi / 180))
 
         omgL, omgs, lamAxis, _ = lam_parse.lamParse(self.lamrang, lam, npts=self.npts)  # , True)
 
@@ -304,10 +347,12 @@ class FormFactor:
         # ion susceptibilities
         # finding derivative of plasma dispersion function along xii array
         # proper handeling of multiple ion temperatures is not implemented
-        xii = vdot(1.0 / jnp.transpose((jnp.sqrt(2.0) * vTi), [1, 0, 2, 3]), vdiv(omgdop, v_add_dim(k)))  # v0s
-        num_species = len(fract)
-        num_ion_pts = jnp.shape(xii[0])
-        # chiI = jnp.zeros(num_ion_pts)
+        xii = vdot(
+            1.0 / jnp.transpose((jnp.sqrt(2.0) * vTi), [1, 0, 2, 3]), vdiv(omgdop[..., jnp.newaxis], v_add_dim(k))
+        )  # v0s
+
+        # probably should be generalized to an arbitrary distribtuion function but for now just assuming maxwellian
+        xii = jnp.sqrt(vdot(xii, xii))
         ZpiR = jnp.interp(xii, self.xi2, self.Zpi[0, :], left=xii**-2, right=xii**-2)
         ZpiI = jnp.interp(xii, self.xi2, self.Zpi[1, :], left=0, right=0)
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
@@ -318,7 +363,8 @@ class FormFactor:
         xie_mag = jnp.sqrt(vdot(xie, xie))
 
         DF, (x, y) = fe
-
+        print(DF)
+        print(x)
         # for a run or 2 can try plotiing out a histogram of all the angles to see if we can do some predefinitions
         # or calculate a smaller set and inperpolate from there
 
@@ -331,39 +377,36 @@ class FormFactor:
         chiERrat = jnp.zeros_like(beta)
         fe_vphi = jnp.zeros_like(beta)
 
+        # def this_ratintn(lin_ind):
+        #     return self.calc_chi_vals(
+        #         x[0, :],
+        #         y[:, 0],
+        #         beta.flatten()[lin_ind],
+        #         DF,
+        #         xie_mag[jnp.unravel_index(lin_ind, beta.shape)],
+        #         klde_mag[jnp.unravel_index(lin_ind, beta.shape)],
+        #     )
+        #
+        # print(len(beta.flatten()))
+        # fe_vphi, chiEI, chiERrat = vmap(this_ratintn)(jnp.arange(len(beta.flatten())))
+
         # for each rotation or element of vector in xie
-        for ind, element in jnp.ndenumerate(beta):
-            # create the grid in k-space
-            xp = x * jnp.cos(element) - y * jnp.sin(element)
-            yp = x * jnp.sin(element) + y * jnp.cos(element)
+        for ind, element in enumerate(beta.flatten()):
+            v1, v2, v3 = self.calc_chi_vals(
+                x[0, :],
+                y[:, 0],
+                element,
+                DF,
+                xie_mag[jnp.unravel_index(ind, beta.shape)],
+                klde_mag[jnp.unravel_index(ind, beta.shape)],
+            )
 
-            # interpolate fe onto the grid aligned to k
-            interp = sp.RegularGridInterpolator((xp, yp), DF)  # may need to switch into interpolation in the log space
-            fe_2D_k = interp(jnp.meshgrid(self.xi2, self.xi2))  # this may need to be indexed 'ij'
+            fe_vphi = fe_vphi.at[jnp.unravel_index(ind, beta.shape)].set(v1)
+            chiEI = chiEI.at[jnp.unravel_index(ind, beta.shape)].set(v2)
+            chiERrat = chiERrat.at[jnp.unravel_index(ind, beta.shape)].set(v3)
+            print(ind)
 
-            # integrate over the k-perp direction
-            fe_1D_k = sum(fe_2D_k, axis=1) * self.h
-            # find the location of xie in axis array
-            loc = jnp.argmin(jnp.abs(self.xi2 - xie_mag[ind]))
-            # add the value of fe to the fe container
-            fe_vphi[ind] = fe_1D_k[loc]
-
-            # derivative of f along k
-            df = jnp.diff(fe_1D_k) / self.h
-            # df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
-            # df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
-
-            # Chi is really chi evaluated at the points xie
-            # so the imaginary part is
-            chiEI[ind] = jnp.pi / (klde_mag[ind] ** 2) * jnp.sqrt(-1 + 0j) * df[ind]
-
-            # the real part is solved with rational integration
-            # giving the value at a single point where the pole is located at xie_mag[ind]
-            chiERrat[ind] = (
-                -1.0 / (klde_mag**2) * ratintn.ratintn(df, self.xi2 - xie_mag[ind], self.xi2)
-            )  # this may need to be downsampled for run time
-
-        chiE = chiERrat + chiEI
+        chiE = chiERrat + jnp.sqrt(-1 + 0j) * chiEI
         epsilon = 1.0 + chiE + chiI
 
         # This line needs to be changed if ion distribution is changed!!!
@@ -374,10 +417,10 @@ class FormFactor:
 
         ele_comp = (jnp.abs(1.0 + chiI)) ** 2.0 * fe_vphi / vTe
 
-        SKW_ion_omg = 1.0 / k[..., jnp.newaxis] * ion_comp / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
+        SKW_ion_omg = 1.0 / k_mag[..., jnp.newaxis] * ion_comp / ((jnp.abs(epsilon[..., jnp.newaxis])) ** 2)
 
         SKW_ion_omg = jnp.sum(SKW_ion_omg, 3)
-        SKW_ele_omg = 1.0 / k * (ele_comp) / ((jnp.abs(epsilon)) ** 2)
+        SKW_ele_omg = 1.0 / k_mag * (ele_comp) / ((jnp.abs(epsilon)) ** 2)
         # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:, None, None]

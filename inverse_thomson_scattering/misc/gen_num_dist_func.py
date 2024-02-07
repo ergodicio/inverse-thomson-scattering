@@ -31,12 +31,12 @@ class DistFunc:
             )
         # add static variable for all the possible fields of the dictionary instead of using a dictionary
 
-    def __call__(self, fedict):
+    def __call__(self, fedict, mdict):
         if self.fe_name == "DLM":
             if self.dim == 1:
-                v, fe = dist_functional_forms.DLM_1D(fedict["m"], self.velocity_res)
+                v, fe = dist_functional_forms.DLM_1D(mdict["val"], self.velocity_res)
             elif self.dim == 2:
-                v, fe = dist_functional_forms.DLM_2D(fedict["m"], self.velocity_res)
+                v, fe = dist_functional_forms.DLM_2D(mdict["val"], self.velocity_res)
 
         elif self.fe_name == "Spitzer":
             if self.dim == 2:
