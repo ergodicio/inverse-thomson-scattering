@@ -13,7 +13,7 @@ class DistFunc:
     def __init__(self, config):
         # self.fedict = config["parameters"]["fe"]
         # self.fedict["m"] = config["parameters"]["m"]["val"]
-        self.velocity_res = 0.01
+        self.velocity_res = 0.02
         self.fe_name = list(config["parameters"]["fe"]["type"].keys())[0]
 
         if "dim" in config["parameters"]["fe"].keys():

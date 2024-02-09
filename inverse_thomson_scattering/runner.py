@@ -198,22 +198,22 @@ def calc_spec(config: Dict):
     ax[0].set_xlabel("Wavelength (nm)")
     ax[0].grid()
 
-    ax[1].plot(lamAxisI, ThryI)
-    ax[1].set_title("Simulated Data, fontsize=14")
-    ax[1].set_ylabel("Amp (arb. units)")
-    ax[1].set_xlabel("Wavelength (nm)")
-    ax[1].grid()
+    # ax[1].plot(lamAxisI, ThryI)
+    # ax[1].set_title("Simulated Data, fontsize=14")
+    # ax[1].set_ylabel("Amp (arb. units)")
+    # ax[1].set_xlabel("Wavelength (nm)")
+    # ax[1].grid()
 
-    coords_ion = (("Wavelength", lamAxisI),)
+    # coords_ion = (("Wavelength", lamAxisI),)
     coords_ele = (("Wavelength", lamAxisE),)
-    ion_dat = {"Sim": ThryI}
+    # ion_dat = {"Sim": ThryI}
     ele_dat = {"Sim": ThryE}
 
-    ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
+    # ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
     ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
 
     with tempfile.TemporaryDirectory() as td:
-        ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
+        # ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
         ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))
         fig.savefig(os.path.join(td, "simulated_data"), bbox_inches="tight")
         mlflow.log_artifacts(td)
