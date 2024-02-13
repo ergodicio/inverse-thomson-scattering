@@ -11,9 +11,7 @@ from inverse_thomson_scattering.misc import dist_functional_forms
 
 class DistFunc:
     def __init__(self, config):
-        # self.fedict = config["parameters"]["fe"]
-        # self.fedict["m"] = config["parameters"]["m"]["val"]
-        self.velocity_res = 0.02
+        self.velocity_res = config["parameters"]["fe"]["v_res"]
         self.fe_name = list(config["parameters"]["fe"]["type"].keys())[0]
 
         if "dim" in config["parameters"]["fe"].keys():

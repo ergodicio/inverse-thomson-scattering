@@ -85,6 +85,7 @@ parameters:
         fe_decrease_strict: False
         symmetric: False
         dim: 2
+        v_res: 0.02
 
 data:
     shotnum: 101675
@@ -114,6 +115,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: maxwellian_test_1
+    run: maxwellian_test_2D_v=0.02
 
 machine: gpu

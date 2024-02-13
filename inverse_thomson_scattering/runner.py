@@ -189,7 +189,9 @@ def calc_spec(config: Dict):
     }
     ts_fitter = TSFitter(config, sas, dummy_batch)
     params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
+    t_start = time.time()
     ThryE, ThryI, lamAxisE, lamAxisI = ts_fitter.spec_calc(params, dummy_batch)
+    spectime = time.time()-t_start
 
     fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
     ax[0].plot(lamAxisE, ThryE)
@@ -217,6 +219,8 @@ def calc_spec(config: Dict):
         ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))
         fig.savefig(os.path.join(td, "simulated_data"), bbox_inches="tight")
         mlflow.log_artifacts(td)
+        metrics_dict = {"spectrum_calc_time": spectime}
+        mlflow.log_metrics(metrics=metrics_dict)
     plt.close(fig)
 
 
@@ -237,13 +241,19 @@ def calc_series(config):
         config["data"]["fit_rng"]["forward_iaw_end"],
     ]
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
-    config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-    if config["parameters"]["fe"]["symmetric"]:
-        config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+#     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+#     if config["parameters"]["fe"]["symmetric"]:
+#         config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
 
-    NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
-    if not config["parameters"]["fe"]["val"]:
-        config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+#     NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
+    dist_obj = DistFunc(config)
+    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(
+        config["parameters"]["fe"], config["parameters"]["m"]
+    )
+    config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
+    
+    # if not config["parameters"]["fe"]["val"]:
+    #     config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
 
     config["units"] = init_param_norm_and_shift(config)
 
@@ -257,12 +267,18 @@ def calc_series(config):
         "i_amps": 1,
     }
 
-    ThryE = [None] * len(config["series"]["vals"])
-    ThryI = [None] * len(config["series"]["vals"])
-    lamAxisE = [None] * len(config["series"]["vals"])
-    lamAxisI = [None] * len(config["series"]["vals"])
-    for i, val in enumerate(config["series"]["vals"]):
-        config["parameters"][config["series"]["param"]]["val"] = val
+    ThryE = [None] * len(config["series"]["vals1"])
+    ThryI = [None] * len(config["series"]["vals1"])
+    lamAxisE = [None] * len(config["series"]["vals1"])
+    lamAxisI = [None] * len(config["series"]["vals1"])
+    for i, val in enumerate(config["series"]["vals1"]):
+        config["parameters"][config["series"]["param1"]]["val"] = val
+        if "param2" in config["series"].keys():
+            config["parameters"][config["series"]["param2"]]["val"] = config["series"]["vals2"][i]
+        if "param3" in config["series"].keys():
+            config["parameters"][config["series"]["param3"]]["val"] = config["series"]["vals3"][i]
+        if "param4" in config["series"].keys():
+            config["parameters"][config["series"]["param4"]]["val"] = config["series"]["vals4"][i]
 
         ts_fitter = TSFitter(config, sas, dummy_batch)
         params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
@@ -278,22 +294,22 @@ def calc_series(config):
     ax[0].set_title("Simulated Data, fontsize=14")
     ax[0].set_ylabel("Amp (arb. units)")
     ax[0].set_xlabel("Wavelength (nm)")
-    ax[0].legend([str(ele) for ele in config["series"]["vals"]])
+    ax[0].legend([str(ele) for ele in config["series"]["vals1"]])
     ax[0].grid()
 
     ax[1].plot(lamAxisI.transpose(), ThryI.transpose())
     ax[1].set_title("Simulated Data, fontsize=14")
     ax[1].set_ylabel("Amp (arb. units)")
     ax[1].set_xlabel("Wavelength (nm)")
-    ax[1].legend([str(ele) for ele in config["series"]["vals"]])
+    ax[1].legend([str(ele) for ele in config["series"]["vals1"]])
     ax[1].grid()
 
-    if config["series"]["param"] == "fract":
-        coords_ion = (("series", np.array(config["series"]["vals"])[:, 0]), ("Wavelength", lamAxisI[0, :]))
-        coords_ele = (("series", np.array(config["series"]["vals"])[:, 0]), ("Wavelength", lamAxisE[0, :]))
+    if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
+        coords_ion = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisI[0, :]))
+        coords_ele = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisE[0, :]))
     else:
-        coords_ion = (("series", config["series"]["vals"]), ("Wavelength", lamAxisI[0, :]))
-        coords_ele = (("series", config["series"]["vals"]), ("Wavelength", lamAxisE[0, :]))
+        coords_ion = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisI[0, :]))
+        coords_ele = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisE[0, :]))
     ion_dat = {"Sim": ThryI}
     ele_dat = {"Sim": ThryE}
 

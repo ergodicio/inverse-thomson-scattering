@@ -1,6 +1,12 @@
 series:
-  param: Ti
-  vals: [0.032, .04, .048, .056, .064, .072, .08, .10]
+  param1: Z
+  vals1: [[9.,1.], [10.5,1.], [11.5,1.],[12.2,1.],[13.,1.],[14.4,1.],[15.2,1.]]
+  param2: Te
+  vals2: [0.2137, 0.3893, 0.4788, 0.5357, 0.5915, 0.6696, 0.6739]
+  param3: Ti
+  vals3: [0.02137, 0.03893, 0.04788, 0.05357, 0.05915, 0.06696, 0.06739]
+  param4: ne
+  vals4: [0.1387, 0.18, 0.2067, 0.2189, 0.2293, 0.2311, 0.2311]
 parameters:
     amp1:
         val: 1.
@@ -44,10 +50,10 @@ parameters:
         lb: 0.5
         ub: 7.0
     A:
-        val: [14., 1.]
+        val: [40., 1.]
         active: False
     fract:
-        val: [.30, .70]
+        val: [.40, .60]
         active: False
     ud:
         val: 0.0
@@ -115,6 +121,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: N-H-Z6-30-70-Te400-Ti_series
+    run: Ar-H-40-60-time_series_20per_hotter
     
 machine: gpu
