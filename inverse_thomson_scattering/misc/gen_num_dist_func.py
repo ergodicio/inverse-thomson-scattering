@@ -60,7 +60,9 @@ class DistFunc:
 
     # need a function that just changes the numerical values of the distribtuion function
     # need a function that changes the values based off changes to the parameters (this may just be a call to the constructor)
-    def project_onto_k(self, k):
+    def rotate(self, fe, v, theta):
+        # create new grid
+        x, y = jnp.meshgrid(jnp.arange(fe.shape(0)), jnp.arange(fe.shape(0)))
         return
 
 

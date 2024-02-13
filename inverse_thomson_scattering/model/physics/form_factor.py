@@ -8,7 +8,7 @@ from interpax import Interpolator2D, interp2d
 
 from inverse_thomson_scattering.model.physics import ratintn
 from inverse_thomson_scattering.misc import lam_parse
-from inverse_thomson_scattering.misc.vector_tools import vadd, vsub, vdot, vdiv, v_add_dim
+from inverse_thomson_scattering.misc.vector_tools import vadd, vsub, vdot, vdiv, v_add_dim, rotate
 
 
 def zprimeMaxw(xi):
@@ -231,54 +231,16 @@ class FormFactor:
         return formfactor, lams
 
     def calc_chi_vals(self, x, element, DF, xie_mag_at, klde_mag_at):
-        # # create the grid in k-space
-        # xp = x * jnp.cos(element) - y * jnp.sin(element)
-        # yp = x * jnp.sin(element) + y * jnp.cos(element)
-        #
-        # # interpolate fe onto the grid aligned to k
-        # # interp = Interpolator2D(
-        # #    xp, yp, DF, method="nearest", derivative=0, extrap=(0, 0)
-        # # )  # may need to switch into interpolation in the log space
-        # # test = interp(0, 0)
-        # # print(test)
-        # newgrid = jnp.array(jnp.meshgrid(self.xi1, self.xi1))
-        # # newpoints = jnp.reshape(newgrid, (2, -1))
-        # if xp[0] > xp[-1]:
-        #     xp = xp[::-1]
-        #     DF = DF[::-1, :]
-        # if yp[0] > yp[-1]:
-        #     yp = yp[::-1]
-        #     DF = DF[:, ::-1]
-        # fe_2D_k = interp2d(newgrid[0, :, :].flatten(), newgrid[1, :, :].flatten(), xp, yp, jnp.log(DF), method="cubic")
-        # # fe_2D_k = interp(newpoints[0, :], newpoints[1, :])  # this may need to be indexed 'ij'
-        # fe_2D_k = jnp.exp(fe_2D_k.reshape(newgrid[0].shape))
-        # fe_2D_k = fe_2D_k.at[jnp.isnan(fe_2D_k)].set(0.0)
         fe_2D_k = snd.rotate(DF, element * 180 / jnp.pi, reshape=False)
         fe_1D_k = jnp.sum(fe_2D_k, axis=1) * (x[1] - x[0])
 
-        # # integrate over the k-perp direction
-        # fe_1D_k = jnp.sum(fe_2D_k, axis=1) * (self.xi1[1] - self.xi1[0])  # this needs to be pulled from the fe object
-        # # try renormalizing?
-        # fe_1D_k = fe_1D_k / (jnp.sum(fe_1D_k) * (self.xi1[1] - self.xi1[0]))
-
-        # from matplotlib import pyplot as plt
-        #
-        # fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
-        # ax[0].plot(self.xi1, fe_1D_k)
-        # plt.show()
-
         # find the location of xie in axis array
-        # loc = jnp.argmin(jnp.abs(self.xi1 - xie_mag_at))
         loc = jnp.argmin(jnp.abs(x - xie_mag_at))
         # add the value of fe to the fe container
         fe_vphi = fe_1D_k[loc]
 
         # derivative of f along k
-        # df = jnp.diff(fe_1D_k) / self.h
-        # df = jnp.real(jnp.gradient(fe_1D_k, self.xi1[1] - self.xi1[0]))
         df = jnp.real(jnp.gradient(fe_1D_k, x[1] - x[0]))
-        # df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
-        # df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
 
         # Chi is really chi evaluated at the points xie
         # so the imaginary part is
@@ -390,51 +352,56 @@ class FormFactor:
         xie = vdiv(vsub(vdot(omgdop / k_mag**2, k), ud), vTe)
         xie_mag = jnp.sqrt(vdot(xie, xie))
         DF, (x, y) = fe
-        # print(DF)
-        # print(x)
-        # for a run or 2 can try plotiing out a histogram of all the angles to see if we can do some predefinitions
-        # or calculate a smaller set and inperpolate from there
 
         # for each vector in xie
         # find the rotation angle beta, the heaviside changes the angles to [0, 2pi)
         beta = jnp.arctan(xie[1] / xie[0]) + jnp.pi * (-jnp.heaviside(xie[0], 1) + 1)
 
         # preallocate chiEI and chiER and fe
-        # chiEI = jnp.zeros_like(beta)
-        # chiERrat = jnp.zeros_like(beta)
-        # fe_vphi = jnp.zeros_like(beta)
-        x1D = x[0, :]
+        chiEI = jnp.zeros_like(beta)
+        chiERrat = jnp.zeros_like(beta)
+        fe_vphi = jnp.zeros_like(beta)
+        # x1D = x[0, :]
 
-        # y1D = y[:, 0]
-        #
-        def this_ratintn(this_beta, this_xie_mag, this_klde_mag):
-            return self.calc_chi_vals(
-                x1D,
-                this_beta,
-                DF,
-                this_xie_mag,
-                this_klde_mag,
-            )
+        fe_2D_k = snd.rotate(DF, 45, reshape=False)
 
-        #
-        # print(len(beta.flatten()))
-        fe_vphi, chiEI, chiERrat = vmap(this_ratintn)(beta.flatten(), xie_mag.flatten(), klde_mag.flatten())
+        fe_2D_k_v2 = rotate(DF, jnp.pi / 4.0)
 
-        # for each rotation or element of vector in xie
-        # for ind, element in enumerate(beta.flatten()):
-        #     v1, v2, v3 = self.calc_chi_vals(
-        #         x[0, :],
-        #         y[:, 0],
-        #         element,
+        from matplotlib import pyplot as plt
+
+        fig, ax = plt.subplots(1, 3, figsize=(18, 6), tight_layout=True, sharex=False)
+        ax[0].contour(DF)
+        ax[1].contour(fe_2D_k)
+        ax[2].contour(fe_2D_k_v2)
+        plt.show()
+
+        # def this_ratintn(this_beta, this_xie_mag, this_klde_mag):
+        #     return self.calc_chi_vals(
+        #         x1D,
+        #         this_beta,
         #         DF,
-        #         xie_mag[jnp.unravel_index(ind, beta.shape)],
-        #         klde_mag[jnp.unravel_index(ind, beta.shape)],
+        #         this_xie_mag,
+        #         this_klde_mag,
         #     )
         #
-        #     fe_vphi = fe_vphi.at[jnp.unravel_index(ind, beta.shape)].set(v1)
-        #     chiEI = chiEI.at[jnp.unravel_index(ind, beta.shape)].set(v2)
-        #     chiERrat = chiERrat.at[jnp.unravel_index(ind, beta.shape)].set(v3)
-        #     print(ind)
+        # #
+        # # print(len(beta.flatten()))
+        # fe_vphi, chiEI, chiERrat = vmap(this_ratintn)(beta.flatten(), xie_mag.flatten(), klde_mag.flatten())
+
+        # for each rotation or element of vector in xie
+        for ind, element in enumerate(beta.flatten()):
+            v1, v2, v3 = self.calc_chi_vals(
+                x[0, :],
+                element,
+                DF,
+                xie_mag[jnp.unravel_index(ind, beta.shape)],
+                klde_mag[jnp.unravel_index(ind, beta.shape)],
+            )
+
+            fe_vphi = fe_vphi.at[jnp.unravel_index(ind, beta.shape)].set(v1)
+            chiEI = chiEI.at[jnp.unravel_index(ind, beta.shape)].set(v2)
+            chiERrat = chiERrat.at[jnp.unravel_index(ind, beta.shape)].set(v3)
+            print(ind)
 
         chiE = chiERrat + jnp.sqrt(-1 + 0j) * chiEI
         epsilon = 1.0 + chiE + chiI
