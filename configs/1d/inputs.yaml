@@ -85,6 +85,7 @@ parameters:
         fe_decrease_strict: False
         symmetric: False
         dim: 2
+        v_res: 0.02
 
 data:
     shotnum: 101675
