@@ -169,9 +169,7 @@ def calc_spec(config: Dict):
     #    config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
 
     dist_obj = DistFunc(config)
-    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(
-        config["parameters"]["fe"], config["parameters"]["m"]
-    )
+    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"])
     config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
     # if not config["parameters"]["fe"]["val"]:
     #    config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
