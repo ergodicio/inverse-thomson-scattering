@@ -41,6 +41,7 @@ def v_add_dim(a):
     return (a[0][..., jnp.newaxis], a[1][..., jnp.newaxis])
 
 
+# performs a clockwise rotation
 def rotate(A, theta):
     # create new grid
     rot_point = [A.shape[0] / 2, A.shape[1] / 2]

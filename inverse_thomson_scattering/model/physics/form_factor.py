@@ -149,34 +149,8 @@ class FormFactor:
         # calculating normilized phase velcoity(xi's) for electrons
         xie = omgdop / (k * vTe) - ud / vTe
 
-        # capable of handling isotropic or anisotropic distribution functions
-        # fe is separated into components distribution function, v / vth axis, angles between f1 and kL
-        # if len(fe) == 2:
         DF, x = fe
         fe_vphi = jnp.exp(jnp.interp(xie, x, jnp.log(jnp.squeeze(DF))))
-
-        # elif len(fe) == 3:
-        #     [DF, x, thetaphi] = fe
-        #     # the angle each k makes with the anisotropy is calculated
-        #     thetak = jnp.pi - jnp.arcsin((ks / k) * jnp.sin(sarad))
-        #     thetak[:, omg < 0, :] = -jnp.arcsin((ks[omg < 0] / k[:, omg < 0, :]) * jnp.sin(sarad))
-        #     # arcsin can only return values from -pi / 2 to pi / 2 this attempts to find the real value
-        #     theta90 = jnp.arcsin((ks / k) * jnp.sin(sarad))
-        #     ambcase = bool((ks > kL / jnp.cos(sarad)) * (sarad < jnp.pi / 2))
-        #     thetak[ambcase] = theta90[ambcase]
-        #
-        #     beta = jnp.arccos(
-        #         jnp.sin(thetaphi[1]) * jnp.sin(thetaphi[0]) * jnp.sin(thetak) + jnp.cos(thetaphi[0]) * jnp.cos(thetak)
-        #     )
-        #
-        #     # here the abs(xie) handles the double counting of the direction of k changing and delta omega being negative
-        #     fe_vphi = jnp.exp(
-        #         jnp.interpn(
-        #             jnp.arange(0, 2 * jnp.pi, 10**-1.2018), x, jnp.log(DF), beta, jnp.abs(xie), interpAlg, -jnp.inf
-        #         )
-        #     )
-        #
-        #     fe_vphi[jnp.isnan(fe_vphi)] = 0
 
         df = jnp.diff(fe_vphi, 1, 1) / jnp.diff(xie, 1, 1)
         df = jnp.append(df, jnp.zeros((len(ne), 1, len(sa))), 1)
@@ -363,17 +337,17 @@ class FormFactor:
         fe_vphi = jnp.zeros_like(beta)
         # x1D = x[0, :]
 
-        fe_2D_k = snd.rotate(DF, 45, reshape=False)
-
-        fe_2D_k_v2 = rotate(DF, jnp.pi / 4.0)
-
-        from matplotlib import pyplot as plt
-
-        fig, ax = plt.subplots(1, 3, figsize=(18, 6), tight_layout=True, sharex=False)
-        ax[0].contour(DF)
-        ax[1].contour(fe_2D_k)
-        ax[2].contour(fe_2D_k_v2)
-        plt.show()
+        # fe_2D_k = snd.rotate(DF, 45, reshape=False)
+        #
+        # fe_2D_k_v2 = rotate(DF, jnp.pi / 4.0)
+        #
+        # from matplotlib import pyplot as plt
+        #
+        # fig, ax = plt.subplots(1, 3, figsize=(18, 6), tight_layout=True, sharex=False)
+        # ax[0].contour(DF)
+        # ax[1].contour(fe_2D_k)
+        # ax[2].contour(fe_2D_k_v2)
+        # plt.show()
 
         # def this_ratintn(this_beta, this_xie_mag, this_klde_mag):
         #     return self.calc_chi_vals(
