@@ -99,9 +99,7 @@ def _run_(config: Dict, mode: str = "fit"):
     t0 = time.time()
     if mode == "fit":
         fit_results, loss = fitter.fit(config=config)
-    elif mode == "forward":
-        calc_spec(config=config)
-    elif mode == "series":
+    elif mode == "forward" or mode == "series":
         calc_series(config=config)
     metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
     mlflow.log_metrics(metrics=metrics_dict)
@@ -137,24 +135,114 @@ def run_job(run_id: str, nested: bool):
         utils.export_run(run_id)
 
 
-def calc_spec(config: Dict):
+#
+# def calc_spec(config: Dict):
+#     """
+#     Just performs a forward pass
+#
+#
+#     Args:
+#         config:
+#
+#     Returns:
+#
+#     """
+#     # get scattering angles and weights
+#     config["optimizer"]["batch_size"] = 1
+#     config["other"]["extraoptions"]["spectype"] = "temporal"
+#     stddev = dict()
+#     stddev["spect_stddev_ion"] = 0.015  # 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
+#     stddev["spect_stddev_ele"] = 0.1  # 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
+#     config["other"]["PhysParams"]["widIRF"] = stddev
+#     config["other"]["lamrangE"] = [
+#         config["data"]["fit_rng"]["forward_epw_start"],
+#         config["data"]["fit_rng"]["forward_epw_end"],
+#     ]
+#     config["other"]["lamrangI"] = [
+#         config["data"]["fit_rng"]["forward_iaw_start"],
+#         config["data"]["fit_rng"]["forward_iaw_end"],
+#     ]
+#     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
+#     # config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+#     # if config["parameters"]["fe"]["symmetric"]:
+#     #    config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+#
+#     dist_obj = DistFunc(config)
+#     config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"])
+#     config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
+#     # if not config["parameters"]["fe"]["val"]:
+#     #    config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+#
+#     config["units"] = init_param_norm_and_shift(config)
+#
+#     sas = get_scattering_angles(config)
+#     dummy_batch = {
+#         "i_data": np.array([1]),
+#         "e_data": np.array([1]),
+#         "noise_e": 0,
+#         "noise_i": 0,
+#         "e_amps": 1,
+#         "i_amps": 1,
+#     }
+#     ts_fitter = TSFitter(config, sas, dummy_batch)
+#     params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
+#     t_start = time.time()
+#     ThryE, ThryI, lamAxisE, lamAxisI = ts_fitter.spec_calc(params, dummy_batch)
+#     spectime = time.time() - t_start
+#
+#     fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
+#     if config["other"]["extraoptions"]["load_ele_spec"]:
+#         ax[0].plot(lamAxisE, ThryE)
+#         ax[0].set_title("Simulated Data, fontsize=14")
+#         ax[0].set_ylabel("Amp (arb. units)")
+#         ax[0].set_xlabel("Wavelength (nm)")
+#         ax[0].grid()
+#
+#         coords_ele = (("Wavelength", lamAxisE),)
+#         ele_dat = {"Sim": ThryE}
+#         ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
+#
+#     if config["other"]["extraoptions"]["load_ion_spec"]:
+#         ax[1].plot(lamAxisI, ThryI)
+#         ax[1].set_title("Simulated Data, fontsize=14")
+#         ax[1].set_ylabel("Amp (arb. units)")
+#         ax[1].set_xlabel("Wavelength (nm)")
+#         ax[1].grid()
+#
+#         coords_ion = (("Wavelength", lamAxisI),)
+#         ion_dat = {"Sim": ThryI}
+#         ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
+#
+#     with tempfile.TemporaryDirectory() as td:
+#         if config["other"]["extraoptions"]["load_ion_spec"]:
+#             ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
+#         if config["other"]["extraoptions"]["load_ele_spec"]:
+#             ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))
+#         fig.savefig(os.path.join(td, "simulated_data"), bbox_inches="tight")
+#         mlflow.log_artifacts(td)
+#         metrics_dict = {"spectrum_calc_time": spectime}
+#         mlflow.log_metrics(metrics=metrics_dict)
+#     plt.close(fig)
+
+
+def calc_series(config):
     """
-    Just performs a forward pass
+    Calculates a spectrum or series of spectra from the input deck, i.e. performs a forward pass or series of forward
+     passes.
 
 
     Args:
-        config:
+        config: Dictionary - Configuration dictionary created from the input deck. For series of spectra contains the special
+         field 'series'. This field can have up to 8 subfields [param1, vals1, param2, vals2, param3, vals3, param4, vals4].
+         the param subfields are a string identifying which fields of "parameters" are to be looped over. The vals subfields
+         give the values of that subfield for each spectrum in the series.
 
     Returns:
+        Ion data, electron data, and plots are saved to mlflow
 
     """
     # get scattering angles and weights
     config["optimizer"]["batch_size"] = 1
-    config["other"]["extraoptions"]["spectype"] = "temporal"
-    stddev = dict()
-    stddev["spect_stddev_ion"] = 0.015  # 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
-    stddev["spect_stddev_ele"] = 0.1  # 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
-    config["other"]["PhysParams"]["widIRF"] = stddev
     config["other"]["lamrangE"] = [
         config["data"]["fit_rng"]["forward_epw_start"],
         config["data"]["fit_rng"]["forward_epw_end"],
@@ -164,19 +252,18 @@ def calc_spec(config: Dict):
         config["data"]["fit_rng"]["forward_iaw_end"],
     ]
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
-    # config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-    # if config["parameters"]["fe"]["symmetric"]:
-    #    config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
 
     dist_obj = DistFunc(config)
     config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"])
     config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
-    # if not config["parameters"]["fe"]["val"]:
-    #    config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
 
     config["units"] = init_param_norm_and_shift(config)
 
     sas = get_scattering_angles(config)
+    # if (config["data"]["lineouts"]["type"] == "range") & (config["other"]["extraoptions"]["spectype"] == "angular"):
+    if config["other"]["extraoptions"]["spectype"] == "angular":
+        config["other"]["extraoptions"]["spectype"] = "angular_full"
+
     dummy_batch = {
         "i_data": np.array([1]),
         "e_data": np.array([1]),
@@ -185,139 +272,85 @@ def calc_spec(config: Dict):
         "e_amps": 1,
         "i_amps": 1,
     }
-    ts_fitter = TSFitter(config, sas, dummy_batch)
-    params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
+
+    if "series" in config.keys():
+        serieslen = len(config["series"]["vals1"])
+    else:
+        serieslen = 1
+    ThryE = [None] * serieslen
+    ThryI = [None] * serieslen
+    lamAxisE = [None] * serieslen
+    lamAxisI = [None] * serieslen
+
     t_start = time.time()
-    ThryE, ThryI, lamAxisE, lamAxisI = ts_fitter.spec_calc(params, dummy_batch)
-    spectime = time.time()-t_start
-
-    fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
-    ax[0].plot(lamAxisE, ThryE)
-    ax[0].set_title("Simulated Data, fontsize=14")
-    ax[0].set_ylabel("Amp (arb. units)")
-    ax[0].set_xlabel("Wavelength (nm)")
-    ax[0].grid()
-
-    # ax[1].plot(lamAxisI, ThryI)
-    # ax[1].set_title("Simulated Data, fontsize=14")
-    # ax[1].set_ylabel("Amp (arb. units)")
-    # ax[1].set_xlabel("Wavelength (nm)")
-    # ax[1].grid()
-
-    # coords_ion = (("Wavelength", lamAxisI),)
-    coords_ele = (("Wavelength", lamAxisE),)
-    # ion_dat = {"Sim": ThryI}
-    ele_dat = {"Sim": ThryE}
-
-    # ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
-    ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
-
-    with tempfile.TemporaryDirectory() as td:
-        # ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
-        ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))
-        fig.savefig(os.path.join(td, "simulated_data"), bbox_inches="tight")
-        mlflow.log_artifacts(td)
-        metrics_dict = {"spectrum_calc_time": spectime}
-        mlflow.log_metrics(metrics=metrics_dict)
-    plt.close(fig)
-
-
-def calc_series(config):
-    # get scattering angles and weights
-    config["optimizer"]["batch_size"] = 1
-    config["other"]["extraoptions"]["spectype"] = "temporal"
-    stddev = dict()
-    stddev["spect_stddev_ion"] = 0.015  # 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
-    stddev["spect_stddev_ele"] = 0.1  # 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
-    config["other"]["PhysParams"]["widIRF"] = stddev
-    config["other"]["lamrangE"] = [
-        config["data"]["fit_rng"]["forward_epw_start"],
-        config["data"]["fit_rng"]["forward_epw_end"],
-    ]
-    config["other"]["lamrangI"] = [
-        config["data"]["fit_rng"]["forward_iaw_start"],
-        config["data"]["fit_rng"]["forward_iaw_end"],
-    ]
-    config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
-#     config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-#     if config["parameters"]["fe"]["symmetric"]:
-#         config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-
-#     NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
-    dist_obj = DistFunc(config)
-    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(
-        config["parameters"]["fe"], config["parameters"]["m"]
-    )
-    config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
-    
-    # if not config["parameters"]["fe"]["val"]:
-    #     config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
-
-    config["units"] = init_param_norm_and_shift(config)
-
-    sas = get_scattering_angles(config)
-    dummy_batch = {
-        "i_data": np.array([1]),
-        "e_data": np.array([1]),
-        "noise_e": 0,
-        "noise_i": 0,
-        "e_amps": 1,
-        "i_amps": 1,
-    }
-
-    ThryE = [None] * len(config["series"]["vals1"])
-    ThryI = [None] * len(config["series"]["vals1"])
-    lamAxisE = [None] * len(config["series"]["vals1"])
-    lamAxisI = [None] * len(config["series"]["vals1"])
-    for i, val in enumerate(config["series"]["vals1"]):
-        config["parameters"][config["series"]["param1"]]["val"] = val
-        if "param2" in config["series"].keys():
-            config["parameters"][config["series"]["param2"]]["val"] = config["series"]["vals2"][i]
-        if "param3" in config["series"].keys():
-            config["parameters"][config["series"]["param3"]]["val"] = config["series"]["vals3"][i]
-        if "param4" in config["series"].keys():
-            config["parameters"][config["series"]["param4"]]["val"] = config["series"]["vals4"][i]
+    for i in range(serieslen):
+        if "series" in config.keys():
+            config["parameters"][config["series"]["param1"]]["val"] = config["series"]["vals1"][i]
+            if "param2" in config["series"].keys():
+                config["parameters"][config["series"]["param2"]]["val"] = config["series"]["vals2"][i]
+            if "param3" in config["series"].keys():
+                config["parameters"][config["series"]["param3"]]["val"] = config["series"]["vals3"][i]
+            if "param4" in config["series"].keys():
+                config["parameters"][config["series"]["param4"]]["val"] = config["series"]["vals4"][i]
 
         ts_fitter = TSFitter(config, sas, dummy_batch)
         params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
         ThryE[i], ThryI[i], lamAxisE[i], lamAxisI[i] = ts_fitter.spec_calc(params, dummy_batch)
 
+    spectime = time.time() - t_start
     ThryE = np.array(ThryE)
     ThryI = np.array(ThryI)
     lamAxisE = np.array(lamAxisE)
     lamAxisI = np.array(lamAxisI)
 
     fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
-    ax[0].plot(lamAxisE.transpose(), ThryE.transpose())
-    ax[0].set_title("Simulated Data, fontsize=14")
-    ax[0].set_ylabel("Amp (arb. units)")
-    ax[0].set_xlabel("Wavelength (nm)")
-    ax[0].legend([str(ele) for ele in config["series"]["vals1"]])
-    ax[0].grid()
+    if config["other"]["extraoptions"]["load_ele_spec"]:
+        ax[0].plot(lamAxisE.transpose(), ThryE.transpose())  # transpose might break single specs?
+        ax[0].set_title("Simulated Data, fontsize=14")
+        ax[0].set_ylabel("Amp (arb. units)")
+        ax[0].set_xlabel("Wavelength (nm)")
+        ax[0].grid()
 
-    ax[1].plot(lamAxisI.transpose(), ThryI.transpose())
-    ax[1].set_title("Simulated Data, fontsize=14")
-    ax[1].set_ylabel("Amp (arb. units)")
-    ax[1].set_xlabel("Wavelength (nm)")
-    ax[1].legend([str(ele) for ele in config["series"]["vals1"]])
-    ax[1].grid()
+        if "series" in config.keys():
+            ax[0].legend([str(ele) for ele in config["series"]["vals1"]])
+            if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
+                coords_ele = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisE[0, :]))
+            else:
+                coords_ele = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisE[0, :]))
+            ele_dat = {"Sim": ThryE}
+            ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
+        else:
+            coords_ele = (("series", [0]), ("Wavelength", lamAxisE[0, :]))
+            ele_dat = {"Sim": ThryE}
+            ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
 
-    if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
-        coords_ion = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisI[0, :]))
-        coords_ele = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisE[0, :]))
-    else:
-        coords_ion = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisI[0, :]))
-        coords_ele = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisE[0, :]))
-    ion_dat = {"Sim": ThryI}
-    ele_dat = {"Sim": ThryE}
+    if config["other"]["extraoptions"]["load_ion_spec"]:
+        ax[1].plot(lamAxisI.transpose(), ThryI.transpose())
+        ax[1].set_title("Simulated Data, fontsize=14")
+        ax[1].set_ylabel("Amp (arb. units)")
+        ax[1].set_xlabel("Wavelength (nm)")
+        ax[1].grid()
 
-    ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
-    ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
-    # ion_data = xr.Dataset(
+        if "series" in config.keys():
+            ax[1].legend([str(ele) for ele in config["series"]["vals1"]])
+            if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
+                coords_ion = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisI[0, :]))
+            else:
+                coords_ion = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisI[0, :]))
+            ion_dat = {"Sim": ThryI}
+            ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
+        else:
+            coords_ion = (("series", [0]), ("Wavelength", lamAxisI[0, :]))
+            ion_dat = {"Sim": ThryI}
+            ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
 
     with tempfile.TemporaryDirectory() as td:
-        ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
-        ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))
+        if config["other"]["extraoptions"]["load_ion_spec"]:
+            ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
+        if config["other"]["extraoptions"]["load_ele_spec"]:
+            ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))
         fig.savefig(os.path.join(td, "simulated_data"), bbox_inches="tight")
         mlflow.log_artifacts(td)
+        metrics_dict = {"spectrum_calc_time": spectime}
+        mlflow.log_metrics(metrics=metrics_dict)
     plt.close(fig)

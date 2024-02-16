@@ -4,22 +4,22 @@ from jax import numpy as jnp
 
 def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
-    Angular Thomson Scattering IRF
-
+    Applies a 2D gaussian smoothing to angular Thomson data to account for the instrument response of the diagnostic.
     todo: improve doc and typehints
 
     Args:
-        config:
-        sas:
-        lamAxisE:
-        modlE:
-        amps:
-        TSins:
-        lam:
+        config: Dict- configuration dictionary built from input deck
+        sas: Dict- fields 'sa' and 'weights' with sizes (n,) where n is the number of angles where the spectrum is computed. 'sa' contains the scattering angles in degrees and 'weights' included the normalized relative weights each angle contributes to final spectrum.
+        lamAxisE: Array- wavelengths the spectrum is computed at in nm
+        modlE: Array- synthetic spectra produced by the formfactor routine
+        amps: float- maximum amplitude of the data, used to rescale model to the data
+        TSins: Dict- Dictionary of the parameters and thier values
+        lam: float- probe wavelength in nm
 
     Returns:
 
     """
+    print(type(config["other"]["PhysParams"]["widIRF"]["ang_FWHM_ele"]))
     stddev_lam = config["other"]["PhysParams"]["widIRF"]["spect_FWHM_ele"] / 2.3548
     stddev_ang = config["other"]["PhysParams"]["widIRF"]["ang_FWHM_ele"] / 2.3548
     # Conceptual_origin so the convolution donsn't shift the signal

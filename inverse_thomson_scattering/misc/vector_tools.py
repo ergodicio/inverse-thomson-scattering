@@ -12,12 +12,8 @@ def vsub(a, b):
 
 
 def vdot(a, b):
-    print(type(a))
-
-    print(type(b))
     # custom function for vector dot product where a and b are tuples of ND-arrays with the first element being the ND-array of x-values and the second element being the ND-array of y-values
     if type(a) is tuple:
-        print("here")
         if type(b) is tuple:
             return a[0] * b[0] + a[1] * b[1]
         else:

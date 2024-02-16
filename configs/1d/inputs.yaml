@@ -85,7 +85,7 @@ parameters:
         fe_decrease_strict: False
         symmetric: False
         dim: 2
-        v_res: 0.01
+        v_res: 0.1
         temp_asym: 2.0
 
 
@@ -111,6 +111,13 @@ other:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
+        spectype: angular
+    PhysParams:
+        widIRF:
+            spect_stddev_ion: 0.015
+            spect_stddev_ele: 0.1
+            spect_FWHM_ele: = 0.9
+            ang_FWHM_ele: 1.0
     refit: False
     refit_thresh: 5.0
     calc_sigmas: False
