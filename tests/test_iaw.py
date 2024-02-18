@@ -26,7 +26,7 @@ def test_iaw():
     Esq = Me * C**2 * re  # sq of the electron charge keV cm
 
     xie = np.linspace(-7, 7, 1024)
-    ion_form_factor = FormFactor([525, 528], npts=8192, vax=xie)
+    ion_form_factor = FormFactor([525, 528], npts=8192)
 
     sa = np.array([60])
     num_dist_func = get_num_dist_func({"DLM": []}, xie)

@@ -44,7 +44,7 @@ def zprimeMaxw(xi):
 
 
 class FormFactor:
-    def __init__(self, lamrang, npts, vax):
+    def __init__(self, lamrang, npts, vax=None):
         # basic quantities
         self.C = 2.99792458e10
         self.Me = 510.9896 / self.C**2  # electron mass keV/C^2
@@ -57,8 +57,10 @@ class FormFactor:
         self.xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
         self.xi2 = jnp.array(jnp.arange(-minmax, minmax, self.h))
         self.Zpi = jnp.array(zprimeMaxw(self.xi2))
-        self.coords = jnp.concatenate([vax[0][..., None], vax[1][..., None]], axis=-1)
-        self.v = vax[0][0]
+
+        if vax is not None:
+            self.coords = jnp.concatenate([vax[0][..., None], vax[1][..., None]], axis=-1)
+            self.v = vax[0][0]
 
     def __call__(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
         """
@@ -200,12 +202,12 @@ class FormFactor:
         # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam
         # formfactorE = PsLamE # commented because unused
-        from matplotlib import pyplot as plt
+        # from matplotlib import pyplot as plt
 
-        fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
-        ax[0].plot(x, DF)
-        ax[1].plot(fe_vphi[1, :, 0])
-        plt.show()
+        # fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
+        # ax[0].plot(x, DF)
+        # ax[1].plot(fe_vphi[1, :, 0])
+        # plt.show()
 
         return formfactor, lams
 
