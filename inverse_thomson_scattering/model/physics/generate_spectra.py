@@ -20,8 +20,12 @@ class FitModel:
     def __init__(self, config: Dict, sa):
         self.config = config
         self.sa = sa
-        self.electron_form_factor = FormFactor(config["other"]["lamrangE"], npts=config["other"]["npts"])
-        self.ion_form_factor = FormFactor(config["other"]["lamrangI"], npts=config["other"]["npts"])
+        self.electron_form_factor = FormFactor(
+            config["other"]["lamrangE"], npts=config["other"]["npts"], vax=config["velocity"]
+        )
+        self.ion_form_factor = FormFactor(
+            config["other"]["lamrangI"], npts=config["other"]["npts"], vax=config["velocity"]
+        )
         self.num_dist_func = DistFunc(config)
 
     def __call__(self, all_params: Dict):

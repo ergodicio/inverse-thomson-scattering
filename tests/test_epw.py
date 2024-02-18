@@ -15,8 +15,8 @@ from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 def test_epw():
     # Test #1: Bohm-Gross test, calculate a spectrum and compare the resonance to the Bohm gross dispersion relation
     npts = 2048
-    electron_form_factor = FormFactor([400, 700], npts=npts)
     xie = np.linspace(-7, 7, npts)
+    electron_form_factor = FormFactor([400, 700], npts=npts, vax=xie)
     sa = np.array([60])
     num_dist_func = get_num_dist_func({"DLM": []}, xie)
     fecur = num_dist_func(2.0)

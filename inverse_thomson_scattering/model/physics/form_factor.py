@@ -2,9 +2,11 @@ from jax import numpy as jnp
 from jax import vmap
 
 import scipy.interpolate as sp
-import scipy.ndimage as snd
+
+# import scipy.ndimage as snd
 import numpy as np
-from interpax import Interpolator2D, interp2d
+from interpax import interp2d
+from jax.lax import scan
 
 from inverse_thomson_scattering.model.physics import ratintn
 from inverse_thomson_scattering.misc import lam_parse
@@ -41,7 +43,7 @@ def zprimeMaxw(xi):
 
 
 class FormFactor:
-    def __init__(self, lamrang, npts):
+    def __init__(self, lamrang, npts, vax):
         # basic quantities
         self.C = 2.99792458e10
         self.Me = 510.9896 / self.C**2  # electron mass keV/C^2
@@ -54,6 +56,8 @@ class FormFactor:
         self.xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
         self.xi2 = jnp.array(jnp.arange(-minmax, minmax, self.h))
         self.Zpi = jnp.array(zprimeMaxw(self.xi2))
+        self.coords = jnp.concatenate([vax[0][..., None], vax[1][..., None]], axis=-1)
+        self.v = vax[0][0]
 
     def __call__(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
         """
@@ -204,8 +208,53 @@ class FormFactor:
 
         return formfactor, lams
 
-    def calc_chi_vals(self, x, element, DF, xie_mag_at, klde_mag_at):
-        fe_2D_k = snd.rotate(DF, element * 180 / jnp.pi, reshape=False)
+    def rotate(self, df, angle, reshape: bool = False) -> jnp.ndarray:
+        """
+        Rotate a 2D array by a given angle in radians
+
+        Args:
+            df: 2D array
+            angle: angle in radians
+
+        Return:
+            interpolated 2D array
+        """
+
+        rad_angle = jnp.deg2rad(-angle)
+        cos_angle = jnp.cos(rad_angle)
+        sin_angle = jnp.sin(rad_angle)
+        rotation_matrix = jnp.array([[cos_angle, -sin_angle], [sin_angle, cos_angle]])
+
+        rotated_mesh = vmap(vmap(jnp.dot, in_axes=(None, 0)), in_axes=(None, 1), out_axes=1)(
+            rotation_matrix, self.coords
+        )
+        xq = rotated_mesh[..., 0].flatten()
+        yq = rotated_mesh[..., 1].flatten()
+        return interp2d(xq, yq, self.v, self.v, df, extrap=True, method="cubic").reshape(
+            (self.v.size, self.v.size), order="F"
+        )
+
+    def calc_chi_vals(self, carry, xs):
+        """
+        Calculate the values of the susceptibility at a given point in the distribution function
+
+        Args:
+            x: 1D array
+            element: angle in radians
+            DF: 2D array
+            xie_mag_at: float
+            klde_mag_at: float
+
+        Returns:
+            fe_vphi: float
+            chiEI: float
+            chiERrat: float
+
+        """
+        x, DF = carry
+        element, xie_mag_at, klde_mag_at = xs
+
+        fe_2D_k = self.rotate(DF, element * 180 / jnp.pi, reshape=False)
         fe_1D_k = jnp.sum(fe_2D_k, axis=1) * (x[1] - x[0])
 
         # find the location of xie in axis array
@@ -225,7 +274,21 @@ class FormFactor:
         chiERrat = (
             -1.0 / (klde_mag_at**2) * jnp.real(ratintn.ratintn(df, x - xie_mag_at, x))
         )  # this may need to be downsampled for run time
-        return fe_vphi, chiEI[0], chiERrat[0]
+        return (x, DF), (fe_vphi, chiEI, chiERrat)
+
+    def calc_all_chi_vals(self, x, beta, DF, xie_mag, klde_mag):
+        # fn = vmap(self.calc_chi_vals, in_axes=(None, 0, None, 0, 0), out_axes=0)
+        # fn = vmap(fn, in_axes=(None, 1, None, 1, 1), out_axes=1)
+        # fn = vmap(fn, in_axes=(None, 2, None, 2, 2), out_axes=2)
+
+        # all_vals = fn(x, beta, DF, xie_mag, klde_mag)
+        _, (fe_vphi, chiEI, chiERrat) = scan(
+            self.calc_chi_vals, (x, DF), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=32
+        )
+        for arr in (fe_vphi, chiEI, chiERrat):
+            arr = arr.reshape(beta.shape)
+
+        return fe_vphi, chiEI, chiERrat
 
     def calc_in_2D(self, params, ud_ang, va_ang, cur_ne, cur_Te, sa, f_and_v, lam):
         """
@@ -360,22 +423,21 @@ class FormFactor:
         #
         # #
         # # print(len(beta.flatten()))
-        # fe_vphi, chiEI, chiERrat = vmap(this_ratintn)(beta.flatten(), xie_mag.flatten(), klde_mag.flatten())
+        fe_vphi, chiEI, chiERrat = self.calc_all_chi_vals(x[0, :], beta, DF, xie_mag, klde_mag)
 
         # for each rotation or element of vector in xie
-        for ind, element in enumerate(beta.flatten()):
-            v1, v2, v3 = self.calc_chi_vals(
-                x[0, :],
-                element,
-                DF,
-                xie_mag[jnp.unravel_index(ind, beta.shape)],
-                klde_mag[jnp.unravel_index(ind, beta.shape)],
-            )
+        # for ind, element in enumerate(beta.flatten()):
+        #     v1, v2, v3 = self.calc_chi_vals(
+        #         x[0, :],
+        #         element,
+        #         DF,
+        #         xie_mag[jnp.unravel_index(ind, beta.shape)],
+        #         klde_mag[jnp.unravel_index(ind, beta.shape)],
+        #     )
 
-            fe_vphi = fe_vphi.at[jnp.unravel_index(ind, beta.shape)].set(v1)
-            chiEI = chiEI.at[jnp.unravel_index(ind, beta.shape)].set(v2)
-            chiERrat = chiERrat.at[jnp.unravel_index(ind, beta.shape)].set(v3)
-            print(ind)
+        #     fe_vphi = fe_vphi.at[jnp.unravel_index(ind, beta.shape)].set(v1)
+        #     chiEI = chiEI.at[jnp.unravel_index(ind, beta.shape)].set(v2)
+        #     chiERrat = chiERrat.at[jnp.unravel_index(ind, beta.shape)].set(v3)
 
         chiE = chiERrat + jnp.sqrt(-1 + 0j) * chiEI
         epsilon = 1.0 + chiE + chiI
