@@ -7,6 +7,7 @@ import scipy.interpolate as sp
 import numpy as np
 from interpax import interp2d
 from jax.lax import scan
+from jax import jit
 
 from inverse_thomson_scattering.model.physics import ratintn
 from inverse_thomson_scattering.misc import lam_parse
@@ -285,10 +286,10 @@ class FormFactor:
         _, (fe_vphi, chiEI, chiERrat) = scan(
             self.calc_chi_vals, (x, DF), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=32
         )
-        for arr in (fe_vphi, chiEI, chiERrat):
-            arr = arr.reshape(beta.shape)
+        # for arr in (fe_vphi, chiEI, chiERrat):
+        # arr = arr.reshape(beta.shape)
 
-        return fe_vphi, chiEI, chiERrat
+        return fe_vphi.reshape(beta.shape), chiEI.reshape(beta.shape), chiERrat.reshape(beta.shape)
 
     def calc_in_2D(self, params, ud_ang, va_ang, cur_ne, cur_Te, sa, f_and_v, lam):
         """
@@ -395,9 +396,9 @@ class FormFactor:
         beta = jnp.arctan(xie[1] / xie[0]) + jnp.pi * (-jnp.heaviside(xie[0], 1) + 1)
 
         # preallocate chiEI and chiER and fe
-        chiEI = jnp.zeros_like(beta)
-        chiERrat = jnp.zeros_like(beta)
-        fe_vphi = jnp.zeros_like(beta)
+        # chiEI = jnp.zeros_like(beta)
+        # chiERrat = jnp.zeros_like(beta)
+        # fe_vphi = jnp.zeros_like(beta)
         # x1D = x[0, :]
 
         # fe_2D_k = snd.rotate(DF, 45, reshape=False)
@@ -423,7 +424,7 @@ class FormFactor:
         #
         # #
         # # print(len(beta.flatten()))
-        fe_vphi, chiEI, chiERrat = self.calc_all_chi_vals(x[0, :], beta, DF, xie_mag, klde_mag)
+        fe_vphi, chiEI, chiERrat = jit(self.calc_all_chi_vals)(x[0, :], beta, DF, xie_mag, klde_mag)
 
         # for each rotation or element of vector in xie
         # for ind, element in enumerate(beta.flatten()):
@@ -463,7 +464,7 @@ class FormFactor:
         # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam
         # formfactorE = PsLamE # commented because unused
-
+        #
         from matplotlib import pyplot as plt
 
         fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)

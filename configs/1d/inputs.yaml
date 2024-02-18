@@ -116,7 +116,7 @@ other:
         widIRF:
             spect_stddev_ion: 0.015
             spect_stddev_ele: 0.1
-            spect_FWHM_ele: = 0.9
+            spect_FWHM_ele: 0.9
             ang_FWHM_ele: 1.0
     refit: False
     refit_thresh: 5.0

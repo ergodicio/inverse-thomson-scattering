@@ -1,6 +1,8 @@
 import time, os
 from typing import Dict, Tuple
 
+from jax import jit
+
 import numpy as np
 import matplotlib.pyplot as plt
 import mlflow, tempfile, yaml
