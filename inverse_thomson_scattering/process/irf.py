@@ -19,7 +19,6 @@ def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam) -> Tuple[jnp.nda
     Returns:
 
     """
-    print(type(config["other"]["PhysParams"]["widIRF"]["ang_FWHM_ele"]))
     stddev_lam = config["other"]["PhysParams"]["widIRF"]["spect_FWHM_ele"] / 2.3548
     stddev_ang = config["other"]["PhysParams"]["widIRF"]["ang_FWHM_ele"] / 2.3548
     # Conceptual_origin so the convolution donsn't shift the signal

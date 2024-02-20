@@ -68,22 +68,26 @@ class TSFitter:
             flattened_ub, _ = ravel_pytree(ub)
             self.bounds = zip(flattened_lb, flattened_ub)
 
-        # if "dist_fit" in cfg:
-        #     self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
-        #     self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
-        #
-        #     if cfg["dist_fit"]["window"]["type"] == "hamming":
-        #         self.w = jnp.hamming(self.smooth_window_len)
-        #     elif cfg["dist_fit"]["window"]["type"] == "hann":
-        #         self.w = jnp.hanning(self.smooth_window_len)
-        #     elif cfg["dist_fit"]["window"]["type"] == "bartlett":
-        #         self.w = jnp.bartlett(self.smooth_window_len)
-        #     else:
-        #         raise NotImplementedError
-        # else:
-        #     Warning(
-        #         "\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n"
-        #     )
+        # this needs to be rethought
+        if "dist_fit" in cfg:
+            if cfg["parameters"]["fe"]["dim"] == 1:
+                self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
+                self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
+
+                if cfg["dist_fit"]["window"]["type"] == "hamming":
+                    self.w = jnp.hamming(self.smooth_window_len)
+                elif cfg["dist_fit"]["window"]["type"] == "hann":
+                    self.w = jnp.hanning(self.smooth_window_len)
+                elif cfg["dist_fit"]["window"]["type"] == "bartlett":
+                    self.w = jnp.bartlett(self.smooth_window_len)
+                else:
+                    raise NotImplementedError
+            else:
+                Warning("Smoothing not enabled for 2D distributions")
+        else:
+            Warning(
+                "\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n"
+            )
 
     def smooth(self, distribution: jnp.ndarray) -> jnp.ndarray:
         """
@@ -133,6 +137,7 @@ class TSFitter:
                 )
                 if param_name == "fe":
                     these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"][0]))[None, :])
+                    # these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"])))
 
             else:
                 if return_static_params:

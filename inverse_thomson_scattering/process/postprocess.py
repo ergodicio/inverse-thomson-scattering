@@ -17,11 +17,11 @@ def recalculate_with_chosen_weights(
 
 
     Args:
-        config:
+        config: Dict- configuration dictionary built from input deck
         batch_indices:
-        all_data:
-        best_weights:
-        ts_fitter:
+        all_data: Dict- contains the electron data, ion data, and their respective amplitudes
+        ts_fitter: Instance of the TSFitter class
+        fitted_weights: Dict- best values of the parameters returned by the minimizer
 
     Returns:
 
@@ -228,28 +228,24 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             best_weights_val = {}
             best_weights_std = {}
             for k, v in fitted_weights.items():
-                best_weights_val[k] = np.average(v, axis=0)#[0, :]
-                best_weights_std[k] = np.std(v, axis=0)#[0, :]
+                best_weights_val[k] = np.average(v, axis=0)  # [0, :]
+                best_weights_std[k] = np.std(v, axis=0)  # [0, :]
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
                 config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], best_weights_val
             )
             mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
             mlflow.set_tag("status", "plotting")
             t1 = time.time()
-            final_params = plotters.plot_angular(
-                config,
-                losses,
-                all_params,
-                used_points,
-                all_axes,
-                fits,
-                all_data,
-                sqdevs,
-                sigmas,
-                td,
-                best_weights_val,
-                best_weights_std,
-            )
+
+            final_params = plotters.get_final_params(config, best_weights_val, td)
+            if config["other"]["calc_sigmas"]:
+                sigma_fe = plotters.plot_sigmas(config, final_params, best_weights_std, sigmas, td)
+            else:
+                sigma_fe = np.zeros_like(final_params["fe"])
+            savedata = plotters.plot_data_angular(config, fits, all_data, all_axes, td)
+            plotters.plot_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedata, td)
+            plotters.plot_dist(config, final_params, sigma_fe, td)
+
         else:
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
                 config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], fitted_weights

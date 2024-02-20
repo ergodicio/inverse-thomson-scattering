@@ -16,6 +16,8 @@ from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.fitter import init_param_norm_and_shift
 from inverse_thomson_scattering.misc import utils
+from inverse_thomson_scattering.misc.calibration import get_calibrations
+from inverse_thomson_scattering.misc import plotters
 
 
 if "BASE_TEMPDIR" in os.environ:
@@ -262,11 +264,17 @@ def calc_series(config):
     sas = get_scattering_angles(config)
     # if (config["data"]["lineouts"]["type"] == "range") & (config["other"]["extraoptions"]["spectype"] == "angular"):
     if config["other"]["extraoptions"]["spectype"] == "angular":
+        [axisxE, _, _, _, _, _] = get_calibrations(
+            104000, config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
+        )  # shot number hardcoded to get calibration
         config["other"]["extraoptions"]["spectype"] = "angular_full"
 
+        sas["angAxis"] = axisxE
+    # all_data, sas, all_axes = prepare.prepare_data(config)
+
     dummy_batch = {
-        "i_data": np.array([1]),
-        "e_data": np.array([1]),
+        "i_data": np.ones((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1])),
+        "e_data": np.ones((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1])),
         "noise_e": 0,
         "noise_i": 0,
         "e_amps": 1,
@@ -303,54 +311,68 @@ def calc_series(config):
     lamAxisE = np.array(lamAxisE)
     lamAxisI = np.array(lamAxisI)
 
-    fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
-    if config["other"]["extraoptions"]["load_ele_spec"]:
-        ax[0].plot(lamAxisE.transpose(), ThryE.transpose())  # transpose might break single specs?
-        ax[0].set_title("Simulated Data, fontsize=14")
-        ax[0].set_ylabel("Amp (arb. units)")
-        ax[0].set_xlabel("Wavelength (nm)")
-        ax[0].grid()
-
-        if "series" in config.keys():
-            ax[0].legend([str(ele) for ele in config["series"]["vals1"]])
-            if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
-                coords_ele = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisE[0, :]))
-            else:
-                coords_ele = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisE[0, :]))
-            ele_dat = {"Sim": ThryE}
-            ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
-        else:
-            coords_ele = (("series", [0]), ("Wavelength", lamAxisE[0, :]))
-            ele_dat = {"Sim": ThryE}
-            ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
-
-    if config["other"]["extraoptions"]["load_ion_spec"]:
-        ax[1].plot(lamAxisI.transpose(), ThryI.transpose())
-        ax[1].set_title("Simulated Data, fontsize=14")
-        ax[1].set_ylabel("Amp (arb. units)")
-        ax[1].set_xlabel("Wavelength (nm)")
-        ax[1].grid()
-
-        if "series" in config.keys():
-            ax[1].legend([str(ele) for ele in config["series"]["vals1"]])
-            if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
-                coords_ion = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisI[0, :]))
-            else:
-                coords_ion = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisI[0, :]))
-            ion_dat = {"Sim": ThryI}
-            ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
-        else:
-            coords_ion = (("series", [0]), ("Wavelength", lamAxisI[0, :]))
-            ion_dat = {"Sim": ThryI}
-            ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
-
     with tempfile.TemporaryDirectory() as td:
-        if config["other"]["extraoptions"]["load_ion_spec"]:
-            ion_data.to_netcdf(os.path.join(td, "ion_data.nc"))
-        if config["other"]["extraoptions"]["load_ele_spec"]:
-            ele_data.to_netcdf(os.path.join(td, "ele_data.nc"))
-        fig.savefig(os.path.join(td, "simulated_data"), bbox_inches="tight")
+        os.makedirs(os.path.join(td, "plots"), exist_ok=True)
+        os.makedirs(os.path.join(td, "binary"), exist_ok=True)
+        os.makedirs(os.path.join(td, "csv"), exist_ok=True)
+        if config["other"]["extraoptions"]["spectype"] == "angular_full":
+            savedata = plotters.plot_data_angular(
+                config,
+                {"ele": np.squeeze(ThryE)},
+                {"e_data": np.zeros((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1]))},
+                {"epw_x": sas["angAxis"], "epw_y": lamAxisE},
+                td,
+            )
+            plotters.plot_dist(
+                config,
+                {"fe": config["parameters"]["fe"]["val"], "v": config["velocity"]},
+                np.zeros_like(config["parameters"]["fe"]["val"]),
+                td,
+            )
+        else:
+            print("Need to refactor lines")
         mlflow.log_artifacts(td)
         metrics_dict = {"spectrum_calc_time": spectime}
         mlflow.log_metrics(metrics=metrics_dict)
-    plt.close(fig)
+
+    #    fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
+
+    # if config["other"]["extraoptions"]["load_ele_spec"]:
+    #     ax[0].plot(lamAxisE.transpose(), ThryE.transpose())  # transpose might break single specs?
+    #     ax[0].set_title("Simulated Data, fontsize=14")
+    #     ax[0].set_ylabel("Amp (arb. units)")
+    #     ax[0].set_xlabel("Wavelength (nm)")
+    #     ax[0].grid()
+    #
+    #     if "series" in config.keys():
+    #         ax[0].legend([str(ele) for ele in config["series"]["vals1"]])
+    #         if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
+    #             coords_ele = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisE[0, :]))
+    #         else:
+    #             coords_ele = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisE[0, :]))
+    #         ele_dat = {"Sim": ThryE}
+    #         ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
+    #     else:
+    #         coords_ele = (("series", [0]), ("Wavelength", lamAxisE[0, :]))
+    #         ele_dat = {"Sim": ThryE}
+    #         ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
+    #
+    # if config["other"]["extraoptions"]["load_ion_spec"]:
+    #     ax[1].plot(lamAxisI.transpose(), ThryI.transpose())
+    #     ax[1].set_title("Simulated Data, fontsize=14")
+    #     ax[1].set_ylabel("Amp (arb. units)")
+    #     ax[1].set_xlabel("Wavelength (nm)")
+    #     ax[1].grid()
+    #
+    #     if "series" in config.keys():
+    #         ax[1].legend([str(ele) for ele in config["series"]["vals1"]])
+    #         if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
+    #             coords_ion = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisI[0, :]))
+    #         else:
+    #             coords_ion = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisI[0, :]))
+    #         ion_dat = {"Sim": ThryI}
+    #         ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
+    #     else:
+    #         coords_ion = (("series", [0]), ("Wavelength", lamAxisI[0, :]))
+    #         ion_dat = {"Sim": ThryI}
+    #         ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})

@@ -2,13 +2,15 @@ from typing import Dict, Tuple, List
 import time
 import numpy as np
 import pandas as pd
+import copy
 import scipy.optimize as spopt
 
 import jaxopt, mlflow, optax
 from tqdm import trange
 from jax.flatten_util import ravel_pytree
 
-from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
+# from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
+from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.process import prepare, postprocess
 
@@ -63,9 +65,15 @@ def _validate_inputs_(config: Dict) -> Dict:
 
     """
     # get derived quantities
-    config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+    dist_obj = DistFunc(config)
+    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"])
+    config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])[None, :]
+    # config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+    Warning("fe length is currently overwritten by v_res")
+    config["parameters"]["fe"]["length"] = len(config["parameters"]["fe"]["val"])
     if config["parameters"]["fe"]["symmetric"]:
-        config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+        Warning("Symmetric EDF has been disabled")
+        # config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
 
     # get slices
     config["data"]["lineouts"]["val"] = [
@@ -76,9 +84,9 @@ def _validate_inputs_(config: Dict) -> Dict:
     ]
 
     # create fes
-    NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
-    if not config["parameters"]["fe"]["val"]:
-        config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
+    # NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
+    # if not config["parameters"]["fe"]["val"]:
+    #     config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
 
     config["parameters"]["fe"]["lb"] = np.multiply(
         config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
@@ -156,31 +164,32 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
         for k in all_weights.keys():
             all_weights[k].append(these_weights[k])
 
-        if i == config["optimizer"]["num_mins"] - 1:
-            break
-        config["parameters"]["fe"]["length"] = (
-            config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
-        )
-        refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-        if config["parameters"]["fe"]["symmetric"]:
-            refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-
-        refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(these_weights["fe"]))
-
-        config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
-        config["velocity"] = refined_v
-        config["parameters"]["ne"]["val"] = these_weights["ne"].squeeze()
-        config["parameters"]["Te"]["val"] = these_weights["Te"].squeeze()
-
-        config["parameters"]["fe"]["ub"] = -0.5
-        config["parameters"]["fe"]["lb"] = -50
-        config["parameters"]["fe"]["lb"] = np.multiply(
-            config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
-        )
-        config["parameters"]["fe"]["ub"] = np.multiply(
-            config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
-        )
-        config["units"] = init_param_norm_and_shift(config)
+        # needs to be reworked for multiple minimizations
+        # if i == config["optimizer"]["num_mins"] - 1:
+        #     break
+        # config["parameters"]["fe"]["length"] = (
+        #     config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
+        # )
+        # refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+        # if config["parameters"]["fe"]["symmetric"]:
+        #     refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+        #
+        # refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(these_weights["fe"]))
+        #
+        # config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
+        # config["velocity"] = refined_v
+        # config["parameters"]["ne"]["val"] = these_weights["ne"].squeeze()
+        # config["parameters"]["Te"]["val"] = these_weights["Te"].squeeze()
+        #
+        # config["parameters"]["fe"]["ub"] = -0.5
+        # config["parameters"]["fe"]["lb"] = -50
+        # config["parameters"]["fe"]["lb"] = np.multiply(
+        #     config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
+        # )
+        # config["parameters"]["fe"]["ub"] = np.multiply(
+        #     config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
+        # )
+        # config["units"] = init_param_norm_and_shift(config)
 
     overall_loss = res["fun"]
 

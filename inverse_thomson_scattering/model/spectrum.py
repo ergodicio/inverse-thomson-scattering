@@ -11,6 +11,7 @@ TODO
 
 """
 
+
 class SpectrumCalculator:
     """
     TODO
@@ -20,8 +21,8 @@ class SpectrumCalculator:
         sas:
         dummy_batch:
     """
-    def __init__(self, cfg, sas, dummy_batch):
 
+    def __init__(self, cfg, sas, dummy_batch):
         super().__init__()
         self.cfg = cfg
         self.sas = sas
@@ -105,8 +106,8 @@ class SpectrumCalculator:
         TODO
 
         Args:
-            params:
-            batch:
+            params: Dict- contains name value pairs for all the parameters from the input deck
+            batch: Dict- contains the electron and ion data arrays as well as their amplitude arrays and noise arrays.
 
         Returns:
 

@@ -85,7 +85,7 @@ parameters:
         fe_decrease_strict: False
         symmetric: False
         dim: 2
-        v_res: 0.1
+        v_res: 1.0
         temp_asym: 2.0
 
 
@@ -95,8 +95,8 @@ data:
     lineouts:
         type:
             pixel
-        start: 340
-        end: 660
+        start: 100
+        end: 900
         skip: 4
     background:
         type:
@@ -116,7 +116,7 @@ other:
         widIRF:
             spect_stddev_ion: 0.015
             spect_stddev_ele: 0.1
-            spect_FWHM_ele: = 0.9
+            spect_FWHM_ele: 0.9
             ang_FWHM_ele: 1.0
     refit: False
     refit_thresh: 5.0

@@ -80,6 +80,9 @@ parameters:
         ub: -0.5
         fe_decrease_strict: True
         symmetric: False
+        dim: 1
+        v_res: 0.1
+        temp_asym: 2.0
 
 data:
     shotnum: 94475

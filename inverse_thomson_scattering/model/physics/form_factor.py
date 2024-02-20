@@ -197,10 +197,10 @@ class FormFactor:
         # formfactorE = PsLamE # commented because unused
         from matplotlib import pyplot as plt
 
-        fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
-        ax[0].plot(x, DF)
-        ax[1].plot(fe_vphi[1, :, 0])
-        plt.show()
+        # fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
+        # ax[0].plot(x, DF)
+        # ax[1].plot(fe_vphi[1, :, 0])
+        # plt.show()
 
         return formfactor, lams
 

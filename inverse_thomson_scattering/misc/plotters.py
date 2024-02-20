@@ -3,6 +3,7 @@ import mlflow, tempfile, os, pandas
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
+from mpl_toolkits.mplot3d import axes3d
 
 
 from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
@@ -10,20 +11,7 @@ from inverse_thomson_scattering.model.physics.generate_spectra import FitModel
 from inverse_thomson_scattering.misc.lineout_plot import lineout_plot
 
 
-def plot_angular(
-    config,
-    losses,
-    all_params,
-    used_points,
-    all_axes,
-    fits,
-    all_data,
-    sqdevs,
-    sigmas,
-    td,
-    best_weights_val,
-    best_weights_std,
-):
+def get_final_params(config, best_weights_val, td):
     all_params = {}
     dist = {}
     for k, v in best_weights_val.items():
@@ -39,23 +27,79 @@ def plot_angular(
     final_dist = pandas.DataFrame(dist)
     final_dist.to_csv(os.path.join(td, "csv", "learned_dist.csv"))
 
+    return all_params | dist
+
+
+def plot_final_params():
+    return
+
+
+def plot_dist(config, final_params, sigma_fe, td):
+    # Create fe image
+    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+    # lineouts = np.array(config["data"]["lineouts"]["val"])
+
+    if config["parameters"]["fe"]["dim"] == 1:
+        ax[0].plot(final_params["v"], final_params["fe"])
+        ax[1].plot(np.log10(np.exp(final_params["fe"])))
+        ax[2].plot(np.exp(final_params["fe"]))
+
+        if config["other"]["calc_sigmas"]:
+            ax[0].fill_between(
+                final_params["v"],
+                (final_params["fe"] - config["plotting"]["n_sigmas"] * sigma_fe.data),
+                (final_params["fe"] + config["plotting"]["n_sigmas"] * sigma_fe.data),
+                color="b",
+                alpha=0.1,
+            )
+    else:
+        ax[0].plot_surface(X, Y, Z, edgecolor="royalblue", lw=0.5, rstride=8, cstride=8, alpha=0.3)
+
+        # Plot projections of the contours for each dimension.  By choosing offsets
+        # that match the appropriate axes limits, the projected contours will sit on
+        # the 'walls' of the graph.
+        ax[0].contour(X, Y, Z, zdir="z", cmap="coolwarm")
+        ax[0].contour(X, Y, Z, zdir="x", cmap="coolwarm")
+        ax[0].contour(X, Y, Z, zdir="y", cmap="coolwarm")
+
+    # no rolling sigma bc we use a smoothing kernel
+    ax[0].set_xlabel("v/vth (points)", fontsize=14)
+    ax[0].set_ylabel("f_e (ln)")
+    ax[0].grid()
+    # ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
+    ax[0].set_title("$f_e$", fontsize=14)
+    ax[1].set_xlabel("v/vth (points)", fontsize=14)
+    ax[1].set_ylabel("f_e (log)")
+    ax[1].grid()
+    ax[1].set_ylim(-5, 0)
+    ax[1].set_title("$f_e$", fontsize=14)
+    ax[2].set_xlabel("v/vth (points)", fontsize=14)
+    ax[2].set_ylabel("f_e")
+    ax[2].grid()
+    fig.savefig(os.path.join(td, "plots", "fe_final.png"), bbox_inches="tight")
+    return
+
+
+def plot_sigmas(config, all_params, best_weights_std, sigmas, td):
     sigma_params = {}
     sizes = {key: all_params[key].shape[0] for key in all_params.keys()}
     param_ctr = 0
-    if config["other"]["calc_sigmas"]:
-        for i, k in enumerate(all_params.keys()):
-            val = sigmas[0, param_ctr : param_ctr + sizes[k]]
-            if k == "fe":
-                sigma_fe = xr.DataArray(val, coords=(("v", np.linspace(-7, 7, len(val))),))
-            else:
-                sigma_params[k] = xr.DataArray(val, coords=(("ind", [0]),))
-            param_ctr += sizes[k]
+    for i, k in enumerate(all_params.keys()):
+        val = sigmas[0, param_ctr : param_ctr + sizes[k]]
+        if k == "fe":
+            sigma_fe = xr.DataArray(val, coords=(("v", np.linspace(-7, 7, len(val))),))
+        else:
+            sigma_params[k] = xr.DataArray(val, coords=(("ind", [0]),))
+        param_ctr += sizes[k]
 
-        sigma_params = best_weights_std
-        sigma_fe.to_netcdf(os.path.join(td, "binary", "sigma-fe.nc"))
-        sigma_params = xr.Dataset(sigma_params)
-        sigma_params.to_netcdf(os.path.join(td, "binary", "sigma-params.nc"))
+    sigma_params = best_weights_std
+    sigma_fe.to_netcdf(os.path.join(td, "binary", "sigma-fe.nc"))
+    sigma_params = xr.Dataset(sigma_params)
+    sigma_params.to_netcdf(os.path.join(td, "binary", "sigma-params.nc"))
+    return sigma_fe
 
+
+def plot_data_angular(config, fits, all_data, all_axes, td):
     dat = {
         "fit": fits["ele"],
         "data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
@@ -79,8 +123,8 @@ def plot_angular(
         savedata["fit"],
         shading="nearest",
         cmap="gist_ncar",
-        vmin=np.amin(savedata["data"]),
-        vmax=np.amax(savedata["data"]),
+        vmin=min(np.amin(savedata["data"]), 0),
+        vmax=max(np.amax(savedata["data"]), 1),
     )
     ax[0].set_xlabel("Angle (degrees)")
     ax[0].set_ylabel("Wavelength (nm)")
@@ -90,13 +134,17 @@ def plot_angular(
         savedata["data"],
         shading="nearest",
         cmap="gist_ncar",
-        vmin=np.amin(savedata["data"]),
-        vmax=np.amax(savedata["data"]),
+        vmin=min(np.amin(savedata["data"]), 0),
+        vmax=max(np.amax(savedata["data"]), 1),
     )
     ax[1].set_xlabel("Angle (degrees)")
     ax[1].set_ylabel("Wavelength (nm)")
     fig.savefig(os.path.join(td, "plots", "fit_and_data.png"), bbox_inches="tight")
 
+    return savedata
+
+
+def plot_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedata, td):
     used_points = used_points * sqdevs["ele"].shape[1]
     red_losses = np.sum(losses) / (1.1 * (used_points - len(all_params)))
     mlflow.log_metrics({"Total reduced loss": float(red_losses)})
@@ -120,40 +168,7 @@ def plot_angular(
         ax[1].grid()
         fig.savefig(os.path.join(td, "lineouts", filename), bbox_inches="tight")
         plt.close(fig)
-
-    # Create fe image
-    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-    # lineouts = np.array(config["data"]["lineouts"]["val"])
-    ax[0].plot(xie := np.linspace(-7, 7, config["parameters"]["fe"]["length"]), final_dist["fe"])
-
-    if config["other"]["calc_sigmas"]:
-        ax[0].fill_between(
-            xie,
-            (final_params["fe"] - config["plotting"]["n_sigmas"] * sigma_fe.data),
-            (final_params["fe"] + config["plotting"]["n_sigmas"] * sigma_fe.data),
-            color="b",
-            alpha=0.1,
-        )
-
-    # no rolling sigma bc we use a smoothing kernel
-    ax[0].set_xlabel("v/vth (points)", fontsize=14)
-    ax[0].set_ylabel("f_e (ln)")
-    ax[0].grid()
-    # ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
-    ax[0].set_title("$f_e$", fontsize=14)
-    ax[1].plot(np.log10(np.exp(final_dist["fe"])))
-    ax[1].set_xlabel("v/vth (points)", fontsize=14)
-    ax[1].set_ylabel("f_e (log)")
-    ax[1].grid()
-    ax[1].set_ylim(-5, 0)
-    ax[1].set_title("$f_e$", fontsize=14)
-    ax[2].plot(np.exp(final_dist["fe"]))
-    ax[2].set_xlabel("v/vth (points)", fontsize=14)
-    ax[2].set_ylabel("f_e")
-    ax[2].grid()
-    fig.savefig(os.path.join(td, "plots", "fe_final.png"), bbox_inches="tight")
-
-    return all_params | dist
+    return
 
 
 def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td):
@@ -379,60 +394,6 @@ def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_da
         fig.savefig(os.path.join(td, "plots", "learned_" + param + ".png"), bbox_inches="tight")
 
     return final_params
-
-
-def plotinput(config, sa):
-    parameters = config["parameters"]
-
-    # Setup x0
-    xie = np.linspace(-7, 7, parameters["fe"]["length"])
-
-    NumDistFunc = get_num_dist_func(parameters["fe"]["type"], xie)
-    parameters["fe"]["val"] = np.log(NumDistFunc(parameters["m"]["val"]))
-    parameters["fe"]["lb"] = np.multiply(parameters["fe"]["lb"], np.ones(parameters["fe"]["length"]))
-    parameters["fe"]["ub"] = np.multiply(parameters["fe"]["ub"], np.ones(parameters["fe"]["length"]))
-
-    x0 = []
-    lb = []
-    ub = []
-    xiter = []
-    for i, _ in enumerate(config["data"]["lineouts"]["val"]):
-        for key in parameters.keys():
-            if parameters[key]["active"]:
-                if np.size(parameters[key]["val"]) > 1:
-                    x0.append(parameters[key]["val"][i])
-                elif isinstance(parameters[key]["val"], list):
-                    x0.append(parameters[key]["val"][0])
-                else:
-                    x0.append(parameters[key]["val"])
-                lb.append(parameters[key]["lb"])
-                ub.append(parameters[key]["ub"])
-
-    x0 = np.array(x0)
-    fit_model = FitModel(config, xie, sa)
-
-    print("plotting")
-    mlflow.set_tag("status", "plotting")
-
-    fig = plt.figure(figsize=(14, 6))
-    with tempfile.TemporaryDirectory() as td:
-        fig.clf()
-        ax = fig.add_subplot(1, 2, 1)
-        ax2 = fig.add_subplot(1, 2, 2)
-        fig, ax = plotState(
-            x0,
-            config,
-            [1, 1],
-            xie,
-            sa,
-            [],
-            fitModel2=fit_model,
-            fig=fig,
-            ax=[ax, ax2],
-        )
-        fig.savefig(os.path.join(td, "simulated_spectrum.png"), bbox_inches="tight")
-        mlflow.log_artifacts(td, artifact_path="plots")
-    return
 
 
 def model_v_actual(
@@ -679,144 +640,3 @@ def ColorPlots(
         ax.legend(CurveNames)
 
     plt.show()
-
-
-def plotState(x, config, amps, xie, sas, data, noiseE, nosieI, fitModel2, fig, ax):
-    [modlE, modlI, lamAxisE, lamAxisI, tsdict] = fitModel2(x, sas["weights"])
-
-    lam = config["parameters"]["lam"]["val"]
-    amp1 = config["parameters"]["amp1"]["val"]
-    amp2 = config["parameters"]["amp2"]["val"]
-    amp3 = config["parameters"]["amp3"]["val"]
-
-    stddev = config["other"]["PhysParams"]["widIRF"]
-
-    if config["other"]["extraoptions"]["load_ion_spec"]:
-        stddevI = config["other"]["PhysParams"]["widIRF"]["spect_stddev_ion"]
-        originI = (np.amax(lamAxisI) + np.amin(lamAxisI)) / 2.0
-        inst_funcI = np.squeeze(
-            (1.0 / (stddevI * np.sqrt(2.0 * np.pi))) * np.exp(-((lamAxisI - originI) ** 2.0) / (2.0 * (stddevI) ** 2.0))
-        )  # Gaussian
-        ThryI = np.convolve(modlI, inst_funcI, "same")
-        ThryI = (np.amax(modlI) / np.amax(ThryI)) * ThryI
-        ThryI = np.average(ThryI.reshape(1024, -1), axis=1)
-
-        if config["other"]["PhysParams"]["norm"] == 0:
-            lamAxisI = np.average(lamAxisI.reshape(1024, -1), axis=1)
-            ThryI = amp3 * amps[1] * ThryI / max(ThryI)
-
-        ThryI = ThryI + np.array(noiseI)
-
-    if config["other"]["extraoptions"]["load_ele_spec"]:
-        stddevE = config["other"]["PhysParams"]["widIRF"]["spect_stddev_ele"]
-        # Conceptual_origin so the convolution doesn't shift the signal
-        originE = (np.amax(lamAxisE) + np.amin(lamAxisE)) / 2.0
-        inst_funcE = np.squeeze(
-            (1.0 / (stddevE * np.sqrt(2.0 * np.pi))) * np.exp(-((lamAxisE - originE) ** 2.0) / (2.0 * (stddevE) ** 2.0))
-        )  # Gaussian
-        ThryE = np.convolve(modlE, inst_funcE, "same")
-        ThryE = (np.amax(modlE) / np.amax(ThryE)) * ThryE
-
-        if config["other"]["PhysParams"]["norm"] > 0:
-            ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam] / max(ThryE[lamAxisE < lam]))
-            ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam] / max(ThryE[lamAxisE > lam]))
-
-        ThryE = np.average(ThryE.reshape(1024, -1), axis=1)
-        if config["other"]["PhysParams"]["norm"] == 0:
-            lamAxisE = np.average(lamAxisE.reshape(1024, -1), axis=1)
-            ThryE = amps[0] * ThryE / max(ThryE)
-            ThryE[lamAxisE < lam] = amp1 * (ThryE[lamAxisE < lam])
-            ThryE[lamAxisE > lam] = amp2 * (ThryE[lamAxisE > lam])
-
-        ThryE = ThryE + np.array(noiseE)
-
-    if config["other"]["extraoptions"]["spectype"] == 0:
-        print("colorplot still needs to be written")
-        # Write Colorplot
-        # Thryinit=ArtemisModel(config["parameters"],xie,scaterangs,x0,weightMatrix,...
-    #    spectralFWHM,angularFWHM,lamAxis,xax,D,norm2B);
-    # if ~norm2B
-    #    Thryinit=Thryinit./max(Thryinit(470:900,:));
-    #    Thryinit=Thryinit.*max(data(470:900,:));
-    #    Thryinit=config["parameters"].amp1.Value*Thryinit;
-    # end
-    # chisq = sum(sum((data([40:330 470:900],90:1015)-Thryinit([40:330 470:900],90:1015)).^2));
-    # Thryinit(330:470,:)=0;
-    #
-    # ColorPlots(yax,xax,rot90(Thryinit),'Kaxis',[config["parameters"].ne.Value*1E20,config["parameters"].Te.Value,526.5],...
-    #    'Title','Starting point','Name','Initial Spectrum');
-    # ColorPlots(yax,xax,rot90(data-Thryinit),'Title',...
-    #    ['Initial difference: \chi^2 =' num2str(chisq)],'Name','Initial Difference');
-    # load('diffcmap.mat','diffcmap');
-    # colormap(diffcmap);
-
-    # if norm2B
-    #    caxis([-1 1]);
-    # else
-    #    caxis([-8000 8000]);
-    # end
-    else:
-        if config["other"]["extraoptions"]["load_ion_spec"]:
-            LinePlots(
-                lamAxisI,
-                np.vstack((data[1, :], ThryI)),
-                fig,
-                ax[0],
-                CurveNames=["Data", "Fit"],
-                XLabel="Wavelength (nm)",
-            )
-            ax[0].set_xlim([525, 528])
-
-        if config["other"]["extraoptions"]["load_ele_spec"]:
-            LinePlots(
-                lamAxisE,
-                np.vstack((data[0, :], ThryE)),
-                fig,
-                ax[1],
-                CurveNames=["Data", "Fit"],
-                XLabel="Wavelength (nm)",
-            )
-            ax[1].set_xlim([400, 630])
-
-    chisq = 0
-    if config["other"]["extraoptions"]["fit_IAW"]:
-        #    chisq=chisq+sum((10*data(2,:)-10*ThryI).^2); %multiplier of 100 is to set IAW and EPW data on the same scale 7-5-20 %changed to 10 9-1-21
-        chisq = chisq + sum((data[1, :] - ThryI) ** 2)
-
-    if config["other"]["extraoptions"]["fit_EPWb"]:
-        chisq = chisq + sum(
-            (data[0, (lamAxisE > 410) & (lamAxisE < 510)] - ThryE[(lamAxisE > 410) & (lamAxisE < 510)]) ** 2
-        )
-
-    if config["other"]["extraoptions"]["fit_EPWr"]:
-        chisq = chisq + sum(
-            (data[0, (lamAxisE > 540) & (lamAxisE < 680)] - ThryE[(lamAxisE > 540) & (lamAxisE < 680)]) ** 2
-        )
-
-    loss = 0
-    if config["other"]["extraoptions"]["fit_IAW"]:
-        loss = loss + np.sum(np.square(data[1, :] - ThryI) / i_data)
-
-    if config["other"]["extraoptions"]["fit_EPWb"]:
-        sqdev = np.square(data[0, :] - ThryE) / ThryE
-        sqdev = np.where(
-            (lamAxisE > config["data"]["fit_rng"]["blue_min"]) & (lamAxisE < config["data"]["fit_rng"]["blue_max"]),
-            sqdev,
-            0.0,
-        )
-
-        loss = loss + np.sum(sqdev)
-
-    if config["other"]["extraoptions"]["fit_EPWr"]:
-        sqdev = np.square(data[0, :] - ThryE) / ThryE
-        sqdev = np.where(
-            (lamAxisE > config["data"]["fit_rng"]["red_min"]) & (lamAxisE < config["data"]["fit_rng"]["red_max"]),
-            sqdev,
-            0.0,
-        )
-
-        loss = loss + np.sum(sqdev)
-
-    print(loss)
-
-    return fig, ax

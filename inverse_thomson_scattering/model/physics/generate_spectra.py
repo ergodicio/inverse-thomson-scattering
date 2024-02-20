@@ -114,9 +114,10 @@ class FitModel:
                 self.config["other"]["lamrangE"][0] < lam < self.config["other"]["lamrangE"][1]
             ):
                 # set the ion feature to 0 #should be switched to a range about lam
-                lamloc = jnp.argmin(jnp.abs(lamAxisE - lam))
+                lamlocb = jnp.argmin(jnp.abs(lamAxisE - lam - 3.0))
+                lamlocr = jnp.argmin(jnp.abs(lamAxisE - lam + 3.0))
                 modlE = jnp.concatenate(
-                    [modlE[: lamloc - 2000], jnp.zeros(4000), modlE[lamloc + 2000 :]]
+                    [modlE[:lamlocb], jnp.zeros(lamlocr - lamlocb), modlE[lamlocr:]]
                 )  # TODO hardcoded
 
             if self.config["other"]["iawfilter"][0]:

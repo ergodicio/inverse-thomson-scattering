@@ -9,6 +9,7 @@ import time
 from inverse_thomson_scattering.misc import dist_functional_forms
 
 
+# needs the ability to enforce symetry
 class DistFunc:
     def __init__(self, config):
         self.velocity_res = config["parameters"]["fe"]["v_res"]
