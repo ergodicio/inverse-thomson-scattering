@@ -36,10 +36,11 @@ def plot_final_params():
 
 def plot_dist(config, final_params, sigma_fe, td):
     # Create fe image
-    fig, ax = plt.subplots(1, 3, figsize=(15, 5))
+
     # lineouts = np.array(config["data"]["lineouts"]["val"])
 
     if config["parameters"]["fe"]["dim"] == 1:
+        fig, ax = plt.subplots(1, 3, figsize=(15, 5))
         ax[0].plot(final_params["v"], final_params["fe"])
         ax[1].plot(np.log10(np.exp(final_params["fe"])))
         ax[2].plot(np.exp(final_params["fe"]))
@@ -52,30 +53,123 @@ def plot_dist(config, final_params, sigma_fe, td):
                 color="b",
                 alpha=0.1,
             )
+        ax[0].set_xlabel("v/vth (points)", fontsize=14)
+        ax[0].set_ylabel("f_e (ln)")
+        ax[0].grid()
+        # ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
+        ax[0].set_title("$f_e$", fontsize=14)
+        ax[1].set_xlabel("v/vth (points)", fontsize=14)
+        ax[1].set_ylabel("f_e (log)")
+        ax[1].grid()
+        ax[1].set_ylim(-5, 0)
+        ax[1].set_title("$f_e$", fontsize=14)
+        ax[2].set_xlabel("v/vth (points)", fontsize=14)
+        ax[2].set_ylabel("f_e")
+        ax[2].grid()
     else:
-        ax[0].plot_surface(X, Y, Z, edgecolor="royalblue", lw=0.5, rstride=8, cstride=8, alpha=0.3)
+        fig = plt.figure(figsize=(15, 5))
+        ax = fig.add_subplot(1, 3, 1, projection="3d")
+        ax.plot_surface(
+            final_params["v"][0],
+            final_params["v"][1],
+            final_params["fe"],
+            edgecolor="royalblue",
+            lw=0.5,
+            rstride=8,
+            cstride=8,
+            alpha=0.3,
+        )
+        ax.contour(
+            final_params["v"][0], final_params["v"][1], final_params["fe"], zdir="x", offset=-7.5, cmap="coolwarm"
+        )
+        ax.contour(
+            final_params["v"][0], final_params["v"][1], final_params["fe"], zdir="y", offset=7.5, cmap="coolwarm"
+        )
+        ax.contour(
+            final_params["v"][0], final_params["v"][1], final_params["fe"], zdir="z", offset=-50, cmap="coolwarm"
+        )
+        ax.set_xlabel("v/vth", fontsize=14)
+        ax.set_ylabel("v/vth", fontsize=14)
+        ax.set_zlabel("f_e (ln)")
+        ax = fig.add_subplot(1, 3, 2, projection="3d")
+        ax.plot_surface(
+            final_params["v"][0],
+            final_params["v"][1],
+            np.log10(np.exp(final_params["fe"])),
+            edgecolor="royalblue",
+            lw=0.5,
+            rstride=8,
+            cstride=8,
+            alpha=0.3,
+        )
+        ax.contour(
+            final_params["v"][0],
+            final_params["v"][1],
+            np.log10(np.exp(final_params["fe"])),
+            zdir="x",
+            offset=-7.5,
+            cmap="coolwarm",
+        )
+        ax.contour(
+            final_params["v"][0],
+            final_params["v"][1],
+            np.log10(np.exp(final_params["fe"])),
+            zdir="y",
+            offset=7.5,
+            cmap="coolwarm",
+        )
+        ax.contour(
+            final_params["v"][0],
+            final_params["v"][1],
+            np.log10(np.exp(final_params["fe"])),
+            zdir="z",
+            offset=-50,
+            cmap="coolwarm",
+        )
+        ax.set_xlabel("v/vth", fontsize=14)
+        ax.set_ylabel("v/vth", fontsize=14)
+        ax.set_zlabel("f_e (log)")
 
-        # Plot projections of the contours for each dimension.  By choosing offsets
-        # that match the appropriate axes limits, the projected contours will sit on
-        # the 'walls' of the graph.
-        ax[0].contour(X, Y, Z, zdir="z", cmap="coolwarm")
-        ax[0].contour(X, Y, Z, zdir="x", cmap="coolwarm")
-        ax[0].contour(X, Y, Z, zdir="y", cmap="coolwarm")
+        ax = fig.add_subplot(1, 3, 3, projection="3d")
+        ax.plot_surface(
+            final_params["v"][0],
+            final_params["v"][1],
+            np.exp(final_params["fe"]),
+            edgecolor="royalblue",
+            lw=0.5,
+            rstride=8,
+            cstride=8,
+            alpha=0.3,
+        )
+        ax.contour(
+            final_params["v"][0],
+            final_params["v"][1],
+            np.exp(final_params["fe"]),
+            zdir="x",
+            offset=-7.5,
+            cmap="coolwarm",
+        )
+        ax.contour(
+            final_params["v"][0],
+            final_params["v"][1],
+            np.exp(final_params["fe"]),
+            zdir="y",
+            offset=7.5,
+            cmap="coolwarm",
+        )
+        ax.contour(
+            final_params["v"][0],
+            final_params["v"][1],
+            np.exp(final_params["fe"]),
+            zdir="z",
+            offset=-50,
+            cmap="coolwarm",
+        )
+        ax.set_xlabel("v/vth", fontsize=14)
+        ax.set_ylabel("v/vth", fontsize=14)
+        ax.set_zlabel("f_e")
 
     # no rolling sigma bc we use a smoothing kernel
-    ax[0].set_xlabel("v/vth (points)", fontsize=14)
-    ax[0].set_ylabel("f_e (ln)")
-    ax[0].grid()
-    # ax.set_ylim(0.8 * np.min(final_params["ne"]), 1.2 * np.max(final_params["ne"]))
-    ax[0].set_title("$f_e$", fontsize=14)
-    ax[1].set_xlabel("v/vth (points)", fontsize=14)
-    ax[1].set_ylabel("f_e (log)")
-    ax[1].grid()
-    ax[1].set_ylim(-5, 0)
-    ax[1].set_title("$f_e$", fontsize=14)
-    ax[2].set_xlabel("v/vth (points)", fontsize=14)
-    ax[2].set_ylabel("f_e")
-    ax[2].grid()
     fig.savefig(os.path.join(td, "plots", "fe_final.png"), bbox_inches="tight")
     return
 
