@@ -4,22 +4,17 @@ from jax import vmap
 from inverse_thomson_scattering.model.physics.generate_spectra import FitModel
 from inverse_thomson_scattering.process import irf
 
-"""
-This is the class that generates the spectrum (?)
-
-TODO 
-
-"""
-
 
 class SpectrumCalculator:
     """
-    TODO
+    The SpectrumCalculator class wraps the FitModel class adding instrumental effects to the calculated spectrum so it
+    can be compared to data.
 
     Args:
-        cfg:
-        sas:
-        dummy_batch:
+        cfg: Dict- configuration dictionary built from input deck
+        sas: Dict- has fields containing the scattering angles the spectrum will be calculated at and the relative
+        weights of each of the scattering angles in the final spectrum
+        dummy_batch: Dict- data dictionary containing the electron and ion data as well as the noise and amplitudes
     """
 
     def __init__(self, cfg, sas, dummy_batch):

@@ -84,7 +84,7 @@ parameters:
         ub: -0.5
         fe_decrease_strict: False
         symmetric: False
-        dim: 2
+        dim: 1
         v_res: 0.2
         temp_asym: 2.0
 
@@ -95,8 +95,8 @@ data:
     lineouts:
         type:
             pixel
-        start: 100
-        end: 900
+        start: 340
+        end: 660
         skip: 4
     background:
         type:
@@ -111,7 +111,7 @@ other:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
-        spectype: angular
+        spectype: temporal
     PhysParams:
         widIRF:
             spect_stddev_ion: 0.015

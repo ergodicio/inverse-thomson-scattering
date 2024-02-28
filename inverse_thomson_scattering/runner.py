@@ -259,12 +259,20 @@ def calc_series(config):
 
     dist_obj = DistFunc(config)
     config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"])
-    config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
+    config["parameters"]["fe"]["val"] = [np.log(config["parameters"]["fe"]["val"])]
 
     config["units"] = init_param_norm_and_shift(config)
 
     sas = get_scattering_angles(config)
-    # if (config["data"]["lineouts"]["type"] == "range") & (config["other"]["extraoptions"]["spectype"] == "angular"):
+    dummy_batch = {
+        "i_data": np.array([1]),
+        "e_data": np.array([1]),
+        "noise_e": 0,
+        "noise_i": 0,
+        "e_amps": 1,
+        "i_amps": 1,
+    }
+
     if config["other"]["extraoptions"]["spectype"] == "angular":
         [axisxE, _, _, _, _, _] = get_calibrations(
             104000, config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
@@ -272,16 +280,8 @@ def calc_series(config):
         config["other"]["extraoptions"]["spectype"] = "angular_full"
 
         sas["angAxis"] = axisxE
-    # all_data, sas, all_axes = prepare.prepare_data(config)
-
-    dummy_batch = {
-        "i_data": np.ones((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1])),
-        "e_data": np.ones((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1])),
-        "noise_e": 0,
-        "noise_i": 0,
-        "e_amps": 1,
-        "i_amps": 1,
-    }
+        dummy_batch["i_data"] = np.ones((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1]))
+        dummy_batch["e_data"] = np.ones((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1]))
 
     if "series" in config.keys():
         serieslen = len(config["series"]["vals1"])

@@ -10,23 +10,31 @@ from jax import numpy as jnp
 
 class FitModel:
     """
-    TODO
+    The FitModel Class wraps the FormFactor class adding finite aperture effects and finite volume effects. This class
+    also handles the options for calculating the form factor.
 
     Args:
-        config:
-        sa:
+        config: Dict- configuration dictionary built from input deck
+        sa: Dict- has fields containing the scattering angles the spectrum will be calculated at and the relative
+        weights of each of the scattering angles in the final spectrum
     """
 
     def __init__(self, config: Dict, sa):
         self.config = config
         self.sa = sa
+        self.num_dist_func = DistFunc(config)
         self.electron_form_factor = FormFactor(
-            config["other"]["lamrangE"], npts=config["other"]["npts"], vax=config["velocity"]
+            config["other"]["lamrangE"],
+            npts=config["other"]["npts"],
+            fe_dim=self.num_dist_func.dim,
+            vax=config["velocity"],
         )
         self.ion_form_factor = FormFactor(
-            config["other"]["lamrangI"], npts=config["other"]["npts"], vax=config["velocity"]
+            config["other"]["lamrangI"],
+            npts=config["other"]["npts"],
+            fe_dim=self.num_dist_func.dim,
+            vax=config["velocity"],
         )
-        self.num_dist_func = DistFunc(config)
 
     def __call__(self, all_params: Dict):
         """
