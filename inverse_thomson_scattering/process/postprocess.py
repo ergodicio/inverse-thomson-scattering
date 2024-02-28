@@ -237,13 +237,13 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             mlflow.set_tag("status", "plotting")
             t1 = time.time()
 
-            final_params = plotters.get_final_params(config, best_weights_val, td)
+            final_params = plotters.get_final_params(config, best_weights_val, all_axes, td)
             if config["other"]["calc_sigmas"]:
-                sigma_fe = plotters.plot_sigmas(config, final_params, best_weights_std, sigmas, td)
+                sigma_fe = plotters.save_sigmas_fe(final_params, best_weights_std, sigmas, td)
             else:
                 sigma_fe = np.zeros_like(final_params["fe"])
             savedata = plotters.plot_data_angular(config, fits, all_data, all_axes, td)
-            plotters.plot_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedata, td)
+            plotters.plot_ang_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedata, td)
             plotters.plot_dist(config, final_params, sigma_fe, td)
 
         else:
@@ -253,9 +253,18 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
             mlflow.set_tag("status", "plotting")
             t1 = time.time()
-            final_params = plotters.plot_regular(
-                config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td
-            )
+
+            final_params = plotters.get_final_params(config, all_params, all_axes, td)
+            red_losses = plotters.plot_loss_hist(config, losses, all_params, used_points, td)
+            savedata = plotters.plot_ts_data(config, fits, all_data, all_axes, td)
+            plotters.model_v_actual(config, all_data, all_axes, fits, losses, red_losses, sqdevs, td)
+            sigma_ds = plotters.save_sigmas_params(config, all_params, sigmas, all_axes, td)
+            plotters.plot_final_params(config, all_params, sigma_ds, td)
+            # plotters.plot_dist(config, final_params, sigma_fe, td)
+
+            # final_params = plotters.plot_regular(
+            #     config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td
+            # )
         mlflow.log_artifacts(td)
     mlflow.log_metrics({"plotting time": round(time.time() - t1, 2)})
 

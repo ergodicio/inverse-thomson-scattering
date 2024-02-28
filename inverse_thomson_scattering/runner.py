@@ -259,7 +259,7 @@ def calc_series(config):
 
     dist_obj = DistFunc(config)
     config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"])
-    config["parameters"]["fe"]["val"] = [np.log(config["parameters"]["fe"]["val"])]
+    config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
 
     config["units"] = init_param_norm_and_shift(config)
 
@@ -332,49 +332,55 @@ def calc_series(config):
                 td,
             )
         else:
-            print("Need to refactor lines")
+            fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
+            if config["other"]["extraoptions"]["load_ele_spec"]:
+                ax[0].plot(lamAxisE.transpose(), ThryE.transpose())  # transpose might break single specs?
+                ax[0].set_title("Simulated Data, fontsize=14")
+                ax[0].set_ylabel("Amp (arb. units)")
+                ax[0].set_xlabel("Wavelength (nm)")
+                ax[0].grid()
+
+                if "series" in config.keys():
+                    ax[0].legend([str(ele) for ele in config["series"]["vals1"]])
+                    if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
+                        coords_ele = (
+                            ("series", np.array(config["series"]["vals1"])[:, 0]),
+                            ("Wavelength", lamAxisE[0, :]),
+                        )
+                    else:
+                        coords_ele = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisE[0, :]))
+                    ele_dat = {"Sim": ThryE}
+                    ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
+                else:
+                    coords_ele = (("series", [0]), ("Wavelength", lamAxisE[0, :]))
+                    ele_dat = {"Sim": ThryE}
+                    ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
+                ele_data.to_netcdf(os.path.join(td, "binary", "ele_fit_and_data.nc"))
+
+            if config["other"]["extraoptions"]["load_ion_spec"]:
+                ax[1].plot(lamAxisI.transpose(), ThryI.transpose())
+                ax[1].set_title("Simulated Data, fontsize=14")
+                ax[1].set_ylabel("Amp (arb. units)")
+                ax[1].set_xlabel("Wavelength (nm)")
+                ax[1].grid()
+
+                if "series" in config.keys():
+                    ax[1].legend([str(ele) for ele in config["series"]["vals1"]])
+                    if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
+                        coords_ion = (
+                            ("series", np.array(config["series"]["vals1"])[:, 0]),
+                            ("Wavelength", lamAxisI[0, :]),
+                        )
+                    else:
+                        coords_ion = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisI[0, :]))
+                    ion_dat = {"Sim": ThryI}
+                    ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
+                else:
+                    coords_ion = (("series", [0]), ("Wavelength", lamAxisI[0, :]))
+                    ion_dat = {"Sim": ThryI}
+                    ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
+                ion_data.to_netcdf(os.path.join(td, "binary", "ion_fit_and_data.nc"))
+            fig.savefig(os.path.join(td, "plots", "simulated_data"), bbox_inches="tight")
         mlflow.log_artifacts(td)
         metrics_dict = {"spectrum_calc_time": spectime}
         mlflow.log_metrics(metrics=metrics_dict)
-
-    #    fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
-
-    # if config["other"]["extraoptions"]["load_ele_spec"]:
-    #     ax[0].plot(lamAxisE.transpose(), ThryE.transpose())  # transpose might break single specs?
-    #     ax[0].set_title("Simulated Data, fontsize=14")
-    #     ax[0].set_ylabel("Amp (arb. units)")
-    #     ax[0].set_xlabel("Wavelength (nm)")
-    #     ax[0].grid()
-    #
-    #     if "series" in config.keys():
-    #         ax[0].legend([str(ele) for ele in config["series"]["vals1"]])
-    #         if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
-    #             coords_ele = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisE[0, :]))
-    #         else:
-    #             coords_ele = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisE[0, :]))
-    #         ele_dat = {"Sim": ThryE}
-    #         ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
-    #     else:
-    #         coords_ele = (("series", [0]), ("Wavelength", lamAxisE[0, :]))
-    #         ele_dat = {"Sim": ThryE}
-    #         ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
-    #
-    # if config["other"]["extraoptions"]["load_ion_spec"]:
-    #     ax[1].plot(lamAxisI.transpose(), ThryI.transpose())
-    #     ax[1].set_title("Simulated Data, fontsize=14")
-    #     ax[1].set_ylabel("Amp (arb. units)")
-    #     ax[1].set_xlabel("Wavelength (nm)")
-    #     ax[1].grid()
-    #
-    #     if "series" in config.keys():
-    #         ax[1].legend([str(ele) for ele in config["series"]["vals1"]])
-    #         if config["series"]["param1"] == "fract" or config["series"]["param1"] == "Z":
-    #             coords_ion = (("series", np.array(config["series"]["vals1"])[:, 0]), ("Wavelength", lamAxisI[0, :]))
-    #         else:
-    #             coords_ion = (("series", config["series"]["vals1"]), ("Wavelength", lamAxisI[0, :]))
-    #         ion_dat = {"Sim": ThryI}
-    #         ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
-    #     else:
-    #         coords_ion = (("series", [0]), ("Wavelength", lamAxisI[0, :]))
-    #         ion_dat = {"Sim": ThryI}
-    #         ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})

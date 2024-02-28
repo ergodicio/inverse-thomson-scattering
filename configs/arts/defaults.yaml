@@ -93,7 +93,6 @@ other:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
-        plot_raw_data: False
     PhysParams:
         background: [0, 0]
         norm: 0

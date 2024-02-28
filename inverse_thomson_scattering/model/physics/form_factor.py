@@ -58,7 +58,7 @@ class FormFactor:
         self.xi2 = jnp.array(jnp.arange(-minmax, minmax, self.h))
         self.Zpi = jnp.array(zprimeMaxw(self.xi2))
 
-        if fe_dim == 2:
+        if (vax is not None) and (fe_dim == 2):
             self.coords = jnp.concatenate([vax[0][..., None], vax[1][..., None]], axis=-1)
             self.v = vax[0][0]
 

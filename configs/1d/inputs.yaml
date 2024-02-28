@@ -84,8 +84,8 @@ parameters:
         ub: -0.5
         fe_decrease_strict: False
         symmetric: False
-        dim: 1
-        v_res: 0.2
+        dim: 2
+        v_res: 0.02
         temp_asym: 2.0
 
 
