@@ -46,11 +46,13 @@ parameters:
 
     ud:
         val: 0.0
+        angle: 0.0
         active: False
         lb: -2.0
         ub: 2.0
     Va:
         val: 0.0
+        angle: 0.0
         active: False
         lb: -1.1
         ub: 2.5
@@ -72,7 +74,7 @@ parameters:
         ub: 5.0
     fe:
         val: []
-        active: True
+        active: False
         length: 256
         type:
             DLM:
@@ -80,8 +82,8 @@ parameters:
         ub: -0.5
         fe_decrease_strict: True
         symmetric: False
-        dim: 1
-        v_res: 0.1
+        dim: 2
+        v_res: 0.01
         temp_asym: 2.0
 
 data:
@@ -104,9 +106,19 @@ other:
         fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
+        spectype: angular
+    PhysParams:
+        widIRF:
+            spect_stddev_ion: 0.015
+            spect_stddev_ele: 0.1
+            spect_FWHM_ele: 0.9
+            ang_FWHM_ele: 1.0
     refit: False
     refit_thresh: 5.0
+    calc_sigmas: False
 
 mlflow:
-    experiment: inverse-thomson-scattering-d2
-    run: archis-test
+    experiment: inverse-thomson-scattering
+    run: maxwellian_ang_test_2D_v=0.01_scanned_gpu
+    
+machine: gpu

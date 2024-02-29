@@ -110,7 +110,7 @@ def _run_(config: Dict, mode: str = "fit"):
     mlflow.set_tag("status", "completed")
 
 
-def run_job(run_id: str, nested: bool):
+def run_job(run_id: str, mode: str, nested: bool):
     """
     This is used to run queued runs on NERSC. It picks up the `run_id` and finds that using MLFlow and does the fitting
 
@@ -133,7 +133,7 @@ def run_job(run_id: str, nested: bool):
             defaults.update(flatten(all_configs["inputs"]))
             config = unflatten(defaults)
 
-        _run_(config, mode="fit")
+        _run_(config, mode)
 
     if "MLFLOW_EXPORT" in os.environ:
         utils.export_run(run_id)
