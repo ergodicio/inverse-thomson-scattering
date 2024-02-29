@@ -335,7 +335,7 @@ def plot_ts_data(config, fits, all_data, all_axes, td):
         ion_savedata["fit"] = ion_savedata["fit"].T
 
         x, y = np.meshgrid(
-            all_axes["iaw_x"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"]],
+            all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]],
             all_axes["iaw_y"],
         )
 
@@ -355,7 +355,7 @@ def plot_ts_data(config, fits, all_data, all_axes, td):
         ele_savedata["fit"] = ele_savedata["fit"].T
 
         x, y = np.meshgrid(
-            all_axes["epw_x"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"]],
+            all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]],
             all_axes["epw_y"],
         )
 
@@ -367,7 +367,7 @@ def plot_2D_data_vs_fit(
 ):
     # Create fit and data image
     fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-    ax[0].pcolormesh(
+    pc = ax[0].pcolormesh(
         x,
         y,
         fit,
@@ -389,6 +389,7 @@ def plot_2D_data_vs_fit(
     )
     ax[1].set_xlabel(xlabel)
     ax[1].set_ylabel(ylabel)
+    fig.colorbar(pc)
     fig.savefig(os.path.join(td, "plots", name), bbox_inches="tight")
 
 
@@ -417,231 +418,6 @@ def plot_ang_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedat
         fig.savefig(os.path.join(td, "lineouts", filename), bbox_inches="tight")
         plt.close(fig)
     return
-
-
-# def plot_regular(config, losses, all_params, used_points, all_axes, fits, all_data, sqdevs, sigmas, td):
-#     num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
-
-# # store fitted parameters
-# reshaped_params = {}
-# for key in all_params.keys():
-#     # cur_ind = 1
-#     if np.shape(all_params[key])[1] > 1:
-#         for i in range(np.shape(all_params[key])[1]):
-#             reshaped_params[key + str(i)] = all_params[key][:, i]
-#     else:
-#         reshaped_params[key] = all_params[key][:, 0]
-#     # all_params[key] = all_params[key].tolist()
-# final_params = pandas.DataFrame(reshaped_params)
-# if config["other"]["extraoptions"]["load_ion_spec"]:
-#     final_params.insert(0, all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]]))
-#     final_params.insert(0, "lineout pixel", config["data"]["lineouts"]["pixelI"])
-# else:
-#     final_params.insert(0, all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]]))
-#     final_params.insert(0, "lineout pixel", config["data"]["lineouts"]["pixelE"])
-# final_params.to_csv(os.path.join(td, "csv", "learned_parameters.csv"))
-
-# losses[losses > 1e10] = 1e10
-# red_losses = losses / (1.1 * (used_points - len(all_params)))
-# loss_inds = losses.flatten().argsort()[::-1]
-# sorted_losses = losses[loss_inds]
-# sorted_redchi = red_losses[loss_inds]
-# mlflow.log_metrics(
-#     {"number of fits above threshold after refit": int(np.sum(red_losses > config["other"]["refit_thresh"]))}
-# )
-#
-# # make histogram
-# fig, ax = plt.subplots(1, 2, figsize=(12, 4), tight_layout=True)
-# if "red_losses_init" not in locals():
-#     red_losses_init = red_losses
-#     losses_init = losses
-# ax[0].hist([red_losses_init, red_losses], 40)
-# # ax[0].hist(red_losses, 128)
-# ax[0].set_yscale("log")
-# ax[0].set_xlabel(r"$\chi^2/DOF$")
-# ax[0].set_ylabel("Counts")
-# ax[0].set_title("Normalized $L^2$ Norm of the Error")
-# ax[0].grid()
-# ax[1].hist([losses_init, losses], 40)
-# # ax[1].hist(losses, 128)
-# ax[1].set_yscale("log")
-# ax[1].set_xlabel(r"$\chi^2$")
-# ax[1].set_ylabel("Counts")
-# ax[1].set_title("$L^2$ Norm of the Error")
-# ax[1].grid()
-# fig.savefig(os.path.join(td, "plots", "error_hist.png"), bbox_inches="tight")
-#
-# losses_ds = pandas.DataFrame(
-#     {
-#         "initial_losses": losses_init,
-#         "losses": losses,
-#         "initial_reduced_losses": red_losses_init,
-#         "reduced_losses": red_losses,
-#     }
-# )
-# losses_ds.to_csv(os.path.join(td, "csv", "losses.csv"))
-
-# os.makedirs(os.path.join(td, "worst"))
-# os.makedirs(os.path.join(td, "best"))
-
-# if config["other"]["extraoptions"]["load_ion_spec"]:
-#     coords = (all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]])), (
-#         "Wavelength",
-#         all_axes["iaw_y"],
-#     )
-#     ion_dat = {"fit": fits["ion"], "data": all_data["i_data"]}
-#     ion_sorted_fits = fits["ion"][loss_inds]
-#     ion_sorted_data = all_data["i_data"][loss_inds]
-#     ion_sorted_sqdev = sqdevs["ion"][loss_inds]
-#     ion_y_axis = all_axes["iaw_y"]
-#     # fit vs data storage and plot
-#     ion_savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in ion_dat.items()})
-#     ion_savedata.to_netcdf(os.path.join(td, "binary", "ion_fit_and_data.nc"))
-# if config["other"]["extraoptions"]["load_ele_spec"]:
-#     coords = (all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]])), (
-#         "Wavelength",
-#         all_axes["epw_y"],
-#     )
-#     ele_dat = {"fit": fits["ele"], "data": all_data["e_data"]}
-#     ele_sorted_fits = fits["ele"][loss_inds]
-#     ele_sorted_data = all_data["e_data"][loss_inds]
-#     ele_sorted_sqdev = sqdevs["ele"][loss_inds]
-#     ele_y_axis = all_axes["epw_y"]
-#     # fit vs data storage and plot
-#     ele_savedata = xr.Dataset({k: xr.DataArray(v, coords=coords) for k, v in ele_dat.items()})
-#     ele_savedata.to_netcdf(os.path.join(td, "binary", "ele_fit_and_data.nc"))
-#
-# if config["other"]["extraoptions"]["load_ion_spec"] and config["other"]["extraoptions"]["load_ele_spec"]:
-#     fig, ax = plt.subplots(2, 2, figsize=(12, 12), tight_layout=True)
-#     ion_clevs = np.linspace(
-#         np.amin(ion_dat["data"])
-#         if config["plotting"]["data_cbar_l"] == "data"
-#         else config["plotting"]["data_cbar_l"],
-#         np.amax(ion_dat["data"])
-#         if config["plotting"]["data_cbar_u"] == "data"
-#         else config["plotting"]["data_cbar_u"],
-#         11,
-#     )
-#     ele_clevs = np.linspace(
-#         np.amin(ele_dat["data"])
-#         if config["plotting"]["data_cbar_l"] == "data"
-#         else config["plotting"]["data_cbar_l"],
-#         np.amax(ele_dat["data"])
-#         if config["plotting"]["data_cbar_u"] == "data"
-#         else config["plotting"]["data_cbar_u"],
-#         11,
-#     )
-#     # clevs = np.linspace(0, 300, 11)
-#     ele_savedata["fit"].T.plot(ax=ax[0][0], cmap="gist_ncar", levels=ele_clevs)
-#     ele_savedata["data"].T.plot(ax=ax[0][1], cmap="gist_ncar", levels=ele_clevs)
-#     ion_savedata["fit"].T.plot(ax=ax[1][0], cmap="gist_ncar", levels=ion_clevs)
-#     ion_savedata["data"].T.plot(ax=ax[1][1], cmap="gist_ncar", levels=ion_clevs)
-#     fig.savefig(os.path.join(td, "plots", "fit_and_data.png"), bbox_inches="tight")
-#
-#     model_v_actual(
-#         sorted_losses,
-#         [ele_sorted_data, ion_sorted_data],
-#         [ele_sorted_fits, ion_sorted_fits],
-#         num_plots,
-#         td,
-#         config,
-#         loss_inds,
-#         [ele_y_axis, ion_y_axis],
-#         [ele_sorted_sqdev, ion_sorted_sqdev],
-#         sorted_redchi,
-#     )
-#
-# elif config["other"]["extraoptions"]["load_ion_spec"]:
-#     fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-#     clevs = np.linspace(
-#         np.amin(ion_savedata["data"])
-#         if config["plotting"]["data_cbar_l"] == "data"
-#         else config["plotting"]["data_cbar_l"],
-#         np.amax(ion_savedata["data"])
-#         if config["plotting"]["data_cbar_u"] == "data"
-#         else config["plotting"]["data_cbar_u"],
-#         11,
-#     )
-#     # clevs = np.linspace(0, 300, 11)
-#     ion_savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
-#     ion_savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
-#     fig.savefig(os.path.join(td, "plots", "fit_and_data.png"), bbox_inches="tight")
-#
-#     model_v_actual(
-#         sorted_losses,
-#         ion_sorted_data,
-#         ion_sorted_fits,
-#         num_plots,
-#         td,
-#         config,
-#         loss_inds,
-#         np.array([ion_y_axis]),
-#         ion_sorted_sqdev,
-#         sorted_redchi,
-#     )
-#
-# elif config["other"]["extraoptions"]["load_ele_spec"]:
-#     fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-#     clevs = np.linspace(
-#         np.amin(ele_savedata["data"])
-#         if config["plotting"]["data_cbar_l"] == "data"
-#         else config["plotting"]["data_cbar_l"],
-#         np.amax(ele_savedata["data"])
-#         if config["plotting"]["data_cbar_u"] == "data"
-#         else config["plotting"]["data_cbar_u"],
-#         11,
-#     )
-#     # clevs = np.linspace(0, 300, 11)
-#     ele_savedata["fit"].T.plot(ax=ax[0], cmap="gist_ncar", levels=clevs)
-#     ele_savedata["data"].T.plot(ax=ax[1], cmap="gist_ncar", levels=clevs)
-#     fig.savefig(os.path.join(td, "plots", "fit_and_data.png"), bbox_inches="tight")
-#
-#     model_v_actual(
-#         sorted_losses,
-#         ele_sorted_data,
-#         ele_sorted_fits,
-#         num_plots,
-#         td,
-#         config,
-#         loss_inds,
-#         np.array([ele_y_axis]),
-#         ele_sorted_sqdev,
-#         sorted_redchi,
-#     )
-
-# sigmas_ds = xr.Dataset(
-#     {k: xr.DataArray(sigmas[:, i], coords=(coords[0],)) for i, k in enumerate(reshaped_params.keys())}
-# )
-# sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
-#
-# for param in reshaped_params.keys():
-#     vals = pandas.Series(final_params[param], dtype=float)
-#     fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-#     lineouts = np.array(config["data"]["lineouts"]["val"])
-#     std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
-#
-#     ax.plot(lineouts, vals)
-#     ax.fill_between(
-#         lineouts,
-#         (vals.values - config["plotting"]["n_sigmas"] * sigmas_ds[param].values),
-#         (vals.values + config["plotting"]["n_sigmas"] * sigmas_ds[param].values),
-#         color="b",
-#         alpha=0.1,
-#     )
-#     ax.fill_between(
-#         lineouts,
-#         (vals.values - config["plotting"]["n_sigmas"] * std.values),
-#         (vals.values + config["plotting"]["n_sigmas"] * std.values),
-#         color="r",
-#         alpha=0.1,
-#     )
-#     ax.set_xlabel("lineout", fontsize=14)
-#     ax.grid()
-#     ax.set_ylim(0.8 * np.min(vals), 1.2 * np.max(vals))
-#     ax.set_ylabel(param, fontsize=14)
-#     fig.savefig(os.path.join(td, "plots", "learned_" + param + ".png"), bbox_inches="tight")
-#
-# return final_params
 
 
 def model_v_actual(config, all_data, all_axes, fits, losses, red_losses, sqdevs, td):
