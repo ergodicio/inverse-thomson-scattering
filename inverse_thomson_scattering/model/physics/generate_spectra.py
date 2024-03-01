@@ -78,7 +78,21 @@ class FitModel:
         lam = all_params["lam"]
 
         if self.config["other"]["extraoptions"]["load_ion_spec"]:
-            ThryI, lamAxisI = self.ion_form_factor(all_params, cur_ne * 1e20, cur_Te, self.sa["sa"], (fecur, vcur), lam)
+            if self.num_dist_func.dim == 1:
+                ThryI, lamAxisI = self.ion_form_factor(
+                    all_params, cur_ne * 1e20, cur_Te, self.sa["sa"], (fecur, vcur), lam
+                )
+            else:
+                ThryI, lamAxisI = self.ion_form_factor.calc_in_2D(
+                    all_params,
+                    self.config["parameters"]["ud"]["angle"],
+                    self.config["parameters"]["ud"]["angle"],
+                    cur_ne * jnp.array([1e20]),
+                    cur_Te,
+                    self.sa["sa"],
+                    (fecur, vcur),
+                    lam,
+                )
 
             # remove extra dimensions and rescale to nm
             lamAxisI = jnp.squeeze(lamAxisI) * 1e7  # TODO hardcoded
