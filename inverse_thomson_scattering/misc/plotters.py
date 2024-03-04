@@ -148,10 +148,11 @@ def plot_dist(config, final_params, sigma_fe, td):
             final_params["fe"],
             edgecolor="royalblue",
             lw=0.5,
-            rstride=8,
-            cstride=8,
+            rstride=16,
+            cstride=16,
             alpha=0.3,
         )
+        ax.set_zlim(-50, 0)
         ax.contour(
             final_params["v"][0], final_params["v"][1], final_params["fe"], zdir="x", offset=-7.5, cmap="coolwarm"
         )
@@ -161,8 +162,8 @@ def plot_dist(config, final_params, sigma_fe, td):
         ax.contour(
             final_params["v"][0], final_params["v"][1], final_params["fe"], zdir="z", offset=-50, cmap="coolwarm"
         )
-        ax.set_xlabel("v/vth", fontsize=14)
-        ax.set_ylabel("v/vth", fontsize=14)
+        ax.set_xlabel("vx/vth", fontsize=14)
+        ax.set_ylabel("vy/vth", fontsize=14)
         ax.set_zlabel("f_e (ln)")
         ax = fig.add_subplot(1, 3, 2, projection="3d")
         ax.plot_surface(
@@ -171,10 +172,11 @@ def plot_dist(config, final_params, sigma_fe, td):
             np.log10(np.exp(final_params["fe"])),
             edgecolor="royalblue",
             lw=0.5,
-            rstride=8,
-            cstride=8,
+            rstride=16,
+            cstride=16,
             alpha=0.3,
         )
+        ax.set_zlim(-50, 0)
         ax.contour(
             final_params["v"][0],
             final_params["v"][1],
@@ -196,11 +198,11 @@ def plot_dist(config, final_params, sigma_fe, td):
             final_params["v"][1],
             np.log10(np.exp(final_params["fe"])),
             zdir="z",
-            offset=-50,
+            offset=-22,
             cmap="coolwarm",
         )
-        ax.set_xlabel("v/vth", fontsize=14)
-        ax.set_ylabel("v/vth", fontsize=14)
+        ax.set_xlabel("vx/vth", fontsize=14)
+        ax.set_ylabel("vy/vth", fontsize=14)
         ax.set_zlabel("f_e (log)")
 
         ax = fig.add_subplot(1, 3, 3, projection="3d")
@@ -210,10 +212,11 @@ def plot_dist(config, final_params, sigma_fe, td):
             np.exp(final_params["fe"]),
             edgecolor="royalblue",
             lw=0.5,
-            rstride=8,
-            cstride=8,
+            rstride=16,
+            cstride=16,
             alpha=0.3,
         )
+        ax.set_zlim(-50, 0)
         ax.contour(
             final_params["v"][0],
             final_params["v"][1],
@@ -235,11 +238,11 @@ def plot_dist(config, final_params, sigma_fe, td):
             final_params["v"][1],
             np.exp(final_params["fe"]),
             zdir="z",
-            offset=-50,
+            offset=0.0,
             cmap="coolwarm",
         )
-        ax.set_xlabel("v/vth", fontsize=14)
-        ax.set_ylabel("v/vth", fontsize=14)
+        ax.set_xlabel("vx/vth", fontsize=14)
+        ax.set_ylabel("vy/vth", fontsize=14)
         ax.set_zlabel("f_e")
 
     # no rolling sigma bc we use a smoothing kernel

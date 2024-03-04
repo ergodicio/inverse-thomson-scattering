@@ -42,7 +42,7 @@ class DistFunc:
 
         # rotion angle for the biDLM defined counter clockwise from the x-axis
         if "m_theta" in config["parameters"]["fe"].keys():
-            self.m_theta = config["parameters"]["fe"]["m_theta"]
+            self.m_theta = config["parameters"]["fe"]["m_theta"] / 180.0 * jnp.pi
         else:
             self.m_theta = 0.0
 
