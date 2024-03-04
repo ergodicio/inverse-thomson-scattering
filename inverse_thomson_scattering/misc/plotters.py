@@ -142,43 +142,47 @@ def plot_dist(config, final_params, sigma_fe, td):
     else:
         fig = plt.figure(figsize=(15, 5))
         ax = fig.add_subplot(1, 3, 1, projection="3d")
+        curfe = np.where(final_params["fe"]<-50.,-50., final_params["fe"])
         ax.plot_surface(
             final_params["v"][0],
             final_params["v"][1],
-            final_params["fe"],
+            curfe,
             edgecolor="royalblue",
             lw=0.5,
-            rstride=8,
-            cstride=8,
+            rstride=16,
+            cstride=16,
             alpha=0.3,
         )
+        ax.set_zlim(-50, 0)
         ax.contour(
-            final_params["v"][0], final_params["v"][1], final_params["fe"], zdir="x", offset=-7.5, cmap="coolwarm"
+            final_params["v"][0], final_params["v"][1], curfe, zdir="x", offset=-7.5, cmap="coolwarm"
         )
         ax.contour(
-            final_params["v"][0], final_params["v"][1], final_params["fe"], zdir="y", offset=7.5, cmap="coolwarm"
+            final_params["v"][0], final_params["v"][1], curfe, zdir="y", offset=7.5, cmap="coolwarm"
         )
         ax.contour(
-            final_params["v"][0], final_params["v"][1], final_params["fe"], zdir="z", offset=-50, cmap="coolwarm"
+            final_params["v"][0], final_params["v"][1], curfe, zdir="z", offset=-50, cmap="coolwarm"
         )
-        ax.set_xlabel("v/vth", fontsize=14)
-        ax.set_ylabel("v/vth", fontsize=14)
+        ax.set_xlabel("vx/vth", fontsize=14)
+        ax.set_ylabel("vy/vth", fontsize=14)
         ax.set_zlabel("f_e (ln)")
         ax = fig.add_subplot(1, 3, 2, projection="3d")
+        curfe = np.where(np.log10(np.exp(final_params["fe"]))<-22., -22., np.log10(np.exp(final_params["fe"])))
         ax.plot_surface(
             final_params["v"][0],
             final_params["v"][1],
-            np.log10(np.exp(final_params["fe"])),
+            curfe,
             edgecolor="royalblue",
             lw=0.5,
-            rstride=8,
-            cstride=8,
+            rstride=16,
+            cstride=16,
             alpha=0.3,
         )
+        ax.set_zlim(-22, 0)
         ax.contour(
             final_params["v"][0],
             final_params["v"][1],
-            np.log10(np.exp(final_params["fe"])),
+            curfe,
             zdir="x",
             offset=-7.5,
             cmap="coolwarm",
@@ -186,7 +190,7 @@ def plot_dist(config, final_params, sigma_fe, td):
         ax.contour(
             final_params["v"][0],
             final_params["v"][1],
-            np.log10(np.exp(final_params["fe"])),
+            curfe,
             zdir="y",
             offset=7.5,
             cmap="coolwarm",
@@ -194,13 +198,13 @@ def plot_dist(config, final_params, sigma_fe, td):
         ax.contour(
             final_params["v"][0],
             final_params["v"][1],
-            np.log10(np.exp(final_params["fe"])),
+            curfe,
             zdir="z",
-            offset=-50,
+            offset=-22,
             cmap="coolwarm",
         )
-        ax.set_xlabel("v/vth", fontsize=14)
-        ax.set_ylabel("v/vth", fontsize=14)
+        ax.set_xlabel("vx/vth", fontsize=14)
+        ax.set_ylabel("vy/vth", fontsize=14)
         ax.set_zlabel("f_e (log)")
 
         ax = fig.add_subplot(1, 3, 3, projection="3d")
@@ -210,10 +214,11 @@ def plot_dist(config, final_params, sigma_fe, td):
             np.exp(final_params["fe"]),
             edgecolor="royalblue",
             lw=0.5,
-            rstride=8,
-            cstride=8,
+            rstride=16,
+            cstride=16,
             alpha=0.3,
         )
+        ax.set_zlim(0.0, .15)
         ax.contour(
             final_params["v"][0],
             final_params["v"][1],
@@ -235,11 +240,11 @@ def plot_dist(config, final_params, sigma_fe, td):
             final_params["v"][1],
             np.exp(final_params["fe"]),
             zdir="z",
-            offset=-50,
+            offset=0.0,
             cmap="coolwarm",
         )
-        ax.set_xlabel("v/vth", fontsize=14)
-        ax.set_ylabel("v/vth", fontsize=14)
+        ax.set_xlabel("vx/vth", fontsize=14)
+        ax.set_ylabel("vy/vth", fontsize=14)
         ax.set_zlabel("f_e")
 
     # no rolling sigma bc we use a smoothing kernel

@@ -20,7 +20,7 @@ parameters:
         lb: 523.0
         ub: 528.0
     Te:
-        val: .64
+        val: .16
         active: True
         lb: 0.01
         ub: 1.5
@@ -31,20 +31,20 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: 0.16
+        val: 0.02
         active: True
         lb: 0.001
         ub: 1.0
     Z:
-        val: [1., 14.]
+        val: 6.
         active: True
         lb: 0.5
         ub: 7.0
     A:
-        val: [1., 40.]
+        val: 14.
         active: False
     fract:
-        val: [.95, .05]
+        val: 1
         active: False
     ud:
         val: 0.0
@@ -59,7 +59,7 @@ parameters:
         lb: -20.5
         ub: 20.5
     ne:
-        val: 0.23
+        val: 0.05
         active: True
         lb: 0.001
         ub: 1.0
@@ -70,7 +70,7 @@ parameters:
         ub: 15.
         num_grad_points: 1
     m:
-        val: 2
+        val: 2.0
         active: False
         lb: 2.0
         ub: 5.0
@@ -86,8 +86,9 @@ parameters:
         symmetric: False
         dim: 2
         v_res: 0.02
-        temp_asym: 2.0
-        m_theta: 10.0
+        temp_asym: 1.0
+        m_theta: 0.0
+        m_asym: 2.0
 
 
 
@@ -126,6 +127,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: maxwellian_2D_converge_test_v=0.005
+    run: test_asym_rotation_0_truncy
 
 machine: gpu
