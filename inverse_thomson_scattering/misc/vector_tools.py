@@ -37,15 +37,18 @@ def v_add_dim(a):
     return (a[0][..., jnp.newaxis], a[1][..., jnp.newaxis])
 
 
-# performs a clockwise rotation
+# performs a counterclockwise rotation, rotation angle in radians
 def rotate(A, theta):
     # create new grid
     rot_point = [A.shape[0] / 2, A.shape[1] / 2]
     x, y = jnp.meshgrid(jnp.arange(A.shape[0]), jnp.arange(A.shape[1]))
     R = jnp.array([[jnp.cos(-theta), -jnp.sin(-theta)], [jnp.sin(-theta), jnp.cos(-theta)]])
-    origin_space = jnp.matmul(R, jnp.array([x - rot_point[0], y - rot_point[1]]).swapaxes(0, 1))
-    or_x = jnp.squeeze(origin_space[:, 0, :])
-    or_y = jnp.squeeze(origin_space[:, 1, :])
+    # origin_space = jnp.matmul(R, jnp.array([x - rot_point[0], y - rot_point[1]]).swapaxes(0, 1))
+    # or_x = jnp.squeeze(origin_space[:, 0, :])
+    # or_y = jnp.squeeze(origin_space[:, 1, :])
+    origin_space = jnp.matmul(R, jnp.array([x.flatten() - rot_point[0], y.flatten() - rot_point[1]]))
+    or_x = origin_space[0, :].reshape(x.shape)
+    or_y = origin_space[1, :].reshape(y.shape)
     # w11 = (x2-x)*(y2-y)/(x2-x1)(y2-y1)
     # doing this on the pixel grid the denominator is 1 and the distance to the next point is 1-current location modulus 1
     w11 = (1 - or_x % 1) * (1 - or_y % 1)
@@ -53,20 +56,20 @@ def rotate(A, theta):
     w21 = (or_x % 1) * (1 - or_y % 1)
     w22 = (or_x % 1) * (or_y % 1)
     q11 = A[
-        jnp.clip(jnp.asarray(or_x + rot_point[0], dtype=int), 0, A.shape[0]),
         jnp.clip(jnp.asarray(or_y + rot_point[1], dtype=int), 0, A.shape[1]),
+        jnp.clip(jnp.asarray(or_x + rot_point[0], dtype=int), 0, A.shape[0]),
     ]
     q12 = A[
-        jnp.clip(jnp.asarray(or_x + rot_point[0], dtype=int), 0, A.shape[0]),
         jnp.clip(jnp.asarray(or_y + rot_point[1] + 1, dtype=int), 0, A.shape[1]),
+        jnp.clip(jnp.asarray(or_x + rot_point[0], dtype=int), 0, A.shape[0]),
     ]
     q21 = A[
-        jnp.clip(jnp.asarray(or_x + rot_point[0] + 1, dtype=int), 0, A.shape[0]),
         jnp.clip(jnp.asarray(or_y + rot_point[1], dtype=int), 0, A.shape[1]),
+        jnp.clip(jnp.asarray(or_x + rot_point[0] + 1, dtype=int), 0, A.shape[0]),
     ]
     q22 = A[
-        jnp.clip(jnp.asarray(or_x + rot_point[0] + 1, dtype=int), 0, A.shape[0]),
         jnp.clip(jnp.asarray(or_y + rot_point[1] + 1, dtype=int), 0, A.shape[1]),
+        jnp.clip(jnp.asarray(or_x + rot_point[0] + 1, dtype=int), 0, A.shape[0]),
     ]
     A_rotated = w11 * q11 + w12 * q12 + w21 * q21 + w22 * q22
 

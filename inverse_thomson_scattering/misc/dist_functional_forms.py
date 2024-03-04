@@ -29,7 +29,7 @@ def BiDLM(mx, my, tasym, theta, h):
     x0x = jnp.sqrt(3 * gamma(3 / mx) / gamma(5 / mx))
     x0y = jnp.sqrt(3 * gamma(3 / my) / gamma(5 / my))
     fe_num = jnp.exp(-((jnp.abs(vx) / x0x) ** mx) - (jnp.abs(vy) / (x0y * jnp.sqrt(tasym))) ** my)
-    fe_num = rotate(fe_num, -theta)
+    fe_num = rotate(fe_num, theta)
     fe_num = fe_num / trapz(trapz(fe_num, h), h)
     return (vx, vy), fe_num
 

@@ -40,9 +40,9 @@ class DistFunc:
         else:
             self.m_asym = 1.0
 
-        # rotion angle for the biDLM defined counter clockwise from the x-axis
+        # rotion angle for the biDLM defined counter clockwise from the x-axis in degrees
         if "m_theta" in config["parameters"]["fe"].keys():
-            self.m_theta = config["parameters"]["fe"]["m_theta"]
+            self.m_theta = config["parameters"]["fe"]["m_theta"] / 180.0 * jnp.pi
         else:
             self.m_theta = 0.0
 

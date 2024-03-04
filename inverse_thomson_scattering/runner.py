@@ -332,6 +332,14 @@ def calc_series(config):
                 td,
             )
         else:
+            if config["parameters"]["fe"]["dim"] == 2:
+                plotters.plot_dist(
+                    config,
+                    {"fe": config["parameters"]["fe"]["val"], "v": config["velocity"]},
+                    np.zeros_like(config["parameters"]["fe"]["val"]),
+                    td,
+                )
+
             fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
             if config["other"]["extraoptions"]["load_ele_spec"]:
                 ax[0].plot(lamAxisE.transpose(), ThryE.transpose())  # transpose might break single specs?
