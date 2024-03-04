@@ -135,8 +135,8 @@ def run_job(run_id: str, mode: str, nested: bool):
 
         _run_(config, mode)
 
-    if "MLFLOW_EXPORT" in os.environ:
-        utils.export_run(run_id)
+    # if "MLFLOW_EXPORT" in os.environ:
+    #     utils.export_run(run_id)
 
 
 #

@@ -84,9 +84,9 @@ parameters:
         ub: -0.5
         fe_decrease_strict: False
         symmetric: False
-        dim: 1
-        v_res: 0.02
-        temp_asym: 2.0
+        dim: 2
+        v_res: 0.005
+        temp_asym: 1.0
 
 
 
@@ -95,8 +95,8 @@ data:
     lineouts:
         type:
             pixel
-        start: 340
-        end: 660
+        start: 100
+        end: 900
         skip: 20
     background:
         type:
@@ -125,6 +125,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: maxwellian_test_2D_v=0.02_scanned
+    run: maxwellian_2D_converge_test_v=0.005
 
 machine: gpu
