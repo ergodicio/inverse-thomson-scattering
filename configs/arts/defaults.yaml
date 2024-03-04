@@ -111,7 +111,7 @@ other:
 plotting:
     n_sigmas: 3
     rolling_std_width: 5
-    data_cbar_u: 10
+    data_cbar_u: 1.1
     data_cbar_l: 0
     ion_window_start: 525
     ion_window_end: 528
@@ -130,6 +130,12 @@ data:
         red_max: 650
         iaw_min: 350
         iaw_max: 352
+        iaw_cf_min: 526.4
+        iaw_cf_max: 526.6
+        forward_epw_start: 400
+        forward_epw_end: 700
+        forward_iaw_start: 524
+        forward_iaw_end: 528
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1

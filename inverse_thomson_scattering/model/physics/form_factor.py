@@ -51,9 +51,9 @@ class FormFactor:
         self.Mp = self.Me * 1836.1  # proton mass keV/C^2
         self.lamrang = lamrang
         self.npts = npts
-        self.h = 0.1  # 0.01
+        self.h = 0.01
         minmax = 8.2
-        h1 = 124  # 1024
+        h1 = 1024  # 1024
         self.xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
         self.xi2 = jnp.array(jnp.arange(-minmax, minmax, self.h))
         self.Zpi = jnp.array(zprimeMaxw(self.xi2))
