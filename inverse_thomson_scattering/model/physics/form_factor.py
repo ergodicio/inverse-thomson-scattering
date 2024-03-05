@@ -258,7 +258,7 @@ class FormFactor:
         element, xie_mag_at, klde_mag_at = xs
 
         fe_2D_k = self.rotate(DF, element * 180 / jnp.pi, reshape=False)
-        fe_1D_k = jnp.sum(fe_2D_k, axis=1) * (x[1] - x[0])
+        fe_1D_k = jnp.sum(fe_2D_k, axis=0) * (x[1] - x[0])
 
         # find the location of xie in axis array
         loc = jnp.argmin(jnp.abs(x - xie_mag_at))
