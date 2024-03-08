@@ -1,10 +1,10 @@
 series:
   param1: Z
-  vals1: [[9.,1.], [10.5,1.], [11.5,1.],[12.2,1.],[13.,1.],[14.4,1.],[15.2,1.]]
+  vals1: [[3.8,1.], [4.5,1.], [4.9,1.],[5.2,1.],[5.6.,1.],[6,1.],[6.2,1.]]
   param2: Te
-  vals2: [0.2137, 0.3893, 0.4788, 0.5357, 0.5915, 0.6696, 0.6739]
+  vals2: [0.17096, 0.31144, 0.38304, 0.42856, 0.4732 , 0.53568, 0.53912]
   param3: Ti
-  vals3: [0.02137, 0.03893, 0.04788, 0.05357, 0.05915, 0.06696, 0.06739]
+  vals3: [0.017096, 0.031144, 0.038304, 0.042856, 0.04732 , 0.053568, 0.053912]
   param4: ne
   vals4: [0.1387, 0.18, 0.2067, 0.2189, 0.2293, 0.2311, 0.2311]
 parameters:
@@ -50,10 +50,10 @@ parameters:
         lb: 0.5
         ub: 7.0
     A:
-        val: [40., 1.]
+        val: [14., 1.]
         active: False
     fract:
-        val: [.40, .60]
+        val: [.45, .55]
         active: False
     ud:
         val: 0.0
@@ -92,6 +92,7 @@ parameters:
         fe_decrease_strict: False
         symmetric: False
         dim: 1
+        v_res: 0.02
 
 data:
     shotnum: 101675
@@ -126,6 +127,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: Ar-H-40-60-time_series_20per_hotter
+    run: N-H-45-55-time_series
     
 machine: gpu

@@ -20,7 +20,7 @@ parameters:
         lb: 523.0
         ub: 528.0
     Te:
-        val: .09
+        val: .6
         active: True
         lb: 0.01
         ub: 1.5
@@ -31,20 +31,20 @@ parameters:
         ub: 10.
         num_grad_points: 1
     Ti:
-        val: 0.02
+        val: 0.12
         active: True
         lb: 0.001
         ub: 1.0
     Z:
-        val: 6.
+        val: [14.0, 1.0]
         active: True
         lb: 0.5
         ub: 7.0
     A:
-        val: 14.
+        val: [40.0, 1.0]
         active: False
     fract:
-        val: 1
+        val: [0.1,0.9]
         active: False
     ud:
         val: 0.0
@@ -59,7 +59,7 @@ parameters:
         lb: -20.5
         ub: 20.5
     ne:
-        val: 0.05
+        val: 0.2
         active: True
         lb: 0.001
         ub: 1.0
@@ -70,7 +70,7 @@ parameters:
         ub: 15.
         num_grad_points: 1
     m:
-        val: 3.2
+        val: 3.0
         active: False
         lb: 2.0
         ub: 5.0
@@ -87,7 +87,7 @@ parameters:
         dim: 1
         v_res: 0.02
         temp_asym: 1.0
-        m_theta: 30.0
+        m_theta: 0.0
         m_asym: 1.
 
 
@@ -127,6 +127,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: zach_test_perp_sym_test_aligned
+    run: test
 
 machine: gpu
