@@ -132,8 +132,8 @@ data:
         iaw_cf_max: 526.6
         forward_epw_start: 400
         forward_epw_end: 700
-        forward_iaw_start: 524
-        forward_iaw_end: 528
+        forward_iaw_start: 525.75
+        forward_iaw_end: 527.25
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1
