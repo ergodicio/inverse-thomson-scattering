@@ -5,6 +5,20 @@ from inverse_thomson_scattering.misc.vector_tools import rotate
 
 # we will probably want to add input checks to ensure the proper fields are defined
 def DLM_1D(m, h):
+    def SG(vx, m):
+        x0 = jnp.sqrt(3 * gamma(3 / m) / gamma(5 / m))
+        return jnp.exp(-((jnp.abs(vx) / x0) ** m))
+
+    vx = jnp.arange(-8, 8, h)
+    fe_num = jnp.array([trapz(SG(jnp.sqrt(vx**2 + vz**2), m), h) for vz in vx])
+
+    # x0 = jnp.sqrt(3 * gamma(3 / m) / gamma(5 / m))
+    # fe_num = jnp.exp(-((jnp.abs(vx) / x0) ** m))
+    fe_num = fe_num / trapz(fe_num, h)
+    return vx, fe_num
+
+
+def SG_1D(m, h):
     vx = jnp.arange(-8, 8, h)
     x0 = jnp.sqrt(3 * gamma(3 / m) / gamma(5 / m))
     fe_num = jnp.exp(-((jnp.abs(vx) / x0) ** m))
@@ -12,6 +26,7 @@ def DLM_1D(m, h):
     return vx, fe_num
 
 
+# Warning: These super-gaussian orders do not follow Matte
 def DLM_2D(m, h):
     vx = jnp.arange(-8, 8, h)
     vy = jnp.arange(-8, 8, h)
@@ -22,6 +37,7 @@ def DLM_2D(m, h):
     return (vx, vy), fe_num
 
 
+# Warning: These super-gaussian orders do not follow Matte
 def BiDLM(mx, my, tasym, theta, h):
     vx = jnp.arange(-8, 8, h)
     vy = jnp.arange(-8, 8, h)
