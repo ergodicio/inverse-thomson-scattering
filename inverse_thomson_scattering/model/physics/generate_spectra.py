@@ -53,7 +53,10 @@ class FitModel:
                 all_params[key] = jnp.squeeze(all_params[key])
 
         if self.config["parameters"]["m"]["active"]:
-            all_params["fe"] = jnp.log(self.num_dist_func(self.config))
+            self.config["velocity"], all_params["fe"] = self.num_dist_func(all_params["m"])
+            # self.config["velocity"], all_params["fe"] = self.num_dist_func(self.config["parameters"]["m"]["val"])
+            all_params["fe"] = jnp.log(all_params["fe"])
+            # all_params["fe"] = jnp.log(self.num_dist_func(self.config["parameters"]["m"]))
             if self.config["parameters"]["m"]["active"] and self.config["parameters"]["fe"]["active"]:
                 raise ValueError("m and fe cannot be actively fit at the same time")
 

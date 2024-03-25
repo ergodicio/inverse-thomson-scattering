@@ -46,14 +46,14 @@ class DistFunc:
         else:
             self.m_theta = 0.0
 
-    def __call__(self, mdict):
+    def __call__(self, mval):
         if self.fe_name == "DLM":
             if self.dim == 1:
-                v, fe = dist_functional_forms.DLM_1D(mdict["val"], self.velocity_res)
+                v, fe = dist_functional_forms.DLM_1D(mval, self.velocity_res)
             elif self.dim == 2:
                 # v, fe = dist_functional_forms.DLM_2D(mdict["val"], self.velocity_res)
                 v, fe = dist_functional_forms.BiDLM(
-                    mdict["val"], max(mdict["val"] * self.m_asym, 2.0), self.temp_asym, self.m_theta, self.velocity_res
+                    mval, jnp.max(jnp.array([mval * self.m_asym, 2.0])), self.temp_asym, self.m_theta, self.velocity_res
                 )
 
         elif self.fe_name == "Spitzer":

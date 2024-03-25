@@ -66,7 +66,7 @@ def _validate_inputs_(config: Dict) -> Dict:
     """
     # get derived quantities
     dist_obj = DistFunc(config)
-    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"])
+    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"]["val"])
     config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])[None, :]
     # config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
     Warning("fe length is currently overwritten by v_res")
@@ -74,6 +74,8 @@ def _validate_inputs_(config: Dict) -> Dict:
     if config["parameters"]["fe"]["symmetric"]:
         Warning("Symmetric EDF has been disabled")
         # config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+    if config["parameters"]["fe"]["dim"] == 2 and config["parameters"]["fe"]["active"]:
+        Warning("2D EDFs can only be fit for angular data")
 
     # get slices
     config["data"]["lineouts"]["val"] = [
@@ -82,11 +84,6 @@ def _validate_inputs_(config: Dict) -> Dict:
             config["data"]["lineouts"]["start"], config["data"]["lineouts"]["end"], config["data"]["lineouts"]["skip"]
         )
     ]
-
-    # create fes
-    # NumDistFunc = get_num_dist_func(config["parameters"]["fe"]["type"], config["velocity"])
-    # if not config["parameters"]["fe"]["val"]:
-    #     config["parameters"]["fe"]["val"] = np.log(NumDistFunc(config["parameters"]["m"]["val"]))
 
     config["parameters"]["fe"]["lb"] = np.multiply(
         config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
@@ -148,9 +145,6 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
         ts_fitter = TSFitter(config, sa, batch)
         init_weights = copy.deepcopy(ts_fitter.flattened_weights)
 
-        # ts_fitter.flattened_weights = ts_fitter.flattened_weights * np.random.uniform(
-        #     0.97, 1.03, len(ts_fitter.flattened_weights)
-        # )
         res = spopt.minimize(
             ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
             init_weights,
@@ -163,33 +157,6 @@ def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, T
         these_weights = ts_fitter.unravel_pytree(res["x"])
         for k in all_weights.keys():
             all_weights[k].append(these_weights[k])
-
-        # needs to be reworked for multiple minimizations
-        # if i == config["optimizer"]["num_mins"] - 1:
-        #     break
-        # config["parameters"]["fe"]["length"] = (
-        #     config["optimizer"]["refine_factor"] * config["parameters"]["fe"]["length"]
-        # )
-        # refined_v = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-        # if config["parameters"]["fe"]["symmetric"]:
-        #     refined_v = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-        #
-        # refined_fe = np.interp(refined_v, config["velocity"], np.squeeze(these_weights["fe"]))
-        #
-        # config["parameters"]["fe"]["val"] = refined_fe.reshape((1, -1))
-        # config["velocity"] = refined_v
-        # config["parameters"]["ne"]["val"] = these_weights["ne"].squeeze()
-        # config["parameters"]["Te"]["val"] = these_weights["Te"].squeeze()
-        #
-        # config["parameters"]["fe"]["ub"] = -0.5
-        # config["parameters"]["fe"]["lb"] = -50
-        # config["parameters"]["fe"]["lb"] = np.multiply(
-        #     config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
-        # )
-        # config["parameters"]["fe"]["ub"] = np.multiply(
-        #     config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
-        # )
-        # config["units"] = init_param_norm_and_shift(config)
 
     overall_loss = res["fun"]
 
@@ -313,7 +280,7 @@ def _1d_scipy_loop_(config: Dict, ts_fitter: TSFitter, previous_weights: np.ndar
         method=config["optimizer"]["method"],
         jac=True if config["optimizer"]["grad_method"] == "AD" else False,
         bounds=ts_fitter.bounds,
-        options={"disp": True, "maxiter": 1000},
+        options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
     )
 
     best_loss = res["fun"]

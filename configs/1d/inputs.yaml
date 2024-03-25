@@ -6,22 +6,22 @@ parameters:
         ub: 3.75
     amp2:
         val: 1.
-        active: True
+        active: False
         lb: 0.01
         ub: 3.75
     amp3:
         val: 1.0
-        active: True
+        active: False
         lb: 0.01
         ub: 3.75
     lam:
         val: 526.5
-        active: True
+        active: False
         lb: 523.0
         ub: 528.0
     Te:
         val: .6
-        active: True
+        active: False
         lb: 0.01
         ub: 1.5
     Te_gradient:
@@ -32,12 +32,12 @@ parameters:
         num_grad_points: 1
     Ti:
         val: 0.12
-        active: True
+        active: False
         lb: 0.001
         ub: 1.0
     Z:
         val: [14.0, 1.0]
-        active: True
+        active: False
         lb: 0.5
         ub: 7.0
     A:
@@ -49,7 +49,7 @@ parameters:
     ud:
         val: 0.0
         angle: 0.0
-        active: True
+        active: False
         lb: -100.0
         ub: 100.0
     Va:
@@ -60,7 +60,7 @@ parameters:
         ub: 20.5
     ne:
         val: 0.2
-        active: True
+        active: False
         lb: 0.001
         ub: 1.0
     ne_gradient:
@@ -71,7 +71,7 @@ parameters:
         num_grad_points: 1
     m:
         val: 3.0
-        active: False
+        active: True
         lb: 2.0
         ub: 5.0
     fe:
@@ -84,7 +84,7 @@ parameters:
         ub: -0.5
         fe_decrease_strict: False
         symmetric: False
-        dim: 1
+        dim: 2
         v_res: 0.02
         temp_asym: 1.0
         m_theta: 0.0
@@ -99,7 +99,7 @@ data:
             pixel
         start: 100
         end: 900
-        skip: 20
+        skip: 100
     background:
         type:
             Fit
