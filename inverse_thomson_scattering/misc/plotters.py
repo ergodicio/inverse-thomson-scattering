@@ -38,7 +38,7 @@ def get_final_params(config, best_weights, all_axes, td):
 
 def plot_final_params(config, all_params, sigmas_ds, td):
     for param in all_params.keys():
-        vals = pandas.Series(all_params[param], dtype=float)
+        vals = pandas.Series(all_params[param].squeeze(), dtype=float)
         fig, ax = plt.subplots(1, 1, figsize=(4, 4))
         lineouts = np.array(config["data"]["lineouts"]["val"])
         std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()

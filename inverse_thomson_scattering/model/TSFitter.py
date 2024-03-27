@@ -10,6 +10,7 @@ from jax.flatten_util import ravel_pytree
 import numpy as np
 
 from inverse_thomson_scattering.model.spectrum import SpectrumCalculator
+from inverse_thomson_scattering.misc.dist_functional_forms import trapz
 
 
 class TSFitter:
@@ -285,18 +286,27 @@ class TSFitter:
         Returns:
 
         """
-        dv = self.cfg["velocity"][1] - self.cfg["velocity"][0]
-        if self.cfg["parameters"]["fe"]["symmetric"]:
-            density_loss = jnp.mean(jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
-            temperature_loss = jnp.mean(
-                jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] ** 2.0 * dv, axis=1))
-            )
+        if self.cfg["parameters"]["fe"]["dim"] == 1:
+            dv = self.cfg["velocity"][1] - self.cfg["velocity"][0]
+            if self.cfg["parameters"]["fe"]["symmetric"]:
+                density_loss = jnp.mean(jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
+                temperature_loss = jnp.mean(
+                    jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] ** 2.0 * dv, axis=1))
+                )
+            else:
+                density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
+                temperature_loss = jnp.mean(
+                    jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] ** 2.0 * dv, axis=1))
+                )
+            momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
         else:
-            density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
+            density_loss = jnp.mean(jnp.square(1.0 - trapz(trapz(jnp.exp(params["fe"]), self.cfg["parameters"]["fe"]["v_res"]), self.cfg["parameters"]["fe"]["v_res"]))) 
             temperature_loss = jnp.mean(
-                jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] ** 2.0 * dv, axis=1))
-            )
-        momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
+                    jnp.square(1.0 - trapz(trapz(jnp.exp(params["fe"]) * self.cfg["velocity"][0] * self.cfg["velocity"][1], self.cfg["parameters"]["fe"]["v_res"]),self.cfg["parameters"]["fe"]["v_res"])))
+            #needs to be fixed
+            #momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
+            momentum_loss = 0.0
+            print(temperature_loss)
         return density_loss, temperature_loss, momentum_loss
 
     def calc_other_losses(self, params):

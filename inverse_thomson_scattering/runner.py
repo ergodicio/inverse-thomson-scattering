@@ -165,7 +165,7 @@ def calc_series(config):
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
 
     dist_obj = DistFunc(config)
-    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"])
+    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"]["val"])
     config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
 
     config["units"] = init_param_norm_and_shift(config)
