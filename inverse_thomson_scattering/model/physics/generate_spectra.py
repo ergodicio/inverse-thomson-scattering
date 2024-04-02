@@ -23,10 +23,15 @@ class FitModel:
         self.config = config
         self.sa = sa
         # this will need to be fixed for multi electron
+        self.num_ions = 0
+        self.num_electrons = 0
         for species in config["parameters"].keys():
             if "electron" in config["parameters"][species]["type"].keys():
                 self.num_dist_func = DistFunc(config["parameters"][species])
                 self.e_species = species
+                self.num_electrons += 1
+            elif "ion" in config["parameters"][species]["type"].keys():
+                self.num_ions += 1
 
         self.electron_form_factor = FormFactor(
             config["other"]["lamrangE"],
@@ -73,40 +78,48 @@ class FitModel:
                 raise ValueError("m and fe cannot be actively fit at the same time")
 
         # Add gradients to electron temperature and density just being applied to EPW
-        cur_Te = []
-        cur_ne = []
-        A = []
-        Z = []
-        Ti = []
-        fract = []
+        cur_Te = jnp.zeros((self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"], self.num_electrons))
+        cur_ne = jnp.zeros((self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"], self.num_electrons))
+        A = jnp.zeros(self.num_ions)
+        Z = jnp.zeros(self.num_ions)
+        Ti = jnp.zeros(self.num_ions)
+        fract = jnp.zeros(self.num_ions)
 
+        ion_c = 0
+        ele_c = 0
         for species in self.config["parameters"].keys():
             if "electron" in self.config["parameters"][species]["type"].keys():
-                cur_Te.append(
+                cur_Te = cur_Te.at[:, ele_c].set(
                     jnp.linspace(
                         (1 - all_params["general"]["Te_gradient"] / 200) * all_params[species]["Te"],
                         (1 + all_params["general"]["Te_gradient"] / 200) * all_params[species]["Te"],
                         self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"],
-                    )
+                    ).squeeze(-1)
                 )
 
-                cur_ne.append(
-                    jnp.linspace(
-                        (1 - all_params["general"]["ne_gradient"] / 200) * all_params[species]["ne"],
-                        (1 + all_params["general"]["ne_gradient"] / 200) * all_params[species]["ne"],
-                        self.config["parameters"]["general"]["ne_gradient"]["num_grad_points"],
-                    )
-                    * 1e20
+                cur_ne = cur_ne.at[:, ele_c].set(
+                    (
+                        jnp.linspace(
+                            (1 - all_params["general"]["ne_gradient"] / 200) * all_params[species]["ne"],
+                            (1 + all_params["general"]["ne_gradient"] / 200) * all_params[species]["ne"],
+                            self.config["parameters"]["general"]["ne_gradient"]["num_grad_points"],
+                        )
+                        * 1e20
+                    ).squeeze(-1)
                 )
+                ele_c += 1
+
             elif "ion" in self.config["parameters"][species]["type"].keys():
-                A.append(all_params[species]["A"])
-                Z.append(all_params[species]["Z"])
-                Ti.append(all_params[species]["Ti"])
-                fract.append(all_params[species]["fract"])
+                A = A.at[ion_c].set(all_params[species]["A"].squeeze(-1))
+                Z = Z.at[ion_c].set(all_params[species]["Z"].squeeze(-1))
+                Ti = Ti.at[ion_c].set(all_params[species]["Ti"].squeeze(-1))
+                fract = fract.at[ion_c].set(all_params[species]["fract"].squeeze(-1))
+                ion_c += 1
 
-        cur_ne = jnp.array(cur_ne).squeeze()
-        cur_Te = jnp.array(cur_Te).squeeze()
-        Ti = jnp.array(Ti).squeeze()
+        # cur_ne = jnp.array(cur_ne).squeeze()
+        # cur_Te = jnp.array(cur_Te).squeeze()
+        # Ti = jnp.array(Ti).squeeze()
+
         fecur = jnp.exp(all_params[self.e_species]["fe"])
         vcur = self.config["parameters"][self.e_species]["fe"]["velocity"]
         if self.config["parameters"][self.e_species]["fe"]["symmetric"]:

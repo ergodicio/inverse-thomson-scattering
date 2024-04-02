@@ -42,8 +42,8 @@ def add_ATS_IRF(config, sas, lamAxisE, modlE, amps, TSins, lam) -> Tuple[jnp.nda
     if config["other"]["PhysParams"]["norm"] > 0:
         ThryE = jnp.where(
             lamAxisE < lam,
-            TSins["amp1"] * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
-            TSins["amp2"] * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
+            TSins["general"]["amp1"] * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
+            TSins["general"]["amp2"] * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
         )
     return lamAxisE, ThryE
 
@@ -77,7 +77,7 @@ def add_ion_IRF(config, lamAxisI, modlI, amps, TSins) -> Tuple[jnp.ndarray, jnp.
 
         if config["other"]["PhysParams"]["norm"] == 0:
             lamAxisI = jnp.average(lamAxisI.reshape(1024, -1), axis=1)
-            ThryI = TSins["amp3"] * amps * ThryI / jnp.amax(ThryI)
+            ThryI = TSins["general"]["amp3"] * amps * ThryI / jnp.amax(ThryI)
             # lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
     else:
         ThryI = modlI
@@ -114,14 +114,14 @@ def add_electron_IRF(config, lamAxisE, modlE, amps, TSins, lam) -> Tuple[jnp.nda
     if config["other"]["PhysParams"]["norm"] > 0:
         ThryE = jnp.where(
             lamAxisE < lam,
-            TSins["amp1"] * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
-            TSins["amp2"] * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
+            TSins["general"]["amp1"] * (ThryE / jnp.amax(ThryE[lamAxisE < lam])),
+            TSins["general"]["amp2"] * (ThryE / jnp.amax(ThryE[lamAxisE > lam])),
         )
 
     ThryE = jnp.average(ThryE.reshape(1024, -1), axis=1)
     if config["other"]["PhysParams"]["norm"] == 0:
         lamAxisE = jnp.average(lamAxisE.reshape(1024, -1), axis=1)
         ThryE = amps * ThryE / jnp.amax(ThryE)
-        ThryE = jnp.where(lamAxisE < lam, TSins["amp1"] * ThryE, TSins["amp2"] * ThryE)
+        ThryE = jnp.where(lamAxisE < lam, TSins["general"]["amp1"] * ThryE, TSins["general"]["amp2"] * ThryE)
 
     return lamAxisE, ThryE

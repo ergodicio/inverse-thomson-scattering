@@ -46,6 +46,11 @@ class TSFitter:
         else:
             self.i_input_norm = self.e_input_norm = 1.0
 
+        # this will need to be fixed for multi electron
+        for species in self.cfg["parameters"].keys():
+            if "electron" in self.cfg["parameters"][species]["type"].keys():
+                self.e_species = species
+
         self.spec_calc = SpectrumCalculator(cfg, sas, dummy_batch)
 
         self._loss_ = jit(self.__loss__)
@@ -294,26 +299,59 @@ class TSFitter:
         Returns:
 
         """
-        if self.cfg["parameters"]["fe"]["dim"] == 1:
-            dv = self.cfg["velocity"][1] - self.cfg["velocity"][0]
-            if self.cfg["parameters"]["fe"]["symmetric"]:
-                density_loss = jnp.mean(jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
+        if self.cfg["parameters"][self.e_species]["fe"]["dim"] == 1:
+            dv = (
+                self.cfg["parameters"][self.e_species]["fe"]["velocity"][1]
+                - self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]
+            )
+            if self.cfg["parameters"][self.e_species]["fe"]["symmetric"]:
+                density_loss = jnp.mean(
+                    jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params[self.e_species]["fe"]) * dv, axis=1))
+                )
                 temperature_loss = jnp.mean(
-                    jnp.square(1.0 - 2.0 * jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] ** 2.0 * dv, axis=1))
+                    jnp.square(
+                        1.0
+                        - 2.0
+                        * jnp.sum(
+                            jnp.exp(params[self.e_species]["fe"])
+                            * self.cfg["parameters"][self.e_species]["fe"]["velocity"] ** 2.0
+                            * dv,
+                            axis=1,
+                        )
+                    )
                 )
             else:
-                density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * dv, axis=1)))
+                density_loss = jnp.mean(jnp.square(1.0 - jnp.sum(jnp.exp(params[self.e_species]["fe"]) * dv, axis=1)))
                 temperature_loss = jnp.mean(
-                    jnp.square(1.0 - jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] ** 2.0 * dv, axis=1))
+                    jnp.square(
+                        1.0
+                        - jnp.sum(
+                            jnp.exp(params[self.e_species]["fe"])
+                            * self.cfg["parameters"][self.e_species]["fe"]["velocity"] ** 2.0
+                            * dv,
+                            axis=1,
+                        )
+                    )
                 )
-            momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
+            momentum_loss = jnp.mean(
+                jnp.square(
+                    jnp.sum(
+                        jnp.exp(params[self.e_species]["fe"])
+                        * self.cfg["parameters"][self.e_species]["fe"]["velocity"]
+                        * dv,
+                        axis=1,
+                    )
+                )
+            )
         else:
             density_loss = jnp.mean(
                 jnp.square(
                     1.0
                     - trapz(
-                        trapz(jnp.exp(params["fe"]), self.cfg["parameters"]["fe"]["v_res"]),
-                        self.cfg["parameters"]["fe"]["v_res"],
+                        trapz(
+                            jnp.exp(params[self.e_species]["fe"]), self.cfg["parameters"][self.e_species]["fe"]["v_res"]
+                        ),
+                        self.cfg["parameters"][self.e_species]["fe"]["v_res"],
                     )
                 )
             )
@@ -322,10 +360,12 @@ class TSFitter:
                     1.0
                     - trapz(
                         trapz(
-                            jnp.exp(params["fe"]) * self.cfg["velocity"][0] * self.cfg["velocity"][1],
-                            self.cfg["parameters"]["fe"]["v_res"],
+                            jnp.exp(params[self.e_species]["fe"])
+                            * self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]
+                            * self.cfg["parameters"][self.e_species]["fe"]["velocity"][1],
+                            self.cfg["parameters"][self.e_species]["fe"]["v_res"],
                         ),
-                        self.cfg["parameters"]["fe"]["v_res"],
+                        self.cfg["parameters"][self.e_species]["fe"]["v_res"],
                     )
                 )
             )
@@ -427,10 +467,11 @@ class TSFitter:
             if "fe" in grad:
                 grad["fe"] = self.cfg["optimizer"]["grad_scalar"] * grad["fe"]
 
-            for k, param_dict in self.cfg["parameters"].items():
-                if param_dict["active"]:
-                    scalar = param_dict["gradient_scalar"] if "gradient_scalar" in param_dict else 1.0
-                    grad[k] *= scalar
+            for species in self.cfg["parameters"].keys():
+                for k, param_dict in self.cfg["parameters"][species].items():
+                    if param_dict["active"]:
+                        scalar = param_dict["gradient_scalar"] if "gradient_scalar" in param_dict else 1.0
+                        grad[species][k] *= scalar
 
             temp_grad, _ = ravel_pytree(grad)
             flattened_grads = np.array(temp_grad)

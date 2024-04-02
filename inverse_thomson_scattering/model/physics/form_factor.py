@@ -90,8 +90,8 @@ class FormFactor:
         """
 
         Te, ne, Va, ud, fe = (
-            cur_Te,
-            cur_ne,
+            cur_Te.squeeze(-1),
+            cur_ne.squeeze(-1),
             params["general"]["Va"],
             params["general"]["ud"],
             f_and_v,  # this is now a DistFunc object
