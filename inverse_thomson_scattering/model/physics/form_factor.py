@@ -62,7 +62,7 @@ class FormFactor:
             self.coords = jnp.concatenate([vax[0][..., None], vax[1][..., None]], axis=-1)
             self.v = vax[0][0]
 
-    def __call__(self, params, cur_ne, cur_Te, sa, f_and_v, lam):
+    def __call__(self, params, cur_ne, cur_Te, A, Z, Ti, fract, sa, f_and_v, lam):
         """
         Calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions
         and scattering angles. The spectral density function is calculated with and without the ion contribution
@@ -89,15 +89,11 @@ class FormFactor:
         :return:
         """
 
-        Te, Ti, Z, A, fract, ne, Va, ud, fe = (
+        Te, ne, Va, ud, fe = (
             cur_Te,
-            params["Ti"],
-            params["Z"],
-            params["A"],
-            params["fract"],
             cur_ne,
-            params["Va"],
-            params["ud"],
+            params["general"]["Va"],
+            params["general"]["ud"],
             f_and_v,  # this is now a DistFunc object
         )
 
@@ -132,14 +128,14 @@ class FormFactor:
         klde = (vTe / omgpe) * k
 
         # ions
-        Z = jnp.reshape(Z, [1, 1, 1, -1])
+        Z = jnp.reshape(jnp.array(Z), [1, 1, 1, -1])
         Mi = jnp.reshape(Mi, [1, 1, 1, -1])
-        fract = jnp.reshape(fract, [1, 1, 1, -1])
+        fract = jnp.reshape(jnp.array(fract), [1, 1, 1, -1])
         Zbar = jnp.sum(Z * fract)
         ni = fract * ne[..., jnp.newaxis, jnp.newaxis, jnp.newaxis] / Zbar
         omgpi = constants * Z * jnp.sqrt(ni * self.Me / Mi)
 
-        vTi = jnp.sqrt(Ti / Mi)  # ion thermal velocity
+        vTi = jnp.sqrt(jnp.array(Ti) / Mi)  # ion thermal velocity
         kldi = (vTi / omgpi) * (k[..., jnp.newaxis])
         # ion susceptibilities
         # finding derivative of plasma dispersion function along xii array

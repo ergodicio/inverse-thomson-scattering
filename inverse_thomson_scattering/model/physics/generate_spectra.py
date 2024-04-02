@@ -22,18 +22,23 @@ class FitModel:
     def __init__(self, config: Dict, sa):
         self.config = config
         self.sa = sa
-        self.num_dist_func = DistFunc(config)
+        # this will need to be fixed for multi electron
+        for species in config["parameters"].keys():
+            if "electron" in config["parameters"][species]["type"].keys():
+                self.num_dist_func = DistFunc(config["parameters"][species])
+                self.e_species = species
+
         self.electron_form_factor = FormFactor(
             config["other"]["lamrangE"],
             npts=config["other"]["npts"],
             fe_dim=self.num_dist_func.dim,
-            vax=config["velocity"],
+            vax=config["parameters"][self.e_species]["fe"]["velocity"],
         )
         self.ion_form_factor = FormFactor(
             config["other"]["lamrangI"],
             npts=config["other"]["npts"],
             fe_dim=self.num_dist_func.dim,
-            vax=config["velocity"],
+            vax=config["parameters"][self.e_species]["fe"]["velocity"],
         )
 
     def __call__(self, all_params: Dict):
@@ -48,50 +53,84 @@ class FitModel:
 
         """
 
-        for key in self.config["parameters"].keys():
-            if key != "fe":
-                all_params[key] = jnp.squeeze(all_params[key])
+        # not sure why this is required
+        # for key in self.config["parameters"].keys():
+        #     if key != "fe":
+        #         all_params[key] = jnp.squeeze(all_params[key])
 
-        if self.config["parameters"]["m"]["active"]:
-            self.config["velocity"], all_params["fe"] = self.num_dist_func(all_params["m"])
+        if self.config["parameters"][self.e_species]["m"]["active"]:
+            (
+                self.config["parameters"][self.e_species]["fe"]["velocity"],
+                all_params[self.e_species]["fe"],
+            ) = self.num_dist_func(all_params[self.e_species]["m"])
             # self.config["velocity"], all_params["fe"] = self.num_dist_func(self.config["parameters"]["m"]["val"])
-            all_params["fe"] = jnp.log(all_params["fe"])
+            all_params[self.e_species]["fe"] = jnp.log(all_params[self.e_species]["fe"])
             # all_params["fe"] = jnp.log(self.num_dist_func(self.config["parameters"]["m"]))
-            if self.config["parameters"]["m"]["active"] and self.config["parameters"]["fe"]["active"]:
+            if (
+                self.config["parameters"][self.e_species]["m"]["active"]
+                and self.config["parameters"][self.e_species]["fe"]["active"]
+            ):
                 raise ValueError("m and fe cannot be actively fit at the same time")
 
         # Add gradients to electron temperature and density just being applied to EPW
-        cur_Te = jnp.linspace(
-            (1 - all_params["Te_gradient"] / 200) * all_params["Te"],
-            (1 + all_params["Te_gradient"] / 200) * all_params["Te"],
-            self.config["parameters"]["Te_gradient"]["num_grad_points"],
-        )
-        cur_ne = jnp.linspace(
-            (1 - all_params["ne_gradient"] / 200) * all_params["ne"],
-            (1 + all_params["ne_gradient"] / 200) * all_params["ne"],
-            self.config["parameters"]["ne_gradient"]["num_grad_points"],
-        )
+        cur_Te = []
+        cur_ne = []
+        A = []
+        Z = []
+        Ti = []
+        fract = []
 
-        fecur = jnp.exp(all_params["fe"])
-        vcur = self.config["velocity"]
-        if self.config["parameters"]["fe"]["symmetric"]:
+        for species in self.config["parameters"].keys():
+            if "electron" in self.config["parameters"][species]["type"].keys():
+                cur_Te.append(
+                    jnp.linspace(
+                        (1 - all_params["general"]["Te_gradient"] / 200) * all_params[species]["Te"],
+                        (1 + all_params["general"]["Te_gradient"] / 200) * all_params[species]["Te"],
+                        self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"],
+                    )
+                )
+
+                cur_ne.append(
+                    jnp.linspace(
+                        (1 - all_params["general"]["ne_gradient"] / 200) * all_params[species]["ne"],
+                        (1 + all_params["general"]["ne_gradient"] / 200) * all_params[species]["ne"],
+                        self.config["parameters"]["general"]["ne_gradient"]["num_grad_points"],
+                    )
+                    * 1e20
+                )
+            elif "ion" in self.config["parameters"][species]["type"].keys():
+                A.append(all_params[species]["A"])
+                Z.append(all_params[species]["Z"])
+                Ti.append(all_params[species]["Ti"])
+                fract.append(all_params[species]["fract"])
+
+        cur_ne = jnp.array(cur_ne).squeeze()
+        cur_Te = jnp.array(cur_Te).squeeze()
+        Ti = jnp.array(Ti).squeeze()
+        fecur = jnp.exp(all_params[self.e_species]["fe"])
+        vcur = self.config["parameters"][self.e_species]["fe"]["velocity"]
+        if self.config["parameters"][self.e_species]["fe"]["symmetric"]:
             fecur = jnp.concatenate((jnp.flip(fecur[1:]), fecur))
             vcur = jnp.concatenate((-jnp.flip(vcur[1:]), vcur))
 
-        lam = all_params["lam"]
+        lam = all_params["general"]["lam"]
 
         if self.config["other"]["extraoptions"]["load_ion_spec"]:
             if self.num_dist_func.dim == 1:
                 ThryI, lamAxisI = self.ion_form_factor(
-                    all_params, cur_ne * 1e20, cur_Te, self.sa["sa"], (fecur, vcur), lam
+                    all_params, cur_ne, cur_Te, A, Z, Ti, fract, self.sa["sa"], (fecur, vcur), lam
                 )
             else:
                 ThryI, lamAxisI = self.ion_form_factor.calc_in_2D(
                     all_params,
-                    self.config["parameters"]["ud"]["angle"],
-                    self.config["parameters"]["ud"]["angle"],
+                    self.config["parameters"]["general"]["ud"]["angle"],
+                    self.config["parameters"]["general"]["ud"]["angle"],
                     cur_ne * jnp.array([1e20]),
                     cur_Te,
+                    A,
+                    Z,
+                    Ti,
+                    fract,
                     self.sa["sa"],
                     (fecur, vcur),
                     lam,
@@ -111,8 +150,12 @@ class FitModel:
             if self.num_dist_func.dim == 1:
                 ThryE, lamAxisE = self.electron_form_factor(
                     all_params,
-                    cur_ne * jnp.array([1e20]),
+                    cur_ne,
                     cur_Te,
+                    A,
+                    Z,
+                    Ti,
+                    fract,
                     self.sa["sa"],
                     (fecur, vcur),
                     lam + self.config["data"]["ele_lam_shift"],
@@ -120,10 +163,14 @@ class FitModel:
             else:
                 ThryE, lamAxisE = self.electron_form_factor.calc_in_2D(
                     all_params,
-                    self.config["parameters"]["ud"]["angle"],
-                    self.config["parameters"]["ud"]["angle"],
-                    cur_ne * jnp.array([1e20]),
+                    self.config["parameters"]["general"]["ud"]["angle"],
+                    self.config["parameters"]["general"]["ud"]["angle"],
+                    cur_ne,
                     cur_Te,
+                    A,
+                    Z,
+                    Ti,
+                    fract,
                     self.sa["sa"],
                     (fecur, vcur),
                     lam + self.config["data"]["ele_lam_shift"],

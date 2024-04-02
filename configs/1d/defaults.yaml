@@ -1,98 +1,136 @@
 parameters:
-    amp1:
-        val: 1.
-        active: False
-        lb: 0.
-        ub: 10.
-    amp2:
-        val: 1.
-        active: False
-        lb: 0.
-        ub: 10.
-    amp3:
-        val: 1.
-        active: False
-        lb: 0.
-        ub: 10.
-    lam:
-        val: 526.5
-        active: False
-        lb: 523.
-        ub: 528.
-    Te:
-        val: .5
-        active: False
-        lb: 0.01
-        ub: 3.
-        gradient: 0.0
-    Te_gradient:
-        val: 0.0
-        active: False
-        lb: 0.
-        ub: 10.
-        num_grad_points: 1
-    Ti:
-        val: .2
-        active: False
-        lb: 0.01
-        ub: 3.
-    Z:
-        val: 1.
-        active: False
-        lb: 1.
-        ub: 25.
-    A:
-        val: 40
-        active: False
-    fract:
-        val: 1
-        active: False
-    ne:
-        val: .2
-        active: False
-        lb: .001
-        ub: 10.
-        gradient: 0.0
-    ne_gradient:
-        val: 0.
-        active: False
-        lb: 0.
-        ub: 15.
-        num_grad_points: 1
-    ud:
-        val: 0
-        active: False
-    Va:
-        val: 0
-        active: False
-    m:
-        val: 2.
-        active: False
-        lb: 2.
-        ub: 5.
-    fe:
-        val: []
-        active: False
-        length: 3999
+    species1:
         type:
-            DLM:
-        lb: -100.
-        ub: -0.5
-        fe_decrease_strict: True
-        symmetric: False
-    blur:
-        val: []
-        active: False
-        lb: 0.
-        ub: 10.
-    specCurvature:
-        val: []
-        active: False
-        lb: .1
-        ub: 10.
-    fitprops:
-        val: []
-        active: False
+            electron:
+        Te:
+            val: .6
+            active: False
+            lb: 0.01
+            ub: 1.5
+        ne:
+            val: 0.2
+            active: False
+            lb: 0.001
+            ub: 1.0
+        m:
+            val: 3.0
+            active: True
+            lb: 2.0
+            ub: 5.0
+        fe:
+            val: [ ]
+            active: False
+            length: 3999
+            type:
+                DLM:
+            lb: -100.
+            ub: -0.5
+            fe_decrease_strict: False
+            symmetric: False
+            dim: 1
+            v_res: 0.1
+            temp_asym: 1.0
+            m_theta: 0.0
+            m_asym: 1.
+
+    species2:
+        type:
+            ion:
+        Ti:
+            val: 0.12
+            active: False
+            lb: 0.001
+            ub: 1.0
+        Z:
+            val: 14.0
+            active: False
+            lb: 0.5
+            ub: 7.0
+        A:
+            val: 40.0
+            active: False
+        fract:
+            val: 0.1
+            active: False
+        ud:
+            val: 0.0
+            angle: 0.0
+            active: False
+            lb: -100.0
+            ub: 100.0
+        Va:
+            val: 0.0
+            angle: 0.0
+            active: False
+            lb: -20.5
+            ub: 20.5
+
+    species3:
+        type:
+            ion:
+        Ti:
+            val: 0.12
+            active: False
+            lb: 0.001
+            ub: 1.0
+        Z:
+            val: 1.0
+            active: False
+            lb: 0.5
+            ub: 7.0
+        A:
+            val: 1.0
+            active: False
+        fract:
+            val: 0.9
+            active: False
+        ud:
+            val: 0.0
+            angle: 0.0
+            active: False
+            lb: -100.0
+            ub: 100.0
+        Va:
+            val: 0.0
+            angle: 0.0
+            active: False
+            lb: -20.5
+            ub: 20.5
+    general:
+        type:
+            general:
+        amp1:
+            val: 1.
+            active: True
+            lb: 0.01
+            ub: 3.75
+        amp2:
+            val: 1.
+            active: False
+            lb: 0.01
+            ub: 3.75
+        amp3:
+            val: 1.0
+            active: False
+            lb: 0.01
+            ub: 3.75
+        lam:
+            val: 526.5
+            active: False
+            lb: 523.0
+            ub: 528.0
+        Te_gradient:
+            val: 0.0
+            active: False
+            lb: 0.
+            ub: 10.
+            num_grad_points: 1
+        ne_gradient:
+            val: 0.
+            active: False
+            lb: 0.
+            ub: 15.
+            num_grad_points: 1
 
 other:
     expandedions: False

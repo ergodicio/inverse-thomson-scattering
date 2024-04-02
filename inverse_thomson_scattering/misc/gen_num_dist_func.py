@@ -11,38 +11,38 @@ from inverse_thomson_scattering.misc import dist_functional_forms
 
 # needs the ability to enforce symetry
 class DistFunc:
-    def __init__(self, config):
-        self.velocity_res = config["parameters"]["fe"]["v_res"]
-        self.fe_name = list(config["parameters"]["fe"]["type"].keys())[0]
+    def __init__(self, cfg):
+        self.velocity_res = cfg["fe"]["v_res"]
+        self.fe_name = list(cfg["fe"]["type"].keys())[0]
 
-        if "dim" in config["parameters"]["fe"].keys():
-            self.dim = config["parameters"]["fe"]["dim"]
+        if "dim" in cfg["fe"].keys():
+            self.dim = cfg["fe"]["dim"]
         else:
             self.dim = 1
 
-        if "dt" in config["parameters"]["fe"].keys():
-            self.dt = config["parameters"]["fe"]["dt"]
+        if "dt" in cfg["fe"].keys():
+            self.dt = cfg["fe"]["dt"]
 
         # normalized here so it only is done once
-        if "f1_direction" in config["parameters"]["fe"].keys():
-            self.f1_direction = config["parameters"]["fe"]["f1_direction"] / jnp.sqrt(
-                jnp.sum([ele**2 for ele in config["parameters"]["fe"]["f1_direction"]])
+        if "f1_direction" in cfg["fe"].keys():
+            self.f1_direction = cfg["fe"]["f1_direction"] / jnp.sqrt(
+                jnp.sum([ele**2 for ele in cfg["fe"]["f1_direction"]])
             )
         # temperature asymetry for biDLM with Tex = Te and Tey = Te*temp_asym
-        if "temp_asym" in config["parameters"]["fe"].keys():
-            self.temp_asym = config["parameters"]["fe"]["temp_asym"]
+        if "temp_asym" in cfg["fe"].keys():
+            self.temp_asym = cfg["fe"]["temp_asym"]
         else:
             self.temp_asym = 1.0
 
         # m asymetry for biDLM with mx = m and my = m*m_asym (with a min of 2)
-        if "m_asym" in config["parameters"]["fe"].keys():
-            self.m_asym = config["parameters"]["fe"]["m_asym"]
+        if "m_asym" in cfg["fe"].keys():
+            self.m_asym = cfg["fe"]["m_asym"]
         else:
             self.m_asym = 1.0
 
         # rotion angle for the biDLM defined counter clockwise from the x-axis in degrees
-        if "m_theta" in config["parameters"]["fe"].keys():
-            self.m_theta = config["parameters"]["fe"]["m_theta"] / 180.0 * jnp.pi
+        if "m_theta" in cfg["fe"].keys():
+            self.m_theta = cfg["fe"]["m_theta"] / 180.0 * jnp.pi
         else:
             self.m_theta = 0.0
 

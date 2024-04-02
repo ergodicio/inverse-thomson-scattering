@@ -23,7 +23,7 @@ class SpectrumCalculator:
         self.sas = sas
 
         self.forward_pass = FitModel(cfg, sas)
-        self.lam = cfg["parameters"]["lam"]["val"]
+        self.lam = cfg["parameters"]["general"]["lam"]["val"]
 
         if (
             cfg["other"]["extraoptions"]["spectype"] == "angular_full"

@@ -30,27 +30,41 @@ def init_param_norm_and_shift(config: Dict) -> Dict:
     lb = {}
     ub = {}
     parameters = config["parameters"]
-    active_params = []
-    for key in parameters.keys():
-        if parameters[key]["active"]:
-            active_params.append(key)
-            if np.size(parameters[key]["val"]) > 1:
-                lb[key] = parameters[key]["lb"] * np.ones(np.size(parameters[key]["val"]))
-                ub[key] = parameters[key]["ub"] * np.ones(np.size(parameters[key]["val"]))
-            else:
-                lb[key] = parameters[key]["lb"]
-                ub[key] = parameters[key]["ub"]
+    active_params = {}
+    for species in parameters.keys():
+        active_params[species] = []
+        lb[species] = {}
+        ub[species] = {}
+        for key in parameters[species].keys():
+            if parameters[species][key]["active"]:
+                active_params[species].append(key)
+                if np.size(parameters[species][key]["val"]) > 1:
+                    lb[species][key] = parameters[species][key]["lb"] * np.ones(
+                        np.size(parameters[species][key]["val"])
+                    )
+                    ub[species][key] = parameters[species][key]["ub"] * np.ones(
+                        np.size(parameters[species][key]["val"])
+                    )
+                else:
+                    lb[species][key] = parameters[species][key]["lb"]
+                    ub[species][key] = parameters[species][key]["ub"]
 
     norms = {}
     shifts = {}
     if config["optimizer"]["parameter_norm"]:
-        for k in active_params:
-            norms[k] = ub[k] - lb[k]
-            shifts[k] = lb[k]
+        for species in active_params.keys():
+            norms[species] = {}
+            shifts[species] = {}
+            for k in active_params[species]:
+                norms[species][k] = ub[species][k] - lb[species][k]
+                shifts[species][k] = lb[species][k]
     else:
-        for k in active_params:
-            norms[k] = 1.0
-            shifts[k] = 0.0
+        for species in active_params.keys():
+            norms[species] = {}
+            shifts[species] = {}
+            for k in active_params:
+                norms[species][k] = 1.0
+                shifts[species][k] = 0.0
     return {"norms": norms, "shifts": shifts, "lb": lb, "ub": ub}
 
 
@@ -65,17 +79,30 @@ def _validate_inputs_(config: Dict) -> Dict:
 
     """
     # get derived quantities
-    dist_obj = DistFunc(config)
-    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"]["val"])
-    config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])[None, :]
-    # config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
-    Warning("fe length is currently overwritten by v_res")
-    config["parameters"]["fe"]["length"] = len(config["parameters"]["fe"]["val"])
-    if config["parameters"]["fe"]["symmetric"]:
-        Warning("Symmetric EDF has been disabled")
-        # config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-    if config["parameters"]["fe"]["dim"] == 2 and config["parameters"]["fe"]["active"]:
-        Warning("2D EDFs can only be fit for angular data")
+    for species in config["parameters"].keys():
+        if "electron" in config["parameters"][species]["type"].keys():
+            dist_obj = DistFunc(config["parameters"][species])
+            config["parameters"][species]["fe"]["velocity"], config["parameters"][species]["fe"]["val"] = dist_obj(
+                config["parameters"][species]["m"]["val"]
+            )
+            config["parameters"][species]["fe"]["val"] = np.log(config["parameters"][species]["fe"]["val"])[None, :]
+            # config["velocity"] = np.linspace(-7, 7, config["parameters"]["fe"]["length"])
+            Warning("fe length is currently overwritten by v_res")
+            config["parameters"][species]["fe"]["length"] = len(config["parameters"][species]["fe"]["val"])
+            if config["parameters"][species]["fe"]["symmetric"]:
+                Warning("Symmetric EDF has been disabled")
+                # config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
+            if config["parameters"][species]["fe"]["dim"] == 2 and config["parameters"]["fe"]["active"]:
+                Warning("2D EDFs can only be fit for angular data")
+
+            config["parameters"][species]["fe"]["lb"] = np.multiply(
+                config["parameters"][species]["fe"]["lb"], np.ones(config["parameters"][species]["fe"]["length"])
+            )
+            config["parameters"][species]["fe"]["ub"] = np.multiply(
+                config["parameters"][species]["fe"]["ub"], np.ones(config["parameters"][species]["fe"]["length"])
+            )
+        if "dist_obj" in locals():
+            ValueError("Only 1 electron species is currently supported")
 
     # get slices
     config["data"]["lineouts"]["val"] = [
@@ -85,12 +112,6 @@ def _validate_inputs_(config: Dict) -> Dict:
         )
     ]
 
-    config["parameters"]["fe"]["lb"] = np.multiply(
-        config["parameters"]["fe"]["lb"], np.ones(config["parameters"]["fe"]["length"])
-    )
-    config["parameters"]["fe"]["ub"] = np.multiply(
-        config["parameters"]["fe"]["ub"], np.ones(config["parameters"]["fe"]["length"])
-    )
     num_slices = len(config["data"]["lineouts"]["val"])
     batch_size = config["optimizer"]["batch_size"]
 

@@ -69,26 +69,29 @@ class TSFitter:
             flattened_ub, _ = ravel_pytree(ub)
             self.bounds = zip(flattened_lb, flattened_ub)
 
-        # this needs to be rethought
-        if "dist_fit" in cfg:
-            if cfg["parameters"]["fe"]["dim"] == 1:
-                self.smooth_window_len = round(cfg["velocity"].size * cfg["dist_fit"]["window"]["len"])
-                self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
+        # this needs to be rethought and does not work in all cases
+        if cfg["parameters"]["species1"]["fe"]["active"]:
+            if "dist_fit" in cfg:
+                if cfg["parameters"]["fe"]["dim"] == 1:
+                    self.smooth_window_len = round(
+                        cfg["parameters"]["species1"]["fe"]["velocity"].size * cfg["dist_fit"]["window"]["len"]
+                    )
+                    self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
 
-                if cfg["dist_fit"]["window"]["type"] == "hamming":
-                    self.w = jnp.hamming(self.smooth_window_len)
-                elif cfg["dist_fit"]["window"]["type"] == "hann":
-                    self.w = jnp.hanning(self.smooth_window_len)
-                elif cfg["dist_fit"]["window"]["type"] == "bartlett":
-                    self.w = jnp.bartlett(self.smooth_window_len)
+                    if cfg["dist_fit"]["window"]["type"] == "hamming":
+                        self.w = jnp.hamming(self.smooth_window_len)
+                    elif cfg["dist_fit"]["window"]["type"] == "hann":
+                        self.w = jnp.hanning(self.smooth_window_len)
+                    elif cfg["dist_fit"]["window"]["type"] == "bartlett":
+                        self.w = jnp.bartlett(self.smooth_window_len)
+                    else:
+                        raise NotImplementedError
                 else:
-                    raise NotImplementedError
+                    Warning("Smoothing not enabled for 2D distributions")
             else:
-                Warning("Smoothing not enabled for 2D distributions")
-        else:
-            Warning(
-                "\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n"
-            )
+                Warning(
+                    "\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n"
+                )
 
     def smooth(self, distribution: jnp.ndarray) -> jnp.ndarray:
         """
@@ -127,22 +130,27 @@ class TSFitter:
         Returns:
 
         """
-        for param_name, param_config in self.cfg["parameters"].items():
-            if param_config["active"]:
-                # if self.cfg["optimizer"]["method"] == "adam":
-                #     these_params[param_name] = 0.5 + 0.5 * jnp.tanh(these_params[param_name])
+        for species in self.cfg["parameters"].keys():
+            for param_name, param_config in self.cfg["parameters"][species].items():
+                if param_name == "type":
+                    continue
+                if param_config["active"]:
+                    # if self.cfg["optimizer"]["method"] == "adam":
+                    #     these_params[param_name] = 0.5 + 0.5 * jnp.tanh(these_params[param_name])
 
-                these_params[param_name] = (
-                    these_params[param_name] * self.cfg["units"]["norms"][param_name]
-                    + self.cfg["units"]["shifts"][param_name]
-                )
-                if param_name == "fe":
-                    these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"][0]))[None, :])
-                    # these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"])))
+                    these_params[species][param_name] = (
+                        these_params[species][param_name] * self.cfg["units"]["norms"][species][param_name]
+                        + self.cfg["units"]["shifts"][species][param_name]
+                    )
+                    if param_name == "fe":
+                        these_params[species]["fe"] = jnp.log(
+                            self.smooth(jnp.exp(these_params[species]["fe"][0]))[None, :]
+                        )
+                        # these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"])))
 
-            else:
-                if return_static_params:
-                    these_params[param_name] = self.static_params[param_name]
+                else:
+                    if return_static_params:
+                        these_params[species][param_name] = self.static_params[species][param_name]
 
         return these_params
 
@@ -300,11 +308,29 @@ class TSFitter:
                 )
             momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
         else:
-            density_loss = jnp.mean(jnp.square(1.0 - trapz(trapz(jnp.exp(params["fe"]), self.cfg["parameters"]["fe"]["v_res"]), self.cfg["parameters"]["fe"]["v_res"]))) 
+            density_loss = jnp.mean(
+                jnp.square(
+                    1.0
+                    - trapz(
+                        trapz(jnp.exp(params["fe"]), self.cfg["parameters"]["fe"]["v_res"]),
+                        self.cfg["parameters"]["fe"]["v_res"],
+                    )
+                )
+            )
             temperature_loss = jnp.mean(
-                    jnp.square(1.0 - trapz(trapz(jnp.exp(params["fe"]) * self.cfg["velocity"][0] * self.cfg["velocity"][1], self.cfg["parameters"]["fe"]["v_res"]),self.cfg["parameters"]["fe"]["v_res"])))
-            #needs to be fixed
-            #momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
+                jnp.square(
+                    1.0
+                    - trapz(
+                        trapz(
+                            jnp.exp(params["fe"]) * self.cfg["velocity"][0] * self.cfg["velocity"][1],
+                            self.cfg["parameters"]["fe"]["v_res"],
+                        ),
+                        self.cfg["parameters"]["fe"]["v_res"],
+                    )
+                )
+            )
+            # needs to be fixed
+            # momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
             momentum_loss = 0.0
             print(temperature_loss)
         return density_loss, temperature_loss, momentum_loss
@@ -432,23 +458,42 @@ def init_weights_and_bounds(config, num_slices):
     ub = {"active": {}, "inactive": {}}
     iw = {"active": {}, "inactive": {}}
 
-    for k, v in config["parameters"].items():
-        if v["active"]:
-            active_or_inactive = "active"
-        else:
-            active_or_inactive = "inactive"
+    for species in config["parameters"].keys():
+        lb["active"][species] = {}
+        ub["active"][species] = {}
+        iw["active"][species] = {}
+        lb["inactive"][species] = {}
+        ub["inactive"][species] = {}
+        iw["inactive"][species] = {}
 
-        if k != "fe":
-            iw[active_or_inactive][k] = np.array([config["parameters"][k]["val"] for _ in range(num_slices)])[:, None]
-        else:
-            iw[active_or_inactive][k] = np.concatenate([config["parameters"][k]["val"] for _ in range(num_slices)])
+    for species in config["parameters"].keys():
+        for k, v in config["parameters"][species].items():
+            if k == "type":
+                continue
+            if v["active"]:
+                active_or_inactive = "active"
+            else:
+                active_or_inactive = "inactive"
 
-        if v["active"]:
-            lb[active_or_inactive][k] = np.array([0 * config["units"]["lb"][k] for _ in range(num_slices)])
-            ub[active_or_inactive][k] = np.array([1.0 + 0 * config["units"]["ub"][k] for _ in range(num_slices)])
+            if k != "fe":
+                iw[active_or_inactive][species][k] = np.array(
+                    [config["parameters"][species][k]["val"] for _ in range(num_slices)]
+                )[:, None]
+            else:
+                iw[active_or_inactive][species][k] = np.concatenate(
+                    [config["parameters"][species][k]["val"] for _ in range(num_slices)]
+                )
 
-            iw[active_or_inactive][k] = (iw[active_or_inactive][k] - config["units"]["shifts"][k]) / config["units"][
-                "norms"
-            ][k]
+            if v["active"]:
+                lb[active_or_inactive][species][k] = np.array(
+                    [0 * config["units"]["lb"][species][k] for _ in range(num_slices)]
+                )
+                ub[active_or_inactive][species][k] = np.array(
+                    [1.0 + 0 * config["units"]["ub"][species][k] for _ in range(num_slices)]
+                )
+
+                iw[active_or_inactive][species][k] = (
+                    iw[active_or_inactive][species][k] - config["units"]["shifts"][species][k]
+                ) / config["units"]["norms"][species][k]
 
     return lb, ub, iw
