@@ -39,33 +39,36 @@ def get_final_params(config, best_weights, all_axes, td):
 
 
 def plot_final_params(config, all_params, sigmas_ds, td):
-    for param in all_params.keys():
-        for i in range(all_params[param].shape[1]):
-            vals = pandas.Series(all_params[param][:,i].squeeze(), dtype=float)
-            fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-            lineouts = np.array(config["data"]["lineouts"]["val"])
-            std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
+    for species in all_params.keys():
+        for param in all_params[species].keys():
+            for i in range(all_params[species][param].shape[1]):
+                vals = pandas.Series(all_params[species][param][:, i].squeeze(), dtype=float)
+                fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+                lineouts = np.array(config["data"]["lineouts"]["val"])
+                std = vals.rolling(config["plotting"]["rolling_std_width"], min_periods=1, center=True).std()
 
-            ax.plot(lineouts, vals)
-            ax.fill_between(
-                lineouts,
-                (vals.values - config["plotting"]["n_sigmas"] * sigmas_ds[param].values),
-                (vals.values + config["plotting"]["n_sigmas"] * sigmas_ds[param].values),
-                color="b",
-                alpha=0.1,
-            )
-            ax.fill_between(
-                lineouts,
-                (vals.values - config["plotting"]["n_sigmas"] * std.values),
-                (vals.values + config["plotting"]["n_sigmas"] * std.values),
-                color="r",
-                alpha=0.1,
-            )
-            ax.set_xlabel("lineout", fontsize=14)
-            ax.grid()
-            ax.set_ylim(0.8 * np.min(vals), 1.2 * np.max(vals))
-            ax.set_ylabel(param, fontsize=14)
-            fig.savefig(os.path.join(td, "plots", "learned_" + param + str(i) + ".png"), bbox_inches="tight")
+                ax.plot(lineouts, vals)
+                ax.fill_between(
+                    lineouts,
+                    (vals.values - config["plotting"]["n_sigmas"] * sigmas_ds[param + "_" + species].values),
+                    (vals.values + config["plotting"]["n_sigmas"] * sigmas_ds[param + "_" + species].values),
+                    color="b",
+                    alpha=0.1,
+                )
+                ax.fill_between(
+                    lineouts,
+                    (vals.values - config["plotting"]["n_sigmas"] * std.values),
+                    (vals.values + config["plotting"]["n_sigmas"] * std.values),
+                    color="r",
+                    alpha=0.1,
+                )
+                ax.set_xlabel("lineout", fontsize=14)
+                ax.grid()
+                ax.set_ylim(0.8 * np.min(vals), 1.2 * np.max(vals))
+                ax.set_ylabel(param, fontsize=14)
+                fig.savefig(
+                    os.path.join(td, "plots", "learned_" + param + "_" + species + str(i) + ".png"), bbox_inches="tight"
+                )
     return
 
 
@@ -271,7 +274,13 @@ def save_sigmas_fe(all_params, best_weights_std, sigmas, td):
 
 def save_sigmas_params(config, all_params, sigmas, all_axes, td):
     coords = ((all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]])),)
-    sigmas_ds = xr.Dataset({k: xr.DataArray(sigmas[:, i], coords=coords) for i, k in enumerate(all_params.keys())})
+    sigmas_ds = xr.Dataset(
+        {
+            k + "_" + series: xr.DataArray(sigmas[:, i], coords=coords)
+            for series in all_params.keys()
+            for i, k in enumerate(all_params[series].keys())
+        }
+    )
     sigmas_ds.to_netcdf(os.path.join(td, "sigmas.nc"))
     return sigmas_ds
 
