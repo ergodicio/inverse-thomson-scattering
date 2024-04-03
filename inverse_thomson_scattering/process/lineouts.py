@@ -79,11 +79,9 @@ def get_lineouts(
         ampI = np.amax(
             LineoutTSI_norm[
                 :,
-                np.hstack(
-                    (
-                        np.arange(config["data"]["fit_rng"]["iaw_min"], config["data"]["fit_rng"]["iaw_cf_min"]),
-                        np.arange(config["data"]["fit_rng"]["iaw_cf_max"], config["data"]["fit_rng"]["iaw_max"]),
-                    )
+                ((config["data"]["fit_rng"]["iaw_min"] < axisyI) & (axisyI < config["data"]["fit_rng"]["iaw_cf_min"]))
+                | (
+                    (config["data"]["fit_rng"]["iaw_cf_max"] < axisyI) & (axisyI < config["data"]["fit_rng"]["iaw_max"])
                 ),
             ],
             axis=1,
@@ -97,12 +95,8 @@ def get_lineouts(
         ampE = np.amax(
             LineoutTSE_norm[
                 :,
-                np.hstack(
-                    (
-                        np.arange(config["data"]["fit_rng"]["blue_min"], config["data"]["fit_rng"]["blue_max"]),
-                        np.arange(config["data"]["fit_rng"]["red_min"], config["data"]["fit_rng"]["red_min"]),
-                    )
-                ),
+                ((config["data"]["fit_rng"]["blue_min"] < axisyE) & (axisyE < config["data"]["fit_rng"]["blue_max"]))
+                | ((config["data"]["fit_rng"]["red_min"] < axisyE) & (axisyE < config["data"]["fit_rng"]["red_max"])),
             ],
             axis=1,
         )
