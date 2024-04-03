@@ -10,16 +10,18 @@ from inverse_thomson_scattering.misc.lineout_plot import lineout_plot
 def get_final_params(config, best_weights, all_axes, td):
     all_params = {}
     dist = {}
-    for k, v in best_weights.items():
-        if k == "fe":
-            dist[k] = pandas.Series(v[0])
-            dist["v"] = pandas.Series(config["velocity"])
-        else:
-            if np.shape(v)[1] > 1:
-                for i in range(np.shape(v)[1]):
-                    all_params[k + str(i)] = pandas.Series(v[:, i].reshape(-1))
+    for species in best_weights.keys():
+        for k, v in best_weights[species].items():
+            if k == "fe":
+                dist[k] = pandas.Series(v[0])
+                dist["v"] = pandas.Series(config[species]["fe"]["velocity"])
             else:
-                all_params[k] = pandas.Series(v.reshape(-1))
+                all_params[k + "_" + species] = pandas.Series(v.reshape(-1))
+                # if np.shape(v)[1] > 1:
+                #     for i in range(np.shape(v)[1]):
+                #         all_params[k + str(i)] = pandas.Series(v[:, i].reshape(-1))
+                # else:
+                #     all_params[k] = pandas.Series(v.reshape(-1))
 
     final_params = pandas.DataFrame(all_params)
     if config["other"]["extraoptions"]["load_ion_spec"]:
@@ -142,7 +144,7 @@ def plot_dist(config, final_params, sigma_fe, td):
     else:
         fig = plt.figure(figsize=(15, 5))
         ax = fig.add_subplot(1, 3, 1, projection="3d")
-        curfe = np.where(final_params["fe"]<-50.,-50., final_params["fe"])
+        curfe = np.where(final_params["fe"] < -50.0, -50.0, final_params["fe"])
         ax.plot_surface(
             final_params["v"][0],
             final_params["v"][1],
@@ -154,20 +156,14 @@ def plot_dist(config, final_params, sigma_fe, td):
             alpha=0.3,
         )
         ax.set_zlim(-50, 0)
-        ax.contour(
-            final_params["v"][0], final_params["v"][1], curfe, zdir="x", offset=-7.5, cmap="coolwarm"
-        )
-        ax.contour(
-            final_params["v"][0], final_params["v"][1], curfe, zdir="y", offset=7.5, cmap="coolwarm"
-        )
-        ax.contour(
-            final_params["v"][0], final_params["v"][1], curfe, zdir="z", offset=-50, cmap="coolwarm"
-        )
+        ax.contour(final_params["v"][0], final_params["v"][1], curfe, zdir="x", offset=-7.5, cmap="coolwarm")
+        ax.contour(final_params["v"][0], final_params["v"][1], curfe, zdir="y", offset=7.5, cmap="coolwarm")
+        ax.contour(final_params["v"][0], final_params["v"][1], curfe, zdir="z", offset=-50, cmap="coolwarm")
         ax.set_xlabel("vx/vth", fontsize=14)
         ax.set_ylabel("vy/vth", fontsize=14)
         ax.set_zlabel("f_e (ln)")
         ax = fig.add_subplot(1, 3, 2, projection="3d")
-        curfe = np.where(np.log10(np.exp(final_params["fe"]))<-22., -22., np.log10(np.exp(final_params["fe"])))
+        curfe = np.where(np.log10(np.exp(final_params["fe"])) < -22.0, -22.0, np.log10(np.exp(final_params["fe"])))
         ax.plot_surface(
             final_params["v"][0],
             final_params["v"][1],
@@ -218,7 +214,7 @@ def plot_dist(config, final_params, sigma_fe, td):
             cstride=16,
             alpha=0.3,
         )
-        ax.set_zlim(0.0, .15)
+        ax.set_zlim(0.0, 0.15)
         ax.contour(
             final_params["v"][0],
             final_params["v"][1],

@@ -28,13 +28,16 @@ def recalculate_with_chosen_weights(
     """
 
     all_params = {}
+    num_params = 0
     for species in config["parameters"].keys():
+        all_params[species] = {}
         for key in config["parameters"][species].keys():
             if config["parameters"][species][key]["active"]:
                 all_params[species][key] = np.zeros(
                     (batch_indices.flatten()[-1] + 1, np.size(config["parameters"][species][key]["val"])),
                     dtype=np.float64,
                 )
+                num_params += np.shape(all_params[species][key])[1]
     batch_indices.sort()
     losses = np.zeros(batch_indices.flatten()[-1] + 1, dtype=np.float64)
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
@@ -46,9 +49,9 @@ def recalculate_with_chosen_weights(
     fits["ele"] = np.zeros(all_data["e_data"].shape)
     sqdevs["ele"] = np.zeros(all_data["e_data"].shape)
 
-    num_params = 0
-    for key, vec in all_params.items():
-        num_params += np.shape(vec)[1]
+    # num_params = 0
+    # for key, vec in all_params.items():
+    #     num_params += np.shape(vec)[1]
 
     if config["other"]["extraoptions"]["load_ion_spec"]:
         sigmas = np.zeros((all_data["i_data"].shape[0], num_params))
@@ -73,9 +76,10 @@ def recalculate_with_chosen_weights(
         fits["ele"] = ThryE
         sqdevs["ele"] = sqds["ele"]
 
-        for k in all_params.keys():
-            # all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
-            all_params[k] = params[k].reshape(-1)
+        for species in all_params.keys():
+            for k in all_params[species].keys():
+                # all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+                all_params[species][k] = params[species][k].reshape(-1)
 
         if calc_sigma:
             active_params = ts_fitter.weights_to_params(fitted_weights, return_static_params=False)
