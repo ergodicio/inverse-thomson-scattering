@@ -126,13 +126,13 @@ parameters:
             ub: 20.5
 
 data:
-    shotnum: 101675
+    shotnum: 111411
     lineouts:
         type:
             pixel
-        start: 100
-        end: 900
-        skip: 100
+        start: 320
+        end: 800
+        skip: 10
     background:
         type:
             Fit
@@ -142,10 +142,10 @@ data:
 other:
     extraoptions:
         load_ion_spec: True
-        load_ele_spec: True
-        fit_IAW: False
-        fit_EPWb: True
-        fit_EPWr: True
+        load_ele_spec: False
+        fit_IAW: True
+        fit_EPWb: False
+        fit_EPWr: False
         spectype: temporal
     PhysParams:
         widIRF:
@@ -160,6 +160,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: test
+    run: shot111411_prelim_wide_iaw_1
 
 machine: gpu
