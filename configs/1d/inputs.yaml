@@ -4,8 +4,8 @@ parameters:
             electron:
             active: False
         Te:
-            val: .6
-            active: False
+            val: .16
+            active: True
             lb: 0.01
             ub: 1.5
         ne:
@@ -15,7 +15,7 @@ parameters:
             ub: 1.0
         m:
             val: 3.0
-            active: True
+            active: False
             lb: 2.0
             ub: 5.0
         fe:
@@ -28,10 +28,10 @@ parameters:
             ub: -0.5
             fe_decrease_strict: False
             symmetric: False
-            dim: 1
-            v_res: 0.1
-            temp_asym: 1.0
-            m_theta: 0.0
+            dim: 2
+            v_res: 0.02
+            temp_asym: 0.5625
+            m_theta: 30.0
             m_asym: 1.
 
     species2:
@@ -39,41 +39,21 @@ parameters:
             ion:
             active: False
         Ti:
-            val: 0.12
-            active: False
+            val: 0.02
+            active: True
+            same: False
             lb: 0.001
             ub: 1.0
         Z:
+            val: 6.0
+            active: True
+            lb: 0.5
+            ub: 18.0
+        A:
             val: 14.0
             active: False
-            lb: 0.5
-            ub: 7.0
-        A:
-            val: 40.0
-            active: False
         fract:
-            val: 0.1
-            active: False
-
-    species3:
-        type:
-            ion:
-            active: False
-        Ti:
-            val: 0.12
-            active: False
-            lb: 0.001
-            ub: 1.0
-        Z:
             val: 1.0
-            active: False
-            lb: 0.5
-            ub: 7.0
-        A:
-            val: 1.0
-            active: False
-        fract:
-            val: 0.9
             active: False
 
     general:
@@ -82,7 +62,7 @@ parameters:
             active: False
         amp1:
             val: 1.
-            active: True
+            active: False
             lb: 0.01
             ub: 3.75
         amp2:
@@ -92,7 +72,7 @@ parameters:
             ub: 3.75
         amp3:
             val: 1.0
-            active: False
+            active: True
             lb: 0.01
             ub: 3.75
         lam:
@@ -115,18 +95,18 @@ parameters:
         ud:
             val: 0.0
             angle: 0.0
-            active: False
-            lb: -100.0
-            ub: 100.0
+            active: True
+            lb: -10.0
+            ub: 10.0
         Va:
             val: 0.0
             angle: 0.0
-            active: False
+            active: True
             lb: -20.5
             ub: 20.5
 
 data:
-    shotnum: 111411
+    shotnum: 111412
     lineouts:
         type:
             pixel
@@ -142,7 +122,7 @@ data:
 other:
     extraoptions:
         load_ion_spec: True
-        load_ele_spec: False
+        load_ele_spec: True
         fit_IAW: True
         fit_EPWb: False
         fit_EPWr: False
@@ -160,6 +140,6 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: shot111411_prelim_wide_iaw_1
+    run: shot111412_prelim_wide_iaw_newcode_oneTi
 
 machine: gpu

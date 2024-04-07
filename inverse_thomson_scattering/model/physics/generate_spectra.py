@@ -112,7 +112,10 @@ class FitModel:
             elif "ion" in self.config["parameters"][species]["type"].keys():
                 A = A.at[ion_c].set(all_params[species]["A"].squeeze(-1))
                 Z = Z.at[ion_c].set(all_params[species]["Z"].squeeze(-1))
-                Ti = Ti.at[ion_c].set(all_params[species]["Ti"].squeeze(-1))
+                if self.config["parameters"][species]["Ti"]["same"]:
+                    Ti = Ti.at[ion_c].set(Ti[ion_c - 1])
+                else:
+                    Ti = Ti.at[ion_c].set(all_params[species]["Ti"].squeeze(-1))
                 fract = fract.at[ion_c].set(all_params[species]["fract"].squeeze(-1))
                 ion_c += 1
 

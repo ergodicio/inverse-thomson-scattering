@@ -74,11 +74,11 @@ def get_calibrations(shotNum, tstype, CCDsize):
         elif 111410<shotNum<111426:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.4104
-            IAWDisp = 0.00678
+            IAWDisp = 0.00678 #needs to be updated
             EPWoff = 319.3
-            IAWoff = 523.10
-            stddev["spect_stddev_ion"] = 0.02262  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
-            stddev["spect_stddev_ele"] = 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
+            IAWoff = 523.12
+            stddev["spect_stddev_ion"] = 0.0187  #needs to be updated
+            stddev["spect_stddev_ele"] = 1.4294 #needs to be updated
 
             # Sweep speed calculated from 5 Ghz comb (should be updated, date unknown)
             magI = 5  # (ps / px) this is just a rough guess
