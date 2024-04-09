@@ -25,8 +25,8 @@ class DistFunc:
 
         # normalized here so it only is done once
         if "f1_direction" in config["parameters"]["fe"].keys():
-            self.f1_direction = config["parameters"]["fe"]["f1_direction"] / jnp.sqrt(
-                jnp.sum([ele**2 for ele in config["parameters"]["fe"]["f1_direction"]])
+            self.f1_direction = jnp.array(config["parameters"]["fe"]["f1_direction"]) / jnp.sqrt(
+                jnp.sum(jnp.array([jnp.array(ele)**2 for ele in config["parameters"]["fe"]["f1_direction"]]))
             )
         # temperature asymetry for biDLM with Tex = Te and Tey = Te*temp_asym
         if "temp_asym" in config["parameters"]["fe"].keys():
