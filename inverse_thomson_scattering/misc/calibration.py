@@ -75,7 +75,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.4104
             IAWDisp = 0.00678 #needs to be updated
-            EPWoff = 318.3
+            EPWoff = 317.6
             IAWoff = 523.12
             stddev["spect_stddev_ion"] = 0.0187  #needs to be updated
             stddev["spect_stddev_ele"] = 1.4294 #needs to be updated
