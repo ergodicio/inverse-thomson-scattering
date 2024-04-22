@@ -92,7 +92,7 @@ def _validate_inputs_(config: Dict) -> Dict:
             if config["parameters"][species]["fe"]["symmetric"]:
                 Warning("Symmetric EDF has been disabled")
                 # config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-            if config["parameters"][species]["fe"]["dim"] == 2 and config["parameters"]["fe"]["active"]:
+            if config["parameters"][species]["fe"]["dim"] == 2 and config["parameters"][species]["fe"]["active"]:
                 Warning("2D EDFs can only be fit for angular data")
 
             config["parameters"][species]["fe"]["lb"] = np.multiply(

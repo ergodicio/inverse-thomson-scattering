@@ -28,7 +28,7 @@ parameters:
             ub: -0.5
             fe_decrease_strict: False
             symmetric: False
-            dim: 1
+            dim: 2
             v_res: 0.1
             temp_asym: 1.0
             m_theta: 0.0
@@ -41,6 +41,7 @@ parameters:
         Ti:
             val: 0.12
             active: False
+            same: False
             lb: 0.001
             ub: 1.0
         Z:
@@ -61,6 +62,7 @@ parameters:
             active: False
         Ti:
             val: 0.12
+            same: True
             active: False
             lb: 0.001
             ub: 1.0
@@ -126,13 +128,13 @@ parameters:
             ub: 20.5
 
 data:
-    shotnum: 111411
+    shotnum: 101675
     lineouts:
         type:
             pixel
         start: 320
         end: 800
-        skip: 10
+        skip: 100
     background:
         type:
             Fit

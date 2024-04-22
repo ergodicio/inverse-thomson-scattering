@@ -212,7 +212,7 @@ optimizer:
     x_norm: False
     grad_method: AD
     batch_size: 4
-    num_epochs: 500
+    num_epochs: 1
     learning_rate: 1.0e-4
     parameter_norm: True
     refine_factor: 0

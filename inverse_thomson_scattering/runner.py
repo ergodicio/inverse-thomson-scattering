@@ -164,9 +164,13 @@ def calc_series(config):
     ]
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
 
-    dist_obj = DistFunc(config)
-    config["velocity"], config["parameters"]["fe"]["val"] = dist_obj(config["parameters"]["m"]["val"])
-    config["parameters"]["fe"]["val"] = np.log(config["parameters"]["fe"]["val"])
+    for species in config["parameters"].keys():
+        if "electron" in config["parameters"][species]["type"].keys():
+            dist_obj = DistFunc(config["parameters"][species])
+            config["parameters"][species]["fe"]["velocity"], config["parameters"][species]["fe"]["val"] = dist_obj(
+                config["parameters"][species]["m"]["val"]
+            )
+            config["parameters"][species]["fe"]["val"] = np.log(config["parameters"][species]["fe"]["val"])
 
     config["units"] = init_param_norm_and_shift(config)
 
