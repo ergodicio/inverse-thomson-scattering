@@ -351,7 +351,7 @@ def plot_ts_data(config, fits, all_data, all_axes, td):
             all_axes["iaw_y"],
         )
 
-        plot_2D_data_vs_fit(config, x, y, ion_savedata["data"], ion_savedata["fit"], td, xlabel=all_axes["x_label"])
+        plot_2D_data_vs_fit(config, x, y, ion_savedata["data"], ion_savedata["fit"], td, xlabel=all_axes["x_label"], name="fit_and_data_ion.png")
 
     if config["other"]["extraoptions"]["load_ele_spec"]:
         coords = (all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]])), (
@@ -371,7 +371,7 @@ def plot_ts_data(config, fits, all_data, all_axes, td):
             all_axes["epw_y"],
         )
 
-        plot_2D_data_vs_fit(config, x, y, ele_savedata["data"], ele_savedata["fit"], td, xlabel=all_axes["x_label"])
+        plot_2D_data_vs_fit(config, x, y, ele_savedata["data"], ele_savedata["fit"], td, xlabel=all_axes["x_label"], name="fit_and_data_ele.png")
 
 
 def plot_2D_data_vs_fit(
