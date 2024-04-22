@@ -166,11 +166,12 @@ def calc_series(config):
 
     for species in config["parameters"].keys():
         if "electron" in config["parameters"][species]["type"].keys():
+            elec_species = species
             dist_obj = DistFunc(config["parameters"][species])
             config["parameters"][species]["fe"]["velocity"], config["parameters"][species]["fe"]["val"] = dist_obj(
                 config["parameters"][species]["m"]["val"]
             )
-            config["parameters"][species]["fe"]["val"] = np.log(config["parameters"][species]["fe"]["val"])
+            config["parameters"][species]["fe"]["val"] = np.log(config["parameters"][species]["fe"]["val"])[None, :]
 
     config["units"] = init_param_norm_and_shift(config)
 
@@ -178,10 +179,10 @@ def calc_series(config):
     dummy_batch = {
         "i_data": np.array([1]),
         "e_data": np.array([1]),
-        "noise_e": 0,
-        "noise_i": 0,
-        "e_amps": 1,
-        "i_amps": 1,
+        "noise_e": np.array([0]),
+        "noise_i": np.array([0]),
+        "e_amps": np.array([1]),
+        "i_amps": np.array([1]),
     }
 
     if config["other"]["extraoptions"]["spectype"] == "angular":
@@ -238,22 +239,30 @@ def calc_series(config):
             )
             plotters.plot_dist(
                 config,
-                {"fe": config["parameters"]["fe"]["val"], "v": config["velocity"]},
-                np.zeros_like(config["parameters"]["fe"]["val"]),
+                {
+                    "fe": config["parameters"][elec_species]["fe"]["val"],
+                    "v": config["parameters"][elec_species]["fe"]["velocity"],
+                },
+                np.zeros_like(config["parameters"][elec_species]["fe"]["val"]),
                 td,
             )
         else:
-            if config["parameters"]["fe"]["dim"] == 2:
+            if config["parameters"][elec_species]["fe"]["dim"] == 2:
                 plotters.plot_dist(
                     config,
-                    {"fe": config["parameters"]["fe"]["val"], "v": config["velocity"]},
-                    np.zeros_like(config["parameters"]["fe"]["val"]),
+                    {
+                        "fe": config["parameters"][elec_species]["fe"]["val"],
+                        "v": config["parameters"][elec_species]["fe"]["velocity"],
+                    },
+                    np.zeros_like(config["parameters"][elec_species]["fe"]["val"]),
                     td,
                 )
 
             fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
             if config["other"]["extraoptions"]["load_ele_spec"]:
-                ax[0].plot(lamAxisE.transpose(), ThryE.transpose())  # transpose might break single specs?
+                ax[0].plot(
+                    lamAxisE.squeeze().transpose(), ThryE.squeeze().transpose()
+                )  # transpose might break single specs?
                 ax[0].set_title("Simulated Data, fontsize=14")
                 ax[0].set_ylabel("Amp (arb. units)")
                 ax[0].set_xlabel("Wavelength (nm)")
@@ -271,13 +280,13 @@ def calc_series(config):
                     ele_dat = {"Sim": ThryE}
                     ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
                 else:
-                    coords_ele = (("series", [0]), ("Wavelength", lamAxisE[0, :]))
-                    ele_dat = {"Sim": ThryE}
+                    coords_ele = (("series", [0]), ("Wavelength", lamAxisE[0, :].squeeze()))
+                    ele_dat = {"Sim": ThryE.squeeze(0)}
                     ele_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ele) for k, v in ele_dat.items()})
                 ele_data.to_netcdf(os.path.join(td, "binary", "ele_fit_and_data.nc"))
 
             if config["other"]["extraoptions"]["load_ion_spec"]:
-                ax[1].plot(lamAxisI.transpose(), ThryI.transpose())
+                ax[1].plot(lamAxisI.squeeze().transpose(), ThryI.squeeze().transpose())
                 ax[1].set_title("Simulated Data, fontsize=14")
                 ax[1].set_ylabel("Amp (arb. units)")
                 ax[1].set_xlabel("Wavelength (nm)")
@@ -295,8 +304,8 @@ def calc_series(config):
                     ion_dat = {"Sim": ThryI}
                     ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
                 else:
-                    coords_ion = (("series", [0]), ("Wavelength", lamAxisI[0, :]))
-                    ion_dat = {"Sim": ThryI}
+                    coords_ion = (("series", [0]), ("Wavelength", lamAxisI[0, :].squeeze()))
+                    ion_dat = {"Sim": ThryI.squeeze(0)}
                     ion_data = xr.Dataset({k: xr.DataArray(v, coords=coords_ion) for k, v in ion_dat.items()})
                 ion_data.to_netcdf(os.path.join(td, "binary", "ion_fit_and_data.nc"))
             fig.savefig(os.path.join(td, "plots", "simulated_data"), bbox_inches="tight")

@@ -128,13 +128,13 @@ parameters:
             ub: 20.5
 
 data:
-    shotnum: 111411
+    shotnum: 101675
     lineouts:
         type:
             ps
         start: 0
-        end: 700
-        skip: 10
+        end: 400
+        skip: 100
     background:
         type:
             pixel

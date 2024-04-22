@@ -180,7 +180,7 @@ optimizer:
     y_norm: True
     x_norm: False
     grad_method: AD
-    batch_size: 4
+    batch_size: 1
     num_epochs: 1
     learning_rate: 1.0e-4
     parameter_norm: True
