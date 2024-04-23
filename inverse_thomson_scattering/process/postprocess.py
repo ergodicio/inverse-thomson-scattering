@@ -1,9 +1,10 @@
 from typing import Dict, List
 
-import time, tempfile, mlflow, os
+import time, tempfile, mlflow, os, copy
 
 import numpy as np
 import scipy.optimize as spopt
+from jax.flatten_util import ravel_pytree
 
 from inverse_thomson_scattering.misc import plotters
 from inverse_thomson_scattering.model.TSFitter import TSFitter
@@ -180,7 +181,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
         # refit bad fits
         red_losses_init = losses_init / (1.1 * (used_points - len(all_params)))
         true_batch_size = config["optimizer"]["batch_size"]
-        config["optimizer"]["batch_size"] = 1
+        # config["optimizer"]["batch_size"] = 1
         mlflow.log_metrics({"number of fits": len(batch_indices.flatten())})
         mlflow.log_metrics({"number of refits": int(np.sum(red_losses_init > config["other"]["refit_thresh"]))})
 
@@ -197,33 +198,47 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
                 "noise_i": np.reshape(config["other"]["PhysParams"]["noiseI"][i], (1, -1)),
             }
 
-            ts_fitter_refit = TSFitter(config, sa, batch)
-            new_weights = np.zeros(ts_fitter_refit["init_weights"].shape)
+            # previous_weights = {}
+            temp_cfg = copy.deepcopy(config)
+            temp_cfg["optimizer"]["batch_size"] = 1
+            for species in fitted_weights[(i - 1) // true_batch_size].keys():
+                for key in fitted_weights[(i - 1) // true_batch_size][species].keys():
+                    if config["parameters"][species][key]["active"]:
+                        temp_cfg["parameters"][species][key]["val"] = float(
+                            fitted_weights[(i - 1) // true_batch_size][species][key][(i - 1) % true_batch_size]
+                        )
 
-            for ii, key in enumerate(fitted_weights[i // true_batch_size].keys()):
-                new_weights[ii] = fitted_weights[(i - 1) // true_batch_size][key][(i - 1) % true_batch_size][0]
+            ts_fitter_refit = TSFitter(temp_cfg, sa, batch)
 
-            ts_fitter_refit["init_weights"] = new_weights
+            # ts_fitter_refit.flattened_weights, ts_fitter_refit.unravel_pytree = ravel_pytree(previous_weights)
 
             res = spopt.minimize(
                 ts_fitter_refit.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter_refit.loss,
-                ts_fitter_refit.flattened_weights,
+                np.copy(ts_fitter_refit.flattened_weights),
                 args=batch,
                 method=config["optimizer"]["method"],
                 jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-                # hess=hess_fn if config["optimizer"]["hessian"] else None,
-                bounds=ts_fitter_refit["bounds"],
-                options={"disp": True},
+                bounds=ts_fitter_refit.bounds,
+                options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
             )
-            cur_result = ts_fitter_refit["unravel_pytree"](res["x"])
+            cur_result = ts_fitter_refit.unravel_pytree(res["x"])
 
-            for key in fitted_weights[i // true_batch_size].keys():
-                cur_value = cur_result[key][0, 0]
-                new_vals = fitted_weights[i // true_batch_size][key]
-                new_vals = new_vals.at[tuple([i % true_batch_size, 0])].set(cur_value)
-                fitted_weights[i // true_batch_size][key] = new_vals
+            for species in cur_result.keys():
+                for key in cur_result[species].keys():
+                    fitted_weights[i // true_batch_size][species][key] = (
+                        fitted_weights[i // true_batch_size][species][key]
+                        .at[i % true_batch_size]
+                        .set(cur_result[species][key][0])
+                    )
+                    # fitted_weights[i // true_batch_size][species][key][i % true_batch_size] = cur_result[species][key]
 
-        config["optimizer"]["batch_size"] = true_batch_size
+            # for key in fitted_weights[i // true_batch_size].keys():
+            #     cur_value = cur_result[key][0, 0]
+            #     new_vals = fitted_weights[i // true_batch_size][key]
+            #     new_vals = new_vals.at[tuple([i % true_batch_size, 0])].set(cur_value)
+            #     fitted_weights[i // true_batch_size][key] = new_vals
+
+        # config["optimizer"]["batch_size"] = true_batch_size
 
     mlflow.log_metrics({"refitting time": round(time.time() - t1, 2)})
 

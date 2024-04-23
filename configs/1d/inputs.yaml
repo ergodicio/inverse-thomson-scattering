@@ -17,7 +17,7 @@ parameters:
             val: 3.0
             active: True
             lb: 2.0
-            ub: 5.0
+            ub: 4.9
         fe:
             val: [ ]
             active: False
@@ -133,7 +133,7 @@ data:
         type:
             ps
         start: 0
-        end: 400
+        end: 600
         skip: 100
     background:
         type:
@@ -155,9 +155,9 @@ other:
             spect_stddev_ele: 0.1
             spect_FWHM_ele: 0.9
             ang_FWHM_ele: 1.0
-    refit: False
+    refit: True
     refit_thresh: 5.0
-    calc_sigmas: False
+    calc_sigmas: True
 
 
 mlflow:

@@ -5,6 +5,18 @@ from inverse_thomson_scattering.misc.vector_tools import rotate
 
 # we will probably want to add input checks to ensure the proper fields are defined
 def DLM_1D(m, h):
+    """
+    Produces a 1-D Dum-Langdon-Matte distribution parametrized by a super-gaussian order m.
+
+    Args:
+        m: (int) Super-Gaussian order
+        h: (int) resolution of normalized velocity grid, i.e. spacing of the grid
+
+    Returns:
+        vx: normalized velocity grid
+        fe_num: numerical distribution function
+    """
+
     def SG(vx, m):
         x0 = jnp.sqrt(3 * gamma(3 / m) / gamma(5 / m))
         return jnp.exp(-((jnp.abs(vx) / x0) ** m))
@@ -19,6 +31,17 @@ def DLM_1D(m, h):
 
 
 def SG_1D(m, h):
+    """
+    Produces a 1-D Super-Gaussian distribution parametrized by a super-gaussian order m.
+
+    Args:
+        m: (int) Super-Gaussian order
+        h: (int) resolution of normalized velocity grid, i.e. spacing of the grid
+
+    Returns:
+        vx: normalized velocity grid
+        fe_num: numerical distribution function
+    """
     vx = jnp.arange(-8, 8, h)
     x0 = jnp.sqrt(3 * gamma(3 / m) / gamma(5 / m))
     fe_num = jnp.exp(-((jnp.abs(vx) / x0) ** m))
@@ -28,6 +51,17 @@ def SG_1D(m, h):
 
 # Warning: These super-gaussian orders do not follow Matte
 def DLM_2D(m, h):
+    """
+    Produces a 2-D symmetric Dum-Langdon-Matte distribution parametrized by a super-gaussian order m.
+
+    Args:
+        m: (int) Super-Gaussian order
+        h: (int) resolution of normalized velocity grid, i.e. spacing of the grid
+
+    Returns:
+        (vx, vy): tuple of the normalized velocity grids in x and y
+        fe_num: numerical distribution function
+    """
     vx = jnp.arange(-8, 8, h)
     vy = jnp.arange(-8, 8, h)
     vx, vy = jnp.meshgrid(vx, vy)
@@ -39,6 +73,22 @@ def DLM_2D(m, h):
 
 # Warning: These super-gaussian orders do not follow Matte
 def BiDLM(mx, my, tasym, theta, h):
+    """
+    Produces a 2-D Dum-Langdon-Matte distribution that can have different widths and super-gaussian orders in the 2
+    dimensions.
+
+    Args:
+        mx: (int) Super-Gaussian order for the x direction
+        my: (int) Super-Gaussian order for the y direction
+        tasym: (int) Temperature asymetry, where the y direction will have an effective temperature of Te*tasym. x
+        direction will have an effective temperature of Te.
+        theta: (int) counter-clockwise rotation of the distribution in radians
+        h: (int) resolution of normalized velocity grid, i.e. spacing of the grid
+
+    Returns:
+        (vx, vy): tuple of the normalized velocity grids in x and y
+        fe_num: numerical distribution function
+    """
     vx = jnp.arange(-8, 8, h)
     vy = jnp.arange(-8, 8, h)
     vx, vy = jnp.meshgrid(vx, vy)
@@ -52,6 +102,18 @@ def BiDLM(mx, my, tasym, theta, h):
 
 # not positive on the normalizations for f1 vs f0 so dt may not be =lambda_ei/LT
 def Spitzer_3V(dt, vq, h):
+    """
+    Produces a 2-D Spitzer-Harm distribution with the f1 direction given in 3-space.
+
+    Args:
+        dt: (int) Knudsen number determining the magnitude of the perturbation
+        vq: array or list with 3 elements giving the direction of the f1 perturbation in x,y,z
+        h: (int) resolution of normalized velocity grid, i.e. spacing of the grid
+
+    Returns:
+        (vx, vy): tuple of the normalized velocity grids in x and y
+        fe_num: numerical distribution function
+    """
     # likely to OOM (probably a shortcut by calculating the anlge out of the plane and multiplying f1 by cos of that angle)
     x = jnp.arange(-8, 8, h)
     y = jnp.arange(-8, 8, h)
@@ -77,6 +139,18 @@ def Spitzer_3V(dt, vq, h):
 
 
 def Spitzer_2V(dt, vq, h):
+    """
+    Produces a 2-D Spitzer-Harm distribution with the f1 direction given in the plane.
+
+    Args:
+        dt: (int) Knudsen number determining the magnitude of the perturbation
+        vq: array or list with 2 elements giving the direction of the f1 perturbation in x,y
+        h: (int) resolution of normalized velocity grid, i.e. spacing of the grid
+
+    Returns:
+        (vx, vy): tuple of the normalized velocity grids in x and y
+        fe_num: numerical distribution function
+    """
     x = jnp.arange(-8, 8, h)
     y = jnp.arange(-8, 8, h)
     vx, vy = jnp.meshgrid(x, y)
@@ -90,6 +164,16 @@ def Spitzer_2V(dt, vq, h):
 
 
 def trapz(y, dx):
+    """
+    JAX compatible trapizoidal intergration.
+
+    Args:
+        y: numerical array to be integrated
+        dx: spacing of the associated x-axis
+
+    Returns:
+        z: integral of ydx
+    """
     return 0.5 * (dx * (y[..., 1:] + y[..., :-1])).sum(-1)
 
 

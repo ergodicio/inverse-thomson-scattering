@@ -75,11 +75,11 @@ class TSFitter:
             self.bounds = zip(flattened_lb, flattened_ub)
 
         # this needs to be rethought and does not work in all cases
-        if cfg["parameters"]["species1"]["fe"]["active"]:
+        if cfg["parameters"][self.e_species]["fe"]["active"]:
             if "dist_fit" in cfg:
                 if cfg["parameters"]["fe"]["dim"] == 1:
                     self.smooth_window_len = round(
-                        cfg["parameters"]["species1"]["fe"]["velocity"].size * cfg["dist_fit"]["window"]["len"]
+                        cfg["parameters"][self.e_species]["fe"]["velocity"].size * cfg["dist_fit"]["window"]["len"]
                     )
                     self.smooth_window_len = self.smooth_window_len if self.smooth_window_len > 1 else 2
 
