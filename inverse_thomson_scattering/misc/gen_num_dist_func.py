@@ -52,8 +52,12 @@ class DistFunc:
                 v, fe = dist_functional_forms.DLM_1D(mval, self.velocity_res)
             elif self.dim == 2:
                 # v, fe = dist_functional_forms.DLM_2D(mdict["val"], self.velocity_res)
+                # v, fe = dist_functional_forms.BiDLM(
+                #    mval, jnp.max(jnp.array([mval * self.m_asym, 2.0])), self.temp_asym, self.m_theta, self.velocity_res
+                # )
+                # this will cause issues if my is less then 2
                 v, fe = dist_functional_forms.BiDLM(
-                    mval, jnp.max(jnp.array([mval * self.m_asym, 2.0])), self.temp_asym, self.m_theta, self.velocity_res
+                    mval, mval * self.m_asym, self.temp_asym, self.m_theta, self.velocity_res
                 )
 
         elif self.fe_name == "Spitzer":
