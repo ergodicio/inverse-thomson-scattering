@@ -4,6 +4,18 @@ import os
 
 
 def lineout_plot(sorted_data, sorted_fits, sorted_sqdev, yaxis, s_ind, e_ind, titlestr, filename, td, tag):
+    """
+    Plots lineout of th
+
+
+    Args:
+        weights: final weights dictionary from the minimizer
+        bounds: bounds zip object submitted to the minimizer
+
+    Returns:
+        rebounded_weights: weights after bounds are reinforced
+
+    """
     if len(sorted_data) == 2:
         num_col = 2
     else:
@@ -22,7 +34,7 @@ def lineout_plot(sorted_data, sorted_fits, sorted_sqdev, yaxis, s_ind, e_ind, ti
         ax[0][col].set_ylabel("Amp (arb. units)")
         ax[0][col].legend(fontsize=14)
         ax[0][col].grid()
-        #ax[0][col].set_ylim((0,1000))
+        # ax[0][col].set_ylim((0,1000))
 
         ax[1][col].plot(
             yaxis[col][s_ind[col] : e_ind[col]],

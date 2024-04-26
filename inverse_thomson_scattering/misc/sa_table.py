@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def sa_lookup(beam):
     if beam == "P9":
         # Scattering angle in degrees for OMEGA TIM6 TS
@@ -17,6 +18,25 @@ def sa_lookup(beam):
                     0.106526733030044,
                     0.0474753389486960,
                     0.00855817305526778,
+                ]
+            ),
+        )
+    elif beam == "B12":
+        # Scattering angle in degrees for OMEGA TIM6 TS
+        sa = dict(
+            sa=np.linspace(71.0195, 83.3160, 10),
+            weights=np.array(
+                [
+                    0.007702,
+                    0.0404,
+                    0.09193,
+                    0.1479,
+                    0.1860,
+                    0.1918,
+                    0.1652,
+                    0.1083,
+                    0.05063,
+                    0.01004,
                 ]
             ),
         )
@@ -155,5 +175,5 @@ def sa_lookup(beam):
         )
     else:
         raise NotImplmentedError("Other probe geometrries are not yet supported")
-    
+
     return sa

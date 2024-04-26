@@ -70,9 +70,9 @@ class TSFitter:
             self.flattened_weights, self.unravel_pytree = ravel_pytree(init_weights["active"])
             self.static_params = init_weights["inactive"]
             self.pytree_weights = init_weights
-            flattened_lb, _ = ravel_pytree(lb)
-            flattened_ub, _ = ravel_pytree(ub)
-            self.bounds = zip(flattened_lb, flattened_ub)
+            self.lb = lb
+            self.ub = ub
+            self.construct_bounds()
 
         # this needs to be rethought and does not work in all cases
         if cfg["parameters"][self.e_species]["fe"]["active"]:
@@ -97,6 +97,20 @@ class TSFitter:
                 Warning(
                     "\n !!! Distribution function not fitted !!! Make sure this is what you thought you were running \n"
                 )
+
+    def construct_bounds(self):
+        """
+        This method construct a bounds zip from the upper and lower bounds. This allows the iterable to be reconstructed
+        after being used in a fit.
+
+        Args:
+
+        Returns:
+
+        """
+        flattened_lb, _ = ravel_pytree(self.lb)
+        flattened_ub, _ = ravel_pytree(self.ub)
+        self.bounds = zip(flattened_lb, flattened_ub)
 
     def smooth(self, distribution: jnp.ndarray) -> jnp.ndarray:
         """
@@ -123,7 +137,8 @@ class TSFitter:
 
     def weights_to_params(self, these_params: Dict, return_static_params: bool = True) -> Dict:
         """
-        This function creates the physical parameters used in the TS algorithm from the weights.
+        This function creates the physical parameters used in the TS algorithm from the weights. The input these_params
+        is directly modified.
 
         This could be a 1:1 mapping, or it could be a linear transformation e.g. "normalized" parameters, or it could
         be something else altogether e.g. a neural network
@@ -177,6 +192,16 @@ class TSFitter:
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
         used_points = 0
         loss = 0
+
+        i_error, e_error = self.calc_ei_error(
+            batch,
+            ThryI,
+            lamAxisI,
+            ThryE,
+            lamAxisE,
+            denom=[jnp.square(self.i_norm), jnp.square(self.e_norm)],
+            reduce_func=jnp.sum,
+        )
 
         i_data = batch["i_data"]
         e_data = batch["e_data"]
@@ -386,7 +411,7 @@ class TSFitter:
         return fe_penalty
 
     def _loss_for_hess_fn_(self, params, batch):
-        params = params | self.static_params
+        # params = params | self.static_params
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
         i_error, e_error = self.calc_ei_error(
             batch,

@@ -5,8 +5,8 @@ import scipy.interpolate as sp
 import numpy as np
 
 from inverse_thomson_scattering.model.physics import ratintn
-from inverse_thomson_scattering.misc import lam_parse
-from inverse_thomson_scattering.misc.vector_tools import vadd, vsub, vdot, vdiv, v_add_dim
+from inverse_thomson_scattering.data_handleing import lam_parse
+from inverse_thomson_scattering.misc.vector_tools import vsub, vdot, vdiv, v_add_dim
 
 
 def zprimeMaxw(xi):

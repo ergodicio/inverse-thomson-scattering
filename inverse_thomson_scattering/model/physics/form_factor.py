@@ -10,8 +10,8 @@ from jax.lax import scan
 from jax import jit
 
 from inverse_thomson_scattering.model.physics import ratintn
-from inverse_thomson_scattering.misc import lam_parse
-from inverse_thomson_scattering.misc.vector_tools import vadd, vsub, vdot, vdiv, v_add_dim, rotate
+from inverse_thomson_scattering.data_handleing import lam_parse
+from inverse_thomson_scattering.misc.vector_tools import vsub, vdot, vdiv
 
 
 def zprimeMaxw(xi):
