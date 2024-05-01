@@ -8,6 +8,17 @@ from inverse_thomson_scattering.misc.lineout_plot import lineout_plot
 
 
 def get_final_params(config, best_weights, all_axes, td):
+    """
+    Formats and saves the final fitted parameter and distribution function.
+
+
+    Args:
+        config: configuration dictionary created from the input decks
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+
+    """
     all_params = {}
     dist = {}
     for species in best_weights.keys():
@@ -351,7 +362,16 @@ def plot_ts_data(config, fits, all_data, all_axes, td):
             all_axes["iaw_y"],
         )
 
-        plot_2D_data_vs_fit(config, x, y, ion_savedata["data"], ion_savedata["fit"], td, xlabel=all_axes["x_label"], name="fit_and_data_ion.png")
+        plot_2D_data_vs_fit(
+            config,
+            x,
+            y,
+            ion_savedata["data"],
+            ion_savedata["fit"],
+            td,
+            xlabel=all_axes["x_label"],
+            name="fit_and_data_ion.png",
+        )
 
     if config["other"]["extraoptions"]["load_ele_spec"]:
         coords = (all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]])), (
@@ -371,7 +391,16 @@ def plot_ts_data(config, fits, all_data, all_axes, td):
             all_axes["epw_y"],
         )
 
-        plot_2D_data_vs_fit(config, x, y, ele_savedata["data"], ele_savedata["fit"], td, xlabel=all_axes["x_label"], name="fit_and_data_ele.png")
+        plot_2D_data_vs_fit(
+            config,
+            x,
+            y,
+            ele_savedata["data"],
+            ele_savedata["fit"],
+            td,
+            xlabel=all_axes["x_label"],
+            name="fit_and_data_ele.png",
+        )
 
 
 def plot_2D_data_vs_fit(

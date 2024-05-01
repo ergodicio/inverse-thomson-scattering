@@ -8,7 +8,6 @@ from jax.flatten_util import ravel_pytree
 
 from inverse_thomson_scattering.misc import plotters
 from inverse_thomson_scattering.model.TSFitter import TSFitter
-from inverse_thomson_scattering.misc.enforce_bounds import enforce_bounds
 
 
 def recalculate_with_chosen_weights(
@@ -101,12 +100,15 @@ def recalculate_with_chosen_weights(
                 "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
             }
 
-            fitted_weights[i_batch] = enforce_bounds(fitted_weights[i_batch], ts_fitter)
             loss, sqds, used_points, [ThryE, ThryI, params] = ts_fitter.array_loss(fitted_weights[i_batch], batch)
             # these_params = ts_fitter.weights_to_params(fitted_weights[i_batch], return_static_params=False)
 
             if calc_sigma:
+                print("calculating hessian")
+                print(params)
+                print(batch)
                 hess = ts_fitter.h_loss_wrt_params(params, batch)
+                print("calculating hessian finished")
 
             losses[inds] = loss
             sqdevs["ele"][inds] = sqds["ele"]

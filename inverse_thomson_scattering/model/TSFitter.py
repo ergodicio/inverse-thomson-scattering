@@ -292,13 +292,14 @@ class TSFitter:
 
         if self.cfg["other"]["extraoptions"]["fit_EPWb"]:
             _error_ = jnp.square(e_data - ThryE) / denom[1]
+            print("where")
             _error_ = jnp.where(
                 (lamAxisE > self.cfg["data"]["fit_rng"]["blue_min"])
                 & (lamAxisE < self.cfg["data"]["fit_rng"]["blue_max"]),
                 _error_,
                 0.0,
             )
-
+            print("reduce")
             e_error += reduce_func(_error_)
 
         if self.cfg["other"]["extraoptions"]["fit_EPWr"]:
@@ -412,7 +413,9 @@ class TSFitter:
 
     def _loss_for_hess_fn_(self, params, batch):
         # params = params | self.static_params
+        print("in loss for hess")
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
+        print("calcing ei_error")
         i_error, e_error = self.calc_ei_error(
             batch,
             ThryI,

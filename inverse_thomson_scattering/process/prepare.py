@@ -2,7 +2,7 @@ from typing import Dict
 
 import numpy as np
 from inverse_thomson_scattering.process.evaluate_background import get_shot_bg
-from inverse_thomson_scattering.misc.load_ts_data import loadData
+from inverse_thomson_scattering.data_handleing.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
 from inverse_thomson_scattering.data_handleing.calibration import get_calibrations, get_scattering_angles
 from inverse_thomson_scattering.process.lineouts import get_lineouts

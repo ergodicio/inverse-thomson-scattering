@@ -414,6 +414,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     # perform fit
     t1 = time.time()
     mlflow.set_tag("status", "minimizing")
+    print("minimizing")
 
     if "angular" in config["other"]["extraoptions"]["spectype"]:
         fitted_weights, overall_loss, ts_fitter = scipy_angular_loop(config, all_data, sa)
@@ -423,6 +424,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     mlflow.log_metrics({"overall loss": float(overall_loss)})
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
     mlflow.set_tag("status", "postprocessing")
+    print("postprocessing")
 
     final_params = postprocess.postprocess(config, batch_indices, all_data, all_axes, ts_fitter, sa, fitted_weights)
 
