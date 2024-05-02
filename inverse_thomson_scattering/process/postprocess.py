@@ -104,9 +104,6 @@ def recalculate_with_chosen_weights(
             # these_params = ts_fitter.weights_to_params(fitted_weights[i_batch], return_static_params=False)
 
             if calc_sigma:
-                print("calculating hessian")
-                print(params)
-                print(batch)
                 hess = ts_fitter.h_loss_wrt_params(params, batch)
                 print("calculating hessian finished")
 
@@ -144,6 +141,8 @@ def get_sigmas(keys: List, hess: Dict, batch_size: int) -> Dict:
     Returns:
 
     """
+    print(keys)
+    print(hess.keys())
     sizes = {key: hess[key][key].shape[1] for key in keys}
     actual_num_params = sum([v for k, v in sizes.items()])
     sigmas = np.zeros((batch_size, actual_num_params))

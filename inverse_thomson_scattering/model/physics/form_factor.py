@@ -289,7 +289,7 @@ class FormFactor:
 
         return fe_vphi.reshape(beta.shape), chiEI.reshape(beta.shape), chiERrat.reshape(beta.shape)
 
-    def calc_in_2D(self, params, ud_ang, va_ang, cur_ne, cur_Te, sa, f_and_v, lam):
+    def calc_in_2D(self, params, ud_ang, va_ang, cur_ne, cur_Te, A, Z, Ti, fract, sa, f_and_v, lam):
         """
         NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions and scattering angles. The spectral density function is calculated with and without the ion contribution which can be set to an independent grid from the electron contribution. Distribution functions can be one or two dimensional and the appropriate susceptibility is calculated with the rational integration.
 
@@ -311,18 +311,24 @@ class FormFactor:
         :return:
         """
         # trying with rotations this time
-
-        Te, Ti, Z, A, fract, ne, Va, ud, fe = (
-            cur_Te,
-            params["Ti"],
-            params["Z"],
-            params["A"],
-            params["fract"],
-            cur_ne,
-            params["Va"],
-            params["ud"],
+        Te, ne, Va, ud, fe = (
+            cur_Te.squeeze(-1),
+            cur_ne.squeeze(-1),
+            params["general"]["Va"],
+            params["general"]["ud"],
             f_and_v,  # this is now a DistFunc object
         )
+        # Te, Ti, Z, A, fract, ne, Va, ud, fe = (
+        #     cur_Te,
+        #     params["Ti"],
+        #     params["Z"],
+        #     params["A"],
+        #     params["fract"],
+        #     cur_ne,
+        #     params["Va"],
+        #     params["ud"],
+        #     f_and_v,  # this is now a DistFunc object
+        # )
 
         Mi = jnp.array(A) * self.Mp  # ion mass
         re = 2.8179e-13  # classical electron radius cm

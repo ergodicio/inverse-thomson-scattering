@@ -4,13 +4,13 @@ parameters:
             electron:
             active: False
         Te:
-            val: .6
-            active: False
+            val: .5
+            active: True
             lb: 0.01
             ub: 1.5
         ne:
             val: 0.2
-            active: False
+            active: True
             lb: 0.001
             ub: 1.0
         m:
@@ -39,43 +39,21 @@ parameters:
             ion:
             active: False
         Ti:
-            val: 0.06
-            active: True
+            val: 0.2
+            active: False
             same: False
             lb: 0.01
             ub: 1.0
         Z:
             val: 8.0
-            active: True
+            active: False
             lb: 0.5
             ub: 18.0
         A:
             val: 40.0
             active: False
         fract:
-            val: 0.1
-            active: False
-
-    species3:
-        type:
-            ion:
-            active: False
-        Ti:
-            val: 0.06
-            active: False
-            same: True
-            lb: 0.01
-            ub: 1.0
-        Z:
             val: 1.0
-            active: False
-            lb: 0.5
-            ub: 1.0
-        A:
-            val: 1.0
-            active: False
-        fract:
-            val: 0.9
             active: False
 
     general:
@@ -94,12 +72,12 @@ parameters:
             ub: 3.75
         amp3:
             val: 1.0
-            active: True
+            active: False
             lb: 0.01
             ub: 3.75
         lam:
-            val: 526.5
-            active: False
+            val: 524.0
+            active: True
             lb: 525.0
             ub: 528.0
         Te_gradient:
@@ -131,23 +109,22 @@ data:
     shotnum: 101675
     lineouts:
         type:
-            ps
-        start: 0
-        end: 600
-        skip: 100
+            pixel
+        start: 500
+        end: 510
+        skip: 1
     background:
         type:
             pixel
         slice: 900
-        show: False
 
 other:
     extraoptions:
-        load_ion_spec: True
+        load_ion_spec: False
         load_ele_spec: True
-        fit_IAW: True
-        fit_EPWb: False
-        fit_EPWr: False
+        fit_IAW: False
+        fit_EPWb: True
+        fit_EPWr: True
         spectype: temporal
     PhysParams:
         widIRF:
@@ -155,7 +132,7 @@ other:
             spect_stddev_ele: 0.1
             spect_FWHM_ele: 0.9
             ang_FWHM_ele: 1.0
-    refit: True
+    refit: False
     refit_thresh: 5.0
     calc_sigmas: True
 

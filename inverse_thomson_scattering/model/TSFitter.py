@@ -292,14 +292,12 @@ class TSFitter:
 
         if self.cfg["other"]["extraoptions"]["fit_EPWb"]:
             _error_ = jnp.square(e_data - ThryE) / denom[1]
-            print("where")
             _error_ = jnp.where(
                 (lamAxisE > self.cfg["data"]["fit_rng"]["blue_min"])
                 & (lamAxisE < self.cfg["data"]["fit_rng"]["blue_max"]),
                 _error_,
                 0.0,
             )
-            print("reduce")
             e_error += reduce_func(_error_)
 
         if self.cfg["other"]["extraoptions"]["fit_EPWr"]:

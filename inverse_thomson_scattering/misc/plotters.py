@@ -14,9 +14,14 @@ def get_final_params(config, best_weights, all_axes, td):
 
     Args:
         config: configuration dictionary created from the input decks
+        best_weights: dictionary containing all the fitted parameters for all the species
+        all_axes: dictionary with calibrated axes and axes labels
         td: temporary directory that will be uploaded to mlflow
 
     Returns:
+        all_params | dist: dictionary containing all the fitted parameters. The fields are a combination of the
+            parameter and species name. The data is structured as a pandas Series. The output combines the distribution
+            function dictionary into the same output as the fitted parameter dictionary.
 
     """
     all_params = {}
@@ -50,6 +55,21 @@ def get_final_params(config, best_weights, all_axes, td):
 
 
 def plot_final_params(config, all_params, sigmas_ds, td):
+    """
+    Plots the fitted parameters as a function of lineout. These plots include a blue uncertainty region from the hessian
+    and a red uncertainty region from the moving average. The plots are saved to files but nothing is returned.
+
+
+    Args:
+        config: configuration dictionary created from the input decks
+        all_params: dictionary containing all the fitted parameters for all the species, same as the best_params from
+            the function get_final_params
+        sigmas_ds: dictionary with uncertainty values for each of the fitted parameters calculated using the hessian
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+
+    """
     for species in all_params.keys():
         for param in all_params[species].keys():
             for i in range(all_params[species][param].shape[1]):
@@ -85,6 +105,27 @@ def plot_final_params(config, all_params, sigmas_ds, td):
 
 
 def plot_loss_hist(config, losses, all_params, used_points, td):
+    """
+    Plots histograms of the raw loss and reduced loss. Each histogram contains 2 data sets, blue for before refitting
+    and orange for after refitting. The losses and reduced losses are saved to file as well. Note: A fit metric of
+    chi-squared is used and the reduced metric is chi-squared per degree of freedom but this will not necessarily be
+    near 1 since Thomson scattering often does not conform to chi-squared statistics.
+
+    Known issues:
+        The pre-refitting values are currently not being imported so the final losses are just plotted twice.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        losses: array of losses with one value per lineout
+        all_params: dictionary containing all the fitted parameters for all the species, same as the best_params from
+            the function get_final_params
+        used_points: int with the number of wavelength points used in each fit, calculated at the same time as loss
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+        red_losses: array of the losses per degree of freedom for each lineout
+
+    """
     losses[losses > 1e10] = 1e10
     red_losses = losses / (1.1 * (used_points - len(all_params)))
     mlflow.log_metrics(
@@ -126,9 +167,20 @@ def plot_loss_hist(config, losses, all_params, used_points, td):
 
 
 def plot_dist(config, final_params, sigma_fe, td):
-    # Create fe image
+    """
+    Plots the fitted or used distribution function. For 1D distributions plots are does as line plots verse the 1D
+    velocity. For 2D distributions a surface plot is shown as a function of the 2 velocities and contours are projected
+    onto each plane. In both cases the distribution is plotted in linear spacing, log base 10 spacing, and log base e.
 
-    # lineouts = np.array(config["data"]["lineouts"]["val"])
+    Args:
+        config: configuration dictionary created from the input decks
+        final_params: dictionary containing the distribution function as produced by the function get_final_params
+        sigma_fe: dictionary with uncertainty values for the distribution function as produced by the function
+            save_sigmas_fe
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+    """
 
     if config["parameters"]["fe"]["dim"] == 1:
         fig, ax = plt.subplots(1, 3, figsize=(15, 5))
@@ -265,6 +317,22 @@ def plot_dist(config, final_params, sigma_fe, td):
 
 
 def save_sigmas_fe(all_params, best_weights_std, sigmas, td):
+    """
+    Formats and saves the uncertainty values for the distribution function.
+
+    Know Issues:
+        THis code has not been updated to reflect the changes for multi-species
+
+    Args:
+        all_params: dictionary containing the distribution function as produced by the function get_final_params
+        best_weights_std: standard deviations of the fitted parameters over repeated fitting
+        sigmas: uncertainty values for the distribution function
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+        sigma_fe: uncertainty values for the distribution function restructured as a DataArray.
+
+    """
     sigma_params = {}
     sizes = {key: all_params[key].shape[0] for key in all_params.keys()}
     param_ctr = 0
@@ -285,6 +353,20 @@ def save_sigmas_fe(all_params, best_weights_std, sigmas, td):
 
 
 def save_sigmas_params(config, all_params, sigmas, all_axes, td):
+    """
+    Formats and saves the uncertainty values for the fitted parameters.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        all_params: dictionary containing the distribution function as produced by the function get_final_params
+        sigmas: uncertainty values for the fitted parameters
+        all_axes: dictionary with calibrated axes and axes labels
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+        sigma_ds: uncertainty values for each of the fitted parameters restructured as a DataArray.
+
+    """
     coords = ((all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]])),)
     sigmas_ds = xr.Dataset(
         {
