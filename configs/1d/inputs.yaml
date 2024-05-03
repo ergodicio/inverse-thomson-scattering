@@ -101,7 +101,7 @@ parameters:
         Va:
             val: 0.0
             angle: 0.0
-            active: True
+            active: False
             lb: -20.5
             ub: 20.5
 
@@ -111,7 +111,7 @@ data:
         type:
             pixel
         start: 500
-        end: 510
+        end: 506
         skip: 1
     background:
         type:
@@ -132,7 +132,7 @@ other:
             spect_stddev_ele: 0.1
             spect_FWHM_ele: 0.9
             ang_FWHM_ele: 1.0
-    refit: False
+    refit: True
     refit_thresh: 5.0
     calc_sigmas: True
 

@@ -10,7 +10,7 @@ from jax.flatten_util import ravel_pytree
 import numpy as np
 
 from inverse_thomson_scattering.model.spectrum import SpectrumCalculator
-from inverse_thomson_scattering.misc.dist_functional_forms import trapz
+from inverse_thomson_scattering.distribution_functions.dist_functional_forms import trapz
 
 
 class TSFitter:
@@ -135,7 +135,7 @@ class TSFitter:
             self.smooth_window_len - 1 : -(self.smooth_window_len - 1)
         ]
 
-    def weights_to_params(self, these_params: Dict, return_static_params: bool = True) -> Dict:
+    def weights_to_params(self, input_weights: Dict, return_static_params: bool = True) -> Dict:
         """
         This function creates the physical parameters used in the TS algorithm from the weights. The input these_params
         is directly modified.
@@ -150,6 +150,7 @@ class TSFitter:
         Returns:
 
         """
+        these_params = copy.deepcopy(input_weights)
         for species in self.cfg["parameters"].keys():
             for param_name, param_config in self.cfg["parameters"][species].items():
                 if param_name == "type":
@@ -409,11 +410,10 @@ class TSFitter:
 
         return fe_penalty
 
-    def _loss_for_hess_fn_(self, params, batch):
+    def _loss_for_hess_fn_(self, weights, batch):
         # params = params | self.static_params
-        print("in loss for hess")
+        params = self.weights_to_params(weights)
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
-        print("calcing ei_error")
         i_error, e_error = self.calc_ei_error(
             batch,
             ThryI,

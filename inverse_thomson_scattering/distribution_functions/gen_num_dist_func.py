@@ -1,6 +1,6 @@
 from jax import numpy as jnp
 
-from inverse_thomson_scattering.misc import dist_functional_forms
+from inverse_thomson_scattering.distribution_functions import dist_functional_forms
 
 
 # needs the ability to enforce symetry

@@ -3,7 +3,7 @@ from typing import Dict
 from inverse_thomson_scattering.model.physics.form_factor import FormFactor
 
 # from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
+from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 
 from jax import numpy as jnp
 

@@ -2,6 +2,16 @@ import numpy as np
 
 
 def sa_lookup(beam):
+    """
+    Creates the scattering angle dictionary with the scattering angles and their weights based of the chosen probe
+    beam. All values are precalculated. Available options are P9, B12, B15, B23, B26, B35, B42, B46, B58.
+
+    Args:
+        beam: string with the name of the beam to be used as a probe
+
+    Returns:
+        sa: dictionary with scattering angles in the 'sa' field and their relative weights in the 'weights' field
+    """
     if beam == "P9":
         # Scattering angle in degrees for OMEGA TIM6 TS
         sa = dict(

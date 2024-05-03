@@ -9,16 +9,15 @@ import xarray as xr
 from flatten_dict import flatten, unflatten
 
 from inverse_thomson_scattering import fitter
-from inverse_thomson_scattering.data_handleing.calibration import get_scattering_angles
+from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_scattering_angles
 
 # from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
+from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.fitter import init_param_norm_and_shift
 from inverse_thomson_scattering.misc import utils
-from inverse_thomson_scattering.data_handleing.calibration import get_calibrations
-from inverse_thomson_scattering.misc import plotters
-
+from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_calibrations
+from inverse_thomson_scattering.plotting import plotters
 
 if "BASE_TEMPDIR" in os.environ:
     BASE_TEMPDIR = os.environ["BASE_TEMPDIR"]

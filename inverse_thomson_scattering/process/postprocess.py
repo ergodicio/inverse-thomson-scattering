@@ -1,12 +1,11 @@
-from typing import Dict, List
+from typing import Dict
 
 import time, tempfile, mlflow, os, copy
 
 import numpy as np
 import scipy.optimize as spopt
-from jax.flatten_util import ravel_pytree
 
-from inverse_thomson_scattering.misc import plotters
+from inverse_thomson_scattering.plotting import plotters
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 
 
@@ -86,7 +85,7 @@ def recalculate_with_chosen_weights(
             # this line may need to be omited since the weights may be transformed by line 77
             active_params = ts_fitter.weights_to_params(fitted_weights, return_static_params=False)
             hess = ts_fitter.h_loss_wrt_params(active_params, batch)
-            sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
+            sigmas = get_sigmas(hess, config["optimizer"]["batch_size"])
             print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
 
     else:
@@ -104,15 +103,14 @@ def recalculate_with_chosen_weights(
             # these_params = ts_fitter.weights_to_params(fitted_weights[i_batch], return_static_params=False)
 
             if calc_sigma:
-                hess = ts_fitter.h_loss_wrt_params(params, batch)
-                print("calculating hessian finished")
+                hess = ts_fitter.h_loss_wrt_params(fitted_weights[i_batch], batch)
 
             losses[inds] = loss
             sqdevs["ele"][inds] = sqds["ele"]
             sqdevs["ion"][inds] = sqds["ion"]
             if calc_sigma:
-                sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-                print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
+                sigmas[inds] = get_sigmas(hess, config["optimizer"]["batch_size"])
+                # print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}") number of negatives?
 
             fits["ele"][inds] = ThryE
             fits["ion"][inds] = ThryI
@@ -127,50 +125,68 @@ def recalculate_with_chosen_weights(
     return losses, sqdevs, used_points, fits, sigmas, all_params
 
 
-def get_sigmas(keys: List, hess: Dict, batch_size: int) -> Dict:
+def get_sigmas(hess: Dict, batch_size: int) -> Dict:
     """
     Calculates the variance using the hessian with respect to the parameters and then using the hessian values
-    as the inverse of the covariance matrix and then inverting that
+    as the inverse of the covariance matrix and then inverting that. Negatives in the inverse hessian normally indicate
+    non-optimal points, to represent this in the final result the uncertainty of those values are reported as negative.
 
 
     Args:
-        keys:
-        hess:
-        batch_size:
+        hess: Hessian dictionary, the field for each fitted parameter has subfields corresponding to each of the other
+            fitted parameters. Within each nested subfield is a batch_size x batch_size array with the hessian values
+            for that parameter combination and that batch. The cross terms of this array are zero since separate
+            lineouts within a batch do not affect each other, they are therefore discarded
+        batch_size: int- number of lineouts in a batch
 
     Returns:
-
+        sigmas: batch_size x number_of_parameters array with the uncertainty values for each parameter
     """
-    print(keys)
-    print(hess.keys())
-    sizes = {key: hess[key][key].shape[1] for key in keys}
+    sizes = {
+        key + species: hess[species][key][species][key].shape[1]
+        for species in hess.keys()
+        for key in hess[species].keys()
+    }
+    # sizes = {key: hess[key][key].shape[1] for key in keys}
     actual_num_params = sum([v for k, v in sizes.items()])
     sigmas = np.zeros((batch_size, actual_num_params))
 
     for i in range(batch_size):
         temp = np.zeros((actual_num_params, actual_num_params))
-        xc = 0
-        for k1, param in enumerate(keys):
-            yc = 0
-            for k2, param2 in enumerate(keys):
-                if i > 0:
-                    temp[k1, k2] = np.squeeze(hess[param][param2])[i, i]
-                else:
-                    temp[xc : xc + sizes[param], yc : yc + sizes[param2]] = hess[param][param2][0, :, 0, :]
+        k1 = 0
+        for species1 in hess.keys():
+            for key1 in hess[species1].keys():
+                k2 = 0
+                for species2 in hess.keys():
+                    for key2 in hess[species2].keys():
+                        temp[k1, k2] = np.squeeze(hess[species1][key1][species2][key2])[i, i]
+                        k2 += 1
+                k1 += 1
 
-                yc += sizes[param2]
-            xc += sizes[param]
+        # xc = 0
+        # for k1, param in enumerate(keys):
+        #     yc = 0
+        #     for k2, param2 in enumerate(keys):
+        #         if i > 0:
+        #             temp[k1, k2] = np.squeeze(hess[param][param2])[i, i]
+        #         else:
+        #             temp[xc : xc + sizes[param], yc : yc + sizes[param2]] = hess[param][param2][0, :, 0, :]
+        #
+        #         yc += sizes[param2]
+        #     xc += sizes[param]
 
         # print(temp)
         inv = np.linalg.inv(temp)
         # print(inv)
 
-        for k1, param in enumerate(keys):
-            sigmas[i, xc : xc + sizes[param]] = np.diag(
-                np.sign(inv[xc : xc + sizes[param], xc : xc + sizes[param]])
-                * np.sqrt(np.abs(inv[xc : xc + sizes[param], xc : xc + sizes[param]]))
-            )
-            # print(sigmas[i, k1])
+        sigmas[i, :] = np.sign(np.diag(inv)) * np.sqrt(np.abs(np.diag(inv)))
+        # for k1, param in enumerate(keys):
+        #     sigmas[i, xc : xc + sizes[param]] = np.diag(
+        #         np.sign(inv[xc : xc + sizes[param], xc : xc + sizes[param]])
+        #         * np.sqrt(np.abs(inv[xc : xc + sizes[param], xc : xc + sizes[param]]))
+        #     )
+        # print(sigmas[i, k1])
+        # change sigmas into a dictionary?
 
     return sigmas
 

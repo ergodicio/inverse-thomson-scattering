@@ -2,9 +2,9 @@
 # new calibration values should be added here as they are calculated
 import numpy as np
 import scipy.io as sio
-from os.path import join, exists
+from os.path import join
 
-from inverse_thomson_scattering.misc.sa_table import sa_lookup
+from inverse_thomson_scattering.data_handleing.calibrations.sa_table import sa_lookup
 
 
 def get_calibrations(shotNum, tstype, CCDsize):

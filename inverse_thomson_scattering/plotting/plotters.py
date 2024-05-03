@@ -1,10 +1,10 @@
 import matplotlib as mpl
-import mlflow, tempfile, os, pandas
+import mlflow, os, pandas
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
 
-from inverse_thomson_scattering.misc.lineout_plot import lineout_plot
+from inverse_thomson_scattering.plotting.lineout_plot import lineout_plot
 
 
 def get_final_params(config, best_weights, all_axes, td):
@@ -380,6 +380,22 @@ def save_sigmas_params(config, all_params, sigmas, all_axes, td):
 
 
 def plot_data_angular(config, fits, all_data, all_axes, td):
+    """
+    Plots the resulting spectrum from the fit vs the raw data for angularly resolved data. The data and fit will be
+    plotted over the region used in the analysis. The function only creates the grids and structures the data before
+    calling the general 2D plotting code.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        fits: dictionary containing the fitted spectra in a field called 'ele'
+        all_data: dictionary containing the raw or processed data must have a field called 'e_data' which contains the
+            angular EPW data
+        all_axes: dictionary with calibrated axes and axes labels
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+        savedata: dictionary containing the data and fits as DataArrays
+    """
     dat = {
         "fit": fits["ele"],
         "data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
@@ -395,37 +411,25 @@ def plot_data_angular(config, fits, all_data, all_axes, td):
     )
 
     plot_2D_data_vs_fit(config, angs, wavs, savedata["data"], savedata["fit"], td, xlabel="Angle (degrees)")
-    # Create fit and data image
-    # fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-    # clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 21)
-    # ax[0].pcolormesh(
-    #     angs,
-    #     wavs,
-    #     savedata["fit"],
-    #     shading="nearest",
-    #     cmap="gist_ncar",
-    #     vmin=min(np.amin(savedata["data"]), 0),
-    #     vmax=max(np.amax(savedata["data"]), 1),
-    # )
-    # ax[0].set_xlabel("Angle (degrees)")
-    # ax[0].set_ylabel("Wavelength (nm)")
-    # ax[1].pcolormesh(
-    #     angs,
-    #     wavs,
-    #     savedata["data"],
-    #     shading="nearest",
-    #     cmap="gist_ncar",
-    #     vmin=min(np.amin(savedata["data"]), 0),
-    #     vmax=max(np.amax(savedata["data"]), 1),
-    # )
-    # ax[1].set_xlabel("Angle (degrees)")
-    # ax[1].set_ylabel("Wavelength (nm)")
-    # fig.savefig(os.path.join(td, "plots", "fit_and_data.png"), bbox_inches="tight")
 
     return savedata
 
 
 def plot_ts_data(config, fits, all_data, all_axes, td):
+    """
+    Plots the resulting spectrum from the fit vs the raw data for EPW and IAW data. The data and fit will be
+    plotted over the region used in the analysis. The function only creates the grids and structures the data before
+    calling the general 2D plotting code.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        fits: dictionary containing the fitted spectra
+        all_data: dictionary containing the raw or processed data
+        all_axes: dictionary with calibrated axes and axes labels
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+    """
     if config["other"]["extraoptions"]["load_ion_spec"]:
         coords = (all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]])), (
             "Wavelength",
@@ -488,6 +492,23 @@ def plot_ts_data(config, fits, all_data, all_axes, td):
 def plot_2D_data_vs_fit(
     config, x, y, data, fit, td, xlabel="Time (ps)", ylabel="Wavelength (nm)", name="fit_and_data.png"
 ):
+    """
+    Plots and then saves a set of 2 color plots (each 2D). Mainly used to plot data vs fit images.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        x: x-axis coordinates from meshgrid
+        y: y-axis coordinates from meshgrid
+        data: data array
+        fit: fit array
+        td: temporary directory that will be uploaded to mlflow
+        xlabel: label to be used for the x-axis
+        ylabel: label to be used for the y-axis
+        name: name under which the file will be saved
+
+    Returns:
+
+    """
     # Create fit and data image
     fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
     pc = ax[0].pcolormesh(
@@ -517,6 +538,24 @@ def plot_2D_data_vs_fit(
 
 
 def plot_ang_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedata, td):
+    """
+    Plots lineout comparing the fits to the data, but designed for angular data. The value of the fit metric chi^2 per
+    point is plotted beneath the data and fit.
+
+
+    Args:
+        used_points: numer of points used in the calculation of the fit metric
+        sqdevs: chi^2 per point. Must be the same shape as data
+        losses: array of losses with one value per lineout
+        all_params: dictionary containing all the fitted parameters for all the species, same as the best_params from
+            the function get_final_params
+        all_axes: dictionary with the calibrated axes and axes labels
+        savedata: dictionary with data and fitted spectra
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+
+    """
     used_points = used_points * sqdevs["ele"].shape[1]
     red_losses = np.sum(losses) / (1.1 * (used_points - len(all_params)))
     mlflow.log_metrics({"Total reduced loss": float(red_losses)})
@@ -544,6 +583,22 @@ def plot_ang_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedat
 
 
 def model_v_actual(config, all_data, all_axes, fits, losses, red_losses, sqdevs, td):
+    """
+    Creates a set of plots, up to 8, comparing the best and worst fits to the data. THis function does the sorting and
+    the lineout_plot code is used to do the plotting.
+
+
+    Args:
+        config: configuration dictionary created from the input decks
+        all_data: dictionary containing the raw or processed data
+        fits: dictionary containing the fitted spectra
+        losses: array of losses with one value per lineout
+        red_losses: array of the losses per lineout divided by the number of degrees of freedom
+        sqdevs: chi^2 per point. Must be the same shape as data
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+    """
     num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
 
     os.makedirs(os.path.join(td, "worst"))
