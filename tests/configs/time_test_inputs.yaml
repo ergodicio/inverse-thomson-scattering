@@ -27,7 +27,7 @@ parameters:
             lb: -100.
             ub: -0.5
             dim: 1
-            v_res: 0.02
+            v_res: 0.1
     species2:
         type:
             ion:
