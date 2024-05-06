@@ -1,8 +1,6 @@
 from typing import Dict
 
 from inverse_thomson_scattering.model.physics.form_factor import FormFactor
-
-# from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 
 from jax import numpy as jnp
@@ -12,14 +10,18 @@ class FitModel:
     """
     The FitModel Class wraps the FormFactor class adding finite aperture effects and finite volume effects. This class
     also handles the options for calculating the form factor.
-
-    Args:
-        config: Dict- configuration dictionary built from input deck
-        sa: Dict- has fields containing the scattering angles the spectrum will be calculated at and the relative
-        weights of each of the scattering angles in the final spectrum
     """
 
     def __init__(self, config: Dict, sa):
+        """
+        FitModel class constructor, sets the static properties associated with spectrum generation that will not be
+        modified from one iteration of the fitter to the next.
+
+        Args:
+            config: Dict- configuration dictionary built from input deck
+            sa: Dict- has fields containing the scattering angles the spectrum will be calculated at and the relative
+                weights of each of the scattering angles in the final spectrum
+        """
         self.config = config
         self.sa = sa
         # this will need to be fixed for multi electron
@@ -48,20 +50,29 @@ class FitModel:
 
     def __call__(self, all_params: Dict):
         """
-        TODO
+        Produces Thomson spectra corrected for finite aperture and optionally including gradients in the plasma
+        conditions based off the current parameter dictionary. Calling this method will automatically choose the
+        appropriate version of the formfactor class based off the dimension and distribute the conditions for
+        multiple ion species to their respective inputs.
 
 
         Args:
-            all_params:
+            all_params: Parameter dictionary containing the current values for all active and static parameters. Only a
+                few permanently static properties from the configuration dictionary will be used, everything else must
+                be included in this input.
 
         Returns:
+            modlE: calculated electron plasma wave spectrum as an array with length of npts. If an angular spectrum is
+                calculated then it will be 2D. If the EPW is not loaded this is returned as the int 0.
+            modlI: calculated ion acoustic wave spectrum as an array with length of npts. If the IAW is not loaded this
+                is returned as the int 0.
+            lamAxisE: electron plasma wave wavelength axis as an array with length of npts. If the EPW is not loaded
+                this is returned as an empty list.
+            lamAxisI: ion acoustic wave wavelength axis as an array with length of npts. If the IAW is not loaded
+                this is returned as an empty list.
+            all_params: The input all_params is returned
 
         """
-
-        # not sure why this is required
-        # for key in self.config["parameters"].keys():
-        #     if key != "fe":
-        #         all_params[key] = jnp.squeeze(all_params[key])
 
         if self.config["parameters"][self.e_species]["m"]["active"]:
             (
@@ -118,10 +129,6 @@ class FitModel:
                     Ti = Ti.at[ion_c].set(all_params[species]["Ti"].squeeze())
                 fract = fract.at[ion_c].set(all_params[species]["fract"].squeeze())
                 ion_c += 1
-
-        # cur_ne = jnp.array(cur_ne).squeeze()
-        # cur_Te = jnp.array(cur_Te).squeeze()
-        # Ti = jnp.array(Ti).squeeze()
 
         fecur = jnp.exp(all_params[self.e_species]["fe"])
         vcur = self.config["parameters"][self.e_species]["fe"]["velocity"]

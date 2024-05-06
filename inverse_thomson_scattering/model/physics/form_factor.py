@@ -420,50 +420,7 @@ class FormFactor:
         # find the rotation angle beta, the heaviside changes the angles to [0, 2pi)
         beta = jnp.arctan(xie[1] / xie[0]) + jnp.pi * (-jnp.heaviside(xie[0], 1) + 1)
 
-        # preallocate chiEI and chiER and fe
-        # chiEI = jnp.zeros_like(beta)
-        # chiERrat = jnp.zeros_like(beta)
-        # fe_vphi = jnp.zeros_like(beta)
-        # x1D = x[0, :]
-
-        # fe_2D_k = snd.rotate(DF, 45, reshape=False)
-        #
-        # fe_2D_k_v2 = rotate(DF, jnp.pi / 4.0)
-        #
-        # from matplotlib import pyplot as plt
-        #
-        # fig, ax = plt.subplots(1, 3, figsize=(18, 6), tight_layout=True, sharex=False)
-        # ax[0].contour(DF)
-        # ax[1].contour(fe_2D_k)
-        # ax[2].contour(fe_2D_k_v2)
-        # plt.show()
-
-        # def this_ratintn(this_beta, this_xie_mag, this_klde_mag):
-        #     return self.calc_chi_vals(
-        #         x1D,
-        #         this_beta,
-        #         DF,
-        #         this_xie_mag,
-        #         this_klde_mag,
-        #     )
-        #
-        # #
-        # # print(len(beta.flatten()))
         fe_vphi, chiEI, chiERrat = jit(self.calc_all_chi_vals)(x[0, :], beta, DF, xie_mag, klde_mag)
-
-        # for each rotation or element of vector in xie
-        # for ind, element in enumerate(beta.flatten()):
-        #     v1, v2, v3 = self.calc_chi_vals(
-        #         x[0, :],
-        #         element,
-        #         DF,
-        #         xie_mag[jnp.unravel_index(ind, beta.shape)],
-        #         klde_mag[jnp.unravel_index(ind, beta.shape)],
-        #     )
-
-        #     fe_vphi = fe_vphi.at[jnp.unravel_index(ind, beta.shape)].set(v1)
-        #     chiEI = chiEI.at[jnp.unravel_index(ind, beta.shape)].set(v2)
-        #     chiERrat = chiERrat.at[jnp.unravel_index(ind, beta.shape)].set(v3)
 
         chiE = chiERrat + jnp.sqrt(-1 + 0j) * chiEI
         epsilon = 1.0 + chiE + chiI
@@ -480,20 +437,10 @@ class FormFactor:
 
         SKW_ion_omg = jnp.sum(SKW_ion_omg, 3)
         SKW_ele_omg = 1.0 / k_mag * (ele_comp) / ((jnp.abs(epsilon)) ** 2)
-        # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:, None, None]
-        # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * self.C / omgs
         PsLam = PsOmg * 2 * jnp.pi * self.C / lams**2
-        # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam
-        # formfactorE = PsLamE # commented because unused
-        #
-        # from matplotlib import pyplot as plt
-        #
-        # fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
-        # ax[0].plot(fe_vphi[1, :, 0])
-        # plt.show()
 
         return formfactor, lams
