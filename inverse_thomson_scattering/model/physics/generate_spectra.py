@@ -74,20 +74,6 @@ class FitModel:
 
         """
 
-        if self.config["parameters"][self.e_species]["m"]["active"]:
-            (
-                self.config["parameters"][self.e_species]["fe"]["velocity"],
-                all_params[self.e_species]["fe"],
-            ) = self.num_dist_func(all_params[self.e_species]["m"])
-            # self.config["velocity"], all_params["fe"] = self.num_dist_func(self.config["parameters"]["m"]["val"])
-            all_params[self.e_species]["fe"] = jnp.log(all_params[self.e_species]["fe"])
-            # all_params["fe"] = jnp.log(self.num_dist_func(self.config["parameters"]["m"]))
-            if (
-                self.config["parameters"][self.e_species]["m"]["active"]
-                and self.config["parameters"][self.e_species]["fe"]["active"]
-            ):
-                raise ValueError("m and fe cannot be actively fit at the same time")
-
         # Add gradients to electron temperature and density just being applied to EPW
         cur_Te = jnp.zeros((self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"], self.num_electrons))
         cur_ne = jnp.zeros((self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"], self.num_electrons))
@@ -130,13 +116,40 @@ class FitModel:
                 fract = fract.at[ion_c].set(all_params[species]["fract"].squeeze())
                 ion_c += 1
 
+        lam = all_params["general"]["lam"]
+
+        if self.config["parameters"][self.e_species]["m"]["active"]:
+            (
+                self.config["parameters"][self.e_species]["fe"]["velocity"],
+                all_params[self.e_species]["fe"],
+            ) = self.num_dist_func(all_params[self.e_species]["m"])
+            all_params[self.e_species]["fe"] = jnp.log(all_params[self.e_species]["fe"])
+            if (
+                self.config["parameters"][self.e_species]["m"]["active"]
+                and self.config["parameters"][self.e_species]["fe"]["active"]
+            ):
+                raise ValueError("m and fe cannot be actively fit at the same time")
+        elif self.config["parameters"][self.e_species]["m"]["matte"]:
+            # Intensity should be given in effective 3omega intensity e.i. I*lamda^2/lamda_3w^2 and in units of 10^14 W/cm^2
+            alpha = (
+                0.042
+                * self.config["parameters"][self.e_species]["m"]["intens"]
+                / 9.0
+                * jnp.sum(Z**2)
+                / (jnp.sum(Z) ** 2 * cur_Te)
+            )
+            mcur = 2.0 + 3.0 / (1 + 1.66 / (alpha**0.724))
+            (
+                self.config["parameters"][self.e_species]["fe"]["velocity"],
+                all_params[self.e_species]["fe"],
+            ) = self.num_dist_func(mcur)
+            all_params[self.e_species]["fe"] = jnp.log(all_params[self.e_species]["fe"])
+
         fecur = jnp.exp(all_params[self.e_species]["fe"])
         vcur = self.config["parameters"][self.e_species]["fe"]["velocity"]
         if self.config["parameters"][self.e_species]["fe"]["symmetric"]:
             fecur = jnp.concatenate((jnp.flip(fecur[1:]), fecur))
             vcur = jnp.concatenate((-jnp.flip(vcur[1:]), vcur))
-
-        lam = all_params["general"]["lam"]
 
         if self.config["other"]["extraoptions"]["load_ion_spec"]:
             if self.num_dist_func.dim == 1:

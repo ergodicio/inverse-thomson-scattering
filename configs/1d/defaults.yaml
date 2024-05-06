@@ -17,6 +17,7 @@ parameters:
             active: True
             lb: 2.0
             ub: 5.0
+            matte: False
         fe:
             val: [ ]
             active: False
