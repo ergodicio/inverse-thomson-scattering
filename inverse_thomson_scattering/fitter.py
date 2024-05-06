@@ -10,7 +10,7 @@ from tqdm import trange
 from jax.flatten_util import ravel_pytree
 
 # from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
+from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.process import prepare, postprocess
 
@@ -92,7 +92,7 @@ def _validate_inputs_(config: Dict) -> Dict:
             if config["parameters"][species]["fe"]["symmetric"]:
                 Warning("Symmetric EDF has been disabled")
                 # config["velocity"] = np.linspace(0, 7, config["parameters"]["fe"]["length"])
-            if config["parameters"][species]["fe"]["dim"] == 2 and config["parameters"]["fe"]["active"]:
+            if config["parameters"][species]["fe"]["dim"] == 2 and config["parameters"][species]["fe"]["active"]:
                 Warning("2D EDFs can only be fit for angular data")
 
             config["parameters"][species]["fe"]["lb"] = np.multiply(
@@ -414,6 +414,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     # perform fit
     t1 = time.time()
     mlflow.set_tag("status", "minimizing")
+    print("minimizing")
 
     if "angular" in config["other"]["extraoptions"]["spectype"]:
         fitted_weights, overall_loss, ts_fitter = scipy_angular_loop(config, all_data, sa)
@@ -423,6 +424,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     mlflow.log_metrics({"overall loss": float(overall_loss)})
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
     mlflow.set_tag("status", "postprocessing")
+    print("postprocessing")
 
     final_params = postprocess.postprocess(config, batch_indices, all_data, all_axes, ts_fitter, sa, fitted_weights)
 

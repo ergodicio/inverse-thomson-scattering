@@ -1,9 +1,7 @@
 from typing import Dict
 
 from inverse_thomson_scattering.model.physics.form_factor import FormFactor
-
-# from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
+from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 
 from jax import numpy as jnp
 
@@ -12,14 +10,18 @@ class FitModel:
     """
     The FitModel Class wraps the FormFactor class adding finite aperture effects and finite volume effects. This class
     also handles the options for calculating the form factor.
-
-    Args:
-        config: Dict- configuration dictionary built from input deck
-        sa: Dict- has fields containing the scattering angles the spectrum will be calculated at and the relative
-        weights of each of the scattering angles in the final spectrum
     """
 
     def __init__(self, config: Dict, sa):
+        """
+        FitModel class constructor, sets the static properties associated with spectrum generation that will not be
+        modified from one iteration of the fitter to the next.
+
+        Args:
+            config: Dict- configuration dictionary built from input deck
+            sa: Dict- has fields containing the scattering angles the spectrum will be calculated at and the relative
+                weights of each of the scattering angles in the final spectrum
+        """
         self.config = config
         self.sa = sa
         # this will need to be fixed for multi electron
@@ -48,34 +50,29 @@ class FitModel:
 
     def __call__(self, all_params: Dict):
         """
-        TODO
+        Produces Thomson spectra corrected for finite aperture and optionally including gradients in the plasma
+        conditions based off the current parameter dictionary. Calling this method will automatically choose the
+        appropriate version of the formfactor class based off the dimension and distribute the conditions for
+        multiple ion species to their respective inputs.
 
 
         Args:
-            all_params:
+            all_params: Parameter dictionary containing the current values for all active and static parameters. Only a
+                few permanently static properties from the configuration dictionary will be used, everything else must
+                be included in this input.
 
         Returns:
+            modlE: calculated electron plasma wave spectrum as an array with length of npts. If an angular spectrum is
+                calculated then it will be 2D. If the EPW is not loaded this is returned as the int 0.
+            modlI: calculated ion acoustic wave spectrum as an array with length of npts. If the IAW is not loaded this
+                is returned as the int 0.
+            lamAxisE: electron plasma wave wavelength axis as an array with length of npts. If the EPW is not loaded
+                this is returned as an empty list.
+            lamAxisI: ion acoustic wave wavelength axis as an array with length of npts. If the IAW is not loaded
+                this is returned as an empty list.
+            all_params: The input all_params is returned
 
         """
-
-        # not sure why this is required
-        # for key in self.config["parameters"].keys():
-        #     if key != "fe":
-        #         all_params[key] = jnp.squeeze(all_params[key])
-
-        if self.config["parameters"][self.e_species]["m"]["active"]:
-            (
-                self.config["parameters"][self.e_species]["fe"]["velocity"],
-                all_params[self.e_species]["fe"],
-            ) = self.num_dist_func(all_params[self.e_species]["m"])
-            # self.config["velocity"], all_params["fe"] = self.num_dist_func(self.config["parameters"]["m"]["val"])
-            all_params[self.e_species]["fe"] = jnp.log(all_params[self.e_species]["fe"])
-            # all_params["fe"] = jnp.log(self.num_dist_func(self.config["parameters"]["m"]))
-            if (
-                self.config["parameters"][self.e_species]["m"]["active"]
-                and self.config["parameters"][self.e_species]["fe"]["active"]
-            ):
-                raise ValueError("m and fe cannot be actively fit at the same time")
 
         # Add gradients to electron temperature and density just being applied to EPW
         cur_Te = jnp.zeros((self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"], self.num_electrons))
@@ -94,7 +91,7 @@ class FitModel:
                         (1 - all_params["general"]["Te_gradient"] / 200) * all_params[species]["Te"],
                         (1 + all_params["general"]["Te_gradient"] / 200) * all_params[species]["Te"],
                         self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"],
-                    ).squeeze(-1)
+                    ).squeeze()
                 )
 
                 cur_ne = cur_ne.at[:, ele_c].set(
@@ -105,31 +102,54 @@ class FitModel:
                             self.config["parameters"]["general"]["ne_gradient"]["num_grad_points"],
                         )
                         * 1e20
-                    ).squeeze(-1)
+                    ).squeeze()
                 )
                 ele_c += 1
 
             elif "ion" in self.config["parameters"][species]["type"].keys():
-                A = A.at[ion_c].set(all_params[species]["A"].squeeze(-1))
-                Z = Z.at[ion_c].set(all_params[species]["Z"].squeeze(-1))
+                A = A.at[ion_c].set(all_params[species]["A"].squeeze())
+                Z = Z.at[ion_c].set(all_params[species]["Z"].squeeze())
                 if self.config["parameters"][species]["Ti"]["same"]:
                     Ti = Ti.at[ion_c].set(Ti[ion_c - 1])
                 else:
-                    Ti = Ti.at[ion_c].set(all_params[species]["Ti"].squeeze(-1))
-                fract = fract.at[ion_c].set(all_params[species]["fract"].squeeze(-1))
+                    Ti = Ti.at[ion_c].set(all_params[species]["Ti"].squeeze())
+                fract = fract.at[ion_c].set(all_params[species]["fract"].squeeze())
                 ion_c += 1
 
-        # cur_ne = jnp.array(cur_ne).squeeze()
-        # cur_Te = jnp.array(cur_Te).squeeze()
-        # Ti = jnp.array(Ti).squeeze()
+        lam = all_params["general"]["lam"]
+
+        if self.config["parameters"][self.e_species]["m"]["active"]:
+            (
+                self.config["parameters"][self.e_species]["fe"]["velocity"],
+                all_params[self.e_species]["fe"],
+            ) = self.num_dist_func(all_params[self.e_species]["m"])
+            all_params[self.e_species]["fe"] = jnp.log(all_params[self.e_species]["fe"])
+            if (
+                self.config["parameters"][self.e_species]["m"]["active"]
+                and self.config["parameters"][self.e_species]["fe"]["active"]
+            ):
+                raise ValueError("m and fe cannot be actively fit at the same time")
+        elif self.config["parameters"][self.e_species]["m"]["matte"]:
+            # Intensity should be given in effective 3omega intensity e.i. I*lamda^2/lamda_3w^2 and in units of 10^14 W/cm^2
+            alpha = (
+                0.042
+                * self.config["parameters"][self.e_species]["m"]["intens"]
+                / 9.0
+                * jnp.sum(Z**2)
+                / (jnp.sum(Z) ** 2 * cur_Te)
+            )
+            mcur = 2.0 + 3.0 / (1 + 1.66 / (alpha**0.724))
+            (
+                self.config["parameters"][self.e_species]["fe"]["velocity"],
+                all_params[self.e_species]["fe"],
+            ) = self.num_dist_func(mcur)
+            all_params[self.e_species]["fe"] = jnp.log(all_params[self.e_species]["fe"])
 
         fecur = jnp.exp(all_params[self.e_species]["fe"])
         vcur = self.config["parameters"][self.e_species]["fe"]["velocity"]
         if self.config["parameters"][self.e_species]["fe"]["symmetric"]:
             fecur = jnp.concatenate((jnp.flip(fecur[1:]), fecur))
             vcur = jnp.concatenate((-jnp.flip(vcur[1:]), vcur))
-
-        lam = all_params["general"]["lam"]
 
         if self.config["other"]["extraoptions"]["load_ion_spec"]:
             if self.num_dist_func.dim == 1:

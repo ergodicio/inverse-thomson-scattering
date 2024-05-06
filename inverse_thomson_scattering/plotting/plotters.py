@@ -1,13 +1,29 @@
 import matplotlib as mpl
-import mlflow, tempfile, os, pandas
+import mlflow, os, pandas
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
 
-from inverse_thomson_scattering.misc.lineout_plot import lineout_plot
+from inverse_thomson_scattering.plotting.lineout_plot import lineout_plot
 
 
 def get_final_params(config, best_weights, all_axes, td):
+    """
+    Formats and saves the final fitted parameter and distribution function.
+
+
+    Args:
+        config: configuration dictionary created from the input decks
+        best_weights: dictionary containing all the fitted parameters for all the species
+        all_axes: dictionary with calibrated axes and axes labels
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+        all_params | dist: dictionary containing all the fitted parameters. The fields are a combination of the
+            parameter and species name. The data is structured as a pandas Series. The output combines the distribution
+            function dictionary into the same output as the fitted parameter dictionary.
+
+    """
     all_params = {}
     dist = {}
     for species in best_weights.keys():
@@ -39,6 +55,21 @@ def get_final_params(config, best_weights, all_axes, td):
 
 
 def plot_final_params(config, all_params, sigmas_ds, td):
+    """
+    Plots the fitted parameters as a function of lineout. These plots include a blue uncertainty region from the hessian
+    and a red uncertainty region from the moving average. The plots are saved to files but nothing is returned.
+
+
+    Args:
+        config: configuration dictionary created from the input decks
+        all_params: dictionary containing all the fitted parameters for all the species, same as the best_params from
+            the function get_final_params
+        sigmas_ds: dictionary with uncertainty values for each of the fitted parameters calculated using the hessian
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+
+    """
     for species in all_params.keys():
         for param in all_params[species].keys():
             for i in range(all_params[species][param].shape[1]):
@@ -74,6 +105,27 @@ def plot_final_params(config, all_params, sigmas_ds, td):
 
 
 def plot_loss_hist(config, losses, all_params, used_points, td):
+    """
+    Plots histograms of the raw loss and reduced loss. Each histogram contains 2 data sets, blue for before refitting
+    and orange for after refitting. The losses and reduced losses are saved to file as well. Note: A fit metric of
+    chi-squared is used and the reduced metric is chi-squared per degree of freedom but this will not necessarily be
+    near 1 since Thomson scattering often does not conform to chi-squared statistics.
+
+    Known issues:
+        The pre-refitting values are currently not being imported so the final losses are just plotted twice.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        losses: array of losses with one value per lineout
+        all_params: dictionary containing all the fitted parameters for all the species, same as the best_params from
+            the function get_final_params
+        used_points: int with the number of wavelength points used in each fit, calculated at the same time as loss
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+        red_losses: array of the losses per degree of freedom for each lineout
+
+    """
     losses[losses > 1e10] = 1e10
     red_losses = losses / (1.1 * (used_points - len(all_params)))
     mlflow.log_metrics(
@@ -115,9 +167,20 @@ def plot_loss_hist(config, losses, all_params, used_points, td):
 
 
 def plot_dist(config, final_params, sigma_fe, td):
-    # Create fe image
+    """
+    Plots the fitted or used distribution function. For 1D distributions plots are does as line plots verse the 1D
+    velocity. For 2D distributions a surface plot is shown as a function of the 2 velocities and contours are projected
+    onto each plane. In both cases the distribution is plotted in linear spacing, log base 10 spacing, and log base e.
 
-    # lineouts = np.array(config["data"]["lineouts"]["val"])
+    Args:
+        config: configuration dictionary created from the input decks
+        final_params: dictionary containing the distribution function as produced by the function get_final_params
+        sigma_fe: dictionary with uncertainty values for the distribution function as produced by the function
+            save_sigmas_fe
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+    """
 
     if config["parameters"]["fe"]["dim"] == 1:
         fig, ax = plt.subplots(1, 3, figsize=(15, 5))
@@ -254,6 +317,22 @@ def plot_dist(config, final_params, sigma_fe, td):
 
 
 def save_sigmas_fe(all_params, best_weights_std, sigmas, td):
+    """
+    Formats and saves the uncertainty values for the distribution function.
+
+    Know Issues:
+        THis code has not been updated to reflect the changes for multi-species
+
+    Args:
+        all_params: dictionary containing the distribution function as produced by the function get_final_params
+        best_weights_std: standard deviations of the fitted parameters over repeated fitting
+        sigmas: uncertainty values for the distribution function
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+        sigma_fe: uncertainty values for the distribution function restructured as a DataArray.
+
+    """
     sigma_params = {}
     sizes = {key: all_params[key].shape[0] for key in all_params.keys()}
     param_ctr = 0
@@ -274,6 +353,20 @@ def save_sigmas_fe(all_params, best_weights_std, sigmas, td):
 
 
 def save_sigmas_params(config, all_params, sigmas, all_axes, td):
+    """
+    Formats and saves the uncertainty values for the fitted parameters.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        all_params: dictionary containing the distribution function as produced by the function get_final_params
+        sigmas: uncertainty values for the fitted parameters
+        all_axes: dictionary with calibrated axes and axes labels
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+        sigma_ds: uncertainty values for each of the fitted parameters restructured as a DataArray.
+
+    """
     coords = ((all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]])),)
     sigmas_ds = xr.Dataset(
         {
@@ -287,6 +380,22 @@ def save_sigmas_params(config, all_params, sigmas, all_axes, td):
 
 
 def plot_data_angular(config, fits, all_data, all_axes, td):
+    """
+    Plots the resulting spectrum from the fit vs the raw data for angularly resolved data. The data and fit will be
+    plotted over the region used in the analysis. The function only creates the grids and structures the data before
+    calling the general 2D plotting code.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        fits: dictionary containing the fitted spectra in a field called 'ele'
+        all_data: dictionary containing the raw or processed data must have a field called 'e_data' which contains the
+            angular EPW data
+        all_axes: dictionary with calibrated axes and axes labels
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+        savedata: dictionary containing the data and fits as DataArrays
+    """
     dat = {
         "fit": fits["ele"],
         "data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
@@ -302,37 +411,25 @@ def plot_data_angular(config, fits, all_data, all_axes, td):
     )
 
     plot_2D_data_vs_fit(config, angs, wavs, savedata["data"], savedata["fit"], td, xlabel="Angle (degrees)")
-    # Create fit and data image
-    # fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
-    # clevs = np.linspace(np.amin(savedata["data"]), np.amax(savedata["data"]), 21)
-    # ax[0].pcolormesh(
-    #     angs,
-    #     wavs,
-    #     savedata["fit"],
-    #     shading="nearest",
-    #     cmap="gist_ncar",
-    #     vmin=min(np.amin(savedata["data"]), 0),
-    #     vmax=max(np.amax(savedata["data"]), 1),
-    # )
-    # ax[0].set_xlabel("Angle (degrees)")
-    # ax[0].set_ylabel("Wavelength (nm)")
-    # ax[1].pcolormesh(
-    #     angs,
-    #     wavs,
-    #     savedata["data"],
-    #     shading="nearest",
-    #     cmap="gist_ncar",
-    #     vmin=min(np.amin(savedata["data"]), 0),
-    #     vmax=max(np.amax(savedata["data"]), 1),
-    # )
-    # ax[1].set_xlabel("Angle (degrees)")
-    # ax[1].set_ylabel("Wavelength (nm)")
-    # fig.savefig(os.path.join(td, "plots", "fit_and_data.png"), bbox_inches="tight")
 
     return savedata
 
 
 def plot_ts_data(config, fits, all_data, all_axes, td):
+    """
+    Plots the resulting spectrum from the fit vs the raw data for EPW and IAW data. The data and fit will be
+    plotted over the region used in the analysis. The function only creates the grids and structures the data before
+    calling the general 2D plotting code.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        fits: dictionary containing the fitted spectra
+        all_data: dictionary containing the raw or processed data
+        all_axes: dictionary with calibrated axes and axes labels
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+    """
     if config["other"]["extraoptions"]["load_ion_spec"]:
         coords = (all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]])), (
             "Wavelength",
@@ -351,7 +448,16 @@ def plot_ts_data(config, fits, all_data, all_axes, td):
             all_axes["iaw_y"],
         )
 
-        plot_2D_data_vs_fit(config, x, y, ion_savedata["data"], ion_savedata["fit"], td, xlabel=all_axes["x_label"], name="fit_and_data_ion.png")
+        plot_2D_data_vs_fit(
+            config,
+            x,
+            y,
+            ion_savedata["data"],
+            ion_savedata["fit"],
+            td,
+            xlabel=all_axes["x_label"],
+            name="fit_and_data_ion.png",
+        )
 
     if config["other"]["extraoptions"]["load_ele_spec"]:
         coords = (all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]])), (
@@ -371,12 +477,38 @@ def plot_ts_data(config, fits, all_data, all_axes, td):
             all_axes["epw_y"],
         )
 
-        plot_2D_data_vs_fit(config, x, y, ele_savedata["data"], ele_savedata["fit"], td, xlabel=all_axes["x_label"], name="fit_and_data_ele.png")
+        plot_2D_data_vs_fit(
+            config,
+            x,
+            y,
+            ele_savedata["data"],
+            ele_savedata["fit"],
+            td,
+            xlabel=all_axes["x_label"],
+            name="fit_and_data_ele.png",
+        )
 
 
 def plot_2D_data_vs_fit(
     config, x, y, data, fit, td, xlabel="Time (ps)", ylabel="Wavelength (nm)", name="fit_and_data.png"
 ):
+    """
+    Plots and then saves a set of 2 color plots (each 2D). Mainly used to plot data vs fit images.
+
+    Args:
+        config: configuration dictionary created from the input decks
+        x: x-axis coordinates from meshgrid
+        y: y-axis coordinates from meshgrid
+        data: data array
+        fit: fit array
+        td: temporary directory that will be uploaded to mlflow
+        xlabel: label to be used for the x-axis
+        ylabel: label to be used for the y-axis
+        name: name under which the file will be saved
+
+    Returns:
+
+    """
     # Create fit and data image
     fig, ax = plt.subplots(1, 2, figsize=(12, 5), tight_layout=True)
     pc = ax[0].pcolormesh(
@@ -406,6 +538,24 @@ def plot_2D_data_vs_fit(
 
 
 def plot_ang_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedata, td):
+    """
+    Plots lineout comparing the fits to the data, but designed for angular data. The value of the fit metric chi^2 per
+    point is plotted beneath the data and fit.
+
+
+    Args:
+        used_points: numer of points used in the calculation of the fit metric
+        sqdevs: chi^2 per point. Must be the same shape as data
+        losses: array of losses with one value per lineout
+        all_params: dictionary containing all the fitted parameters for all the species, same as the best_params from
+            the function get_final_params
+        all_axes: dictionary with the calibrated axes and axes labels
+        savedata: dictionary with data and fitted spectra
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+
+    """
     used_points = used_points * sqdevs["ele"].shape[1]
     red_losses = np.sum(losses) / (1.1 * (used_points - len(all_params)))
     mlflow.log_metrics({"Total reduced loss": float(red_losses)})
@@ -433,6 +583,22 @@ def plot_ang_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedat
 
 
 def model_v_actual(config, all_data, all_axes, fits, losses, red_losses, sqdevs, td):
+    """
+    Creates a set of plots, up to 8, comparing the best and worst fits to the data. THis function does the sorting and
+    the lineout_plot code is used to do the plotting.
+
+
+    Args:
+        config: configuration dictionary created from the input decks
+        all_data: dictionary containing the raw or processed data
+        fits: dictionary containing the fitted spectra
+        losses: array of losses with one value per lineout
+        red_losses: array of the losses per lineout divided by the number of degrees of freedom
+        sqdevs: chi^2 per point. Must be the same shape as data
+        td: temporary directory that will be uploaded to mlflow
+
+    Returns:
+    """
     num_plots = 8 if 8 < len(losses) // 2 else len(losses) // 2
 
     os.makedirs(os.path.join(td, "worst"))

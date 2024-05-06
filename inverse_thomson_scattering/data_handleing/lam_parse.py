@@ -1,11 +1,26 @@
 from jax import numpy as jnp
 
+
 def lamParse(lamrang, lam, npts, fineion=True):
     """
     This function handles the calculation of wavelength grids and their associated frequency grids.
-    Uses a minimum and maximum wavlength (string inputs have beeen depreciated).
+    Uses a minimum and maximum wavelength (string inputs have been depreciated).
     A boolean switch is included to allow a finer griding in the ion spectrum allowing for simultaneous resolution of
     the ion and electron frequencies (currently inoperable working on a solution 11/7/22).
+
+    Args:
+        lamrang: list with minimum and maximum wavelengths in nm in that order
+        lam: probe wavelength in nm
+        npts: number of wavelength points
+        fineion: (Boolean) used to produce wavelength grid with finer spacing for the IAW feature, currently
+            depreciated
+
+    Returns:
+        omgL: laser frequency in Hz
+        omgs: array of scattered frequencies
+        lamAxis: array of scattered wavelengths
+        npts: number of wavelength points used
+
     """
 
     c = 2.99792458e10

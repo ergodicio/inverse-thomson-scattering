@@ -1,17 +1,30 @@
-# import jax.scipy.interpolate
-# from jax.scipy.special import gamma
 from jax import numpy as jnp
 
-# import scipy.io as sio
-# from os.path import join, exists
-# from typing import Dict
-import time
-from inverse_thomson_scattering.misc import dist_functional_forms
+from inverse_thomson_scattering.distribution_functions import dist_functional_forms
 
 
 # needs the ability to enforce symetry
 class DistFunc:
+    """
+    Distribution function class used to generate numerical distribution functions based off some known functional forms.
+    Eventually this class will be expanded to handle loading of numerical distribution function from text files.
+
+    """
+
     def __init__(self, cfg):
+        """
+        Distribution function class constructor, reads the inout deck and used the relevant fields to set static
+        parameters for the distribution function creation. These include properties like the dimension and velocity grid
+        spacing that are static.
+
+
+        Args:
+            cfg: Dictionary for the electron species, a subfield of the input deck dictionary
+
+        Returns:
+            DistFunc: An instance of the DistFunc class
+
+        """
         self.velocity_res = cfg["fe"]["v_res"]
         self.fe_name = list(cfg["fe"]["type"].keys())[0]
 
@@ -47,13 +60,35 @@ class DistFunc:
             self.m_theta = 0.0
 
     def __call__(self, mval):
+        """
+        Distribution function class call, produces a numerical distribution function based of the object and the current
+        m-value.
+
+
+        Args:
+            mval: super-gaussian order to be used in calculation
+
+        Returns:
+            v: Velocity grid, for 1D distribution this is a single array, for 2D this is a tuple of arrays
+            fe: Numerical distribution function
+
+        """
         if self.fe_name == "DLM":
             if self.dim == 1:
                 v, fe = dist_functional_forms.DLM_1D(mval, self.velocity_res)
             elif self.dim == 2:
                 # v, fe = dist_functional_forms.DLM_2D(mdict["val"], self.velocity_res)
+                # v, fe = dist_functional_forms.BiDLM(
+                #    mval,
+                #    jnp.max(jnp.array([mval * self.m_asym, 2.0])),
+                #    jnp.max(jnp.array([jnp.array(mval * self.m_asym).squeeze(), 2.0])),
+                #    self.temp_asym,
+                #    self.m_theta,
+                #    self.velocity_res,
+                # )
+                # this will cause issues if my is less then 2
                 v, fe = dist_functional_forms.BiDLM(
-                    mval, jnp.max(jnp.array([mval * self.m_asym, 2.0])), self.temp_asym, self.m_theta, self.velocity_res
+                    mval, mval * self.m_asym, self.temp_asym, self.m_theta, self.velocity_res
                 )
 
         elif self.fe_name == "Spitzer":
@@ -75,13 +110,3 @@ class DistFunc:
                 raise ValueError("Mora and Yahi distribution can only be computed in 2D")
 
         return v, fe
-
-    # need a function that just changes the numerical values of the distribtuion function
-    # need a function that changes the values based off changes to the parameters (this may just be a call to the constructor)
-    def rotate(self, fe, v, theta):
-        # create new grid
-        x, y = jnp.meshgrid(jnp.arange(fe.shape(0)), jnp.arange(fe.shape(0)))
-        return
-
-
-# def get_num_dist_func

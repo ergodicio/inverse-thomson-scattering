@@ -2,11 +2,40 @@
 # new calibration values should be added here as they are calculated
 import numpy as np
 import scipy.io as sio
-from os.path import join, exists
+from os.path import join
 
-from inverse_thomson_scattering.misc.sa_table import sa_lookup
+from inverse_thomson_scattering.data_handleing.calibrations.sa_table import sa_lookup
+
 
 def get_calibrations(shotNum, tstype, CCDsize):
+    """
+    Contains and loads the appropriate instrument calibrations based off the shot number and type of Thomson scattering
+    performed. The calibrations loaded are the spectral dispersion, offset for the spectral axis, spectral instrument
+    response functions (as the 1 standard deviation value), and a scale for the x-axis. In the case of temporal data
+    this scale is the time per pixel. In the case of Imaging data the scale is a magnification and there is also an
+    offset based off the TCC location. The calibrated axes are return as well as calibration values that will be needed
+    later.
+
+    For non-OMEGA data this function will have to be reworked.
+
+
+    Args:
+        shotNum: OMEGA shot number
+        tstype: string with the ype of data, 'temporal', 'imaging', or 'angular'
+        CCDsize: list with the CCD size in pixels, for OMEGA data this is [1024, 1024]
+
+    Returns: return axisxE, axisxI, axisyE, axisyI, magE, stddev
+        axisxE: Calibrated x-axis for electron data [time (ps), space(um), or scattering angle(degree)]
+        axisxI: Calibrated x-axis for ion data [time (ps), space(um), or scattering angle(degree)]
+        axisyE: Calibrated spectral/y-axis for electron data in nm
+        axisyI: Calibrated spectral/y-axis for ion data in nm
+        magE: scale for the x-axis (ps/px or um/px)
+        stddev: dictionary with fields 'spect_stddev_ion' and 'spect_stddev_ele' containing the standard deviation
+        (width) of the ion an electron spectral instrument response function respectively. In the case of angular data
+        the fields 'spect_FWHM_ele' and 'ang_FWHM_ele' may be present containing the spectral and angular instrumental
+        width in full-width-half-max.
+
+    """
     stddev = dict()
     # Dispersions and calibrations
     if tstype == "angular":
@@ -29,7 +58,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         stddev["spect_FWHM_ele"] = 0.9  # nominally this is ~.8 or .9 for h2
         stddev["spect_stddev_ele"] = stddev["spect_FWHM_ele"] / 2.3548  # dummy
         stddev["ang_FWHM_ele"] = 1  # see Joe's FDR slides ~1-1.2
-        #IAWtime = 0  # means nothing here just kept to allow one code to be used for both
+        # IAWtime = 0  # means nothing here just kept to allow one code to be used for both
 
     elif tstype == "temporal":
         if shotNum < 105000:
@@ -45,8 +74,8 @@ def get_calibrations(shotNum, tstype, CCDsize):
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
 
-        elif shotNum <108950:
-            #these are calibrations for shot 108135
+        elif shotNum < 108950:
+            # these are calibrations for shot 108135
             EPWDisp = 0.4104
             IAWDisp = 0.005749
             EPWoff = 319.3
@@ -57,9 +86,9 @@ def get_calibrations(shotNum, tstype, CCDsize):
             # Sweep speed calculated from 5 Ghz comb (should be updated, date unknown)
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
-        
-        elif shotNum <108990:
-            #these are calibrations for shots 108964-
+
+        elif shotNum < 108990:
+            # these are calibrations for shots 108964-
             EPWDisp = 0.4104
             IAWDisp = 0.00959
             EPWoff = 135.0
@@ -71,19 +100,19 @@ def get_calibrations(shotNum, tstype, CCDsize):
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
 
-        elif 111410<shotNum<111426:
+        elif 111410 < shotNum < 111426:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.4104
-            IAWDisp = 0.00678 #needs to be updated
-            EPWoff = 318.3
+            IAWDisp = 0.00678  # needs to be updated
+            EPWoff = 317.6
             IAWoff = 523.12
-            stddev["spect_stddev_ion"] = 0.0187  #needs to be updated
-            stddev["spect_stddev_ele"] = 1.4294 #needs to be updated
+            stddev["spect_stddev_ion"] = 0.0187  # needs to be updated
+            stddev["spect_stddev_ele"] = 1.4294  # needs to be updated
 
             # Sweep speed calculated from 5 Ghz comb (should be updated, date unknown)
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
-            
+
         else:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.4104
@@ -97,7 +126,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
 
-       # IAWtime = 0  # temporal offset between EPW ross and IAW ross (varies shot to shot, can potentially add a fix based off the fiducials)
+    # IAWtime = 0  # temporal offset between EPW ross and IAW ross (varies shot to shot, can potentially add a fix based off the fiducials)
 
     else:
         if shotNum < 104000:
@@ -116,21 +145,21 @@ def get_calibrations(shotNum, tstype, CCDsize):
             IAWtcc = 1024 - 519  # 469;
 
         elif 106303 <= shotNum <= 106321:
-            #refractive teloscope used on 11/8/22
+            # refractive teloscope used on 11/8/22
             EPWDisp = 0.27594
             IAWDisp = 0.00437
-            EPWoff = 388.256  #390.256 worked for 106317
+            EPWoff = 388.256  # 390.256 worked for 106317
             IAWoff = 524.345
 
             stddev["spect_stddev_ion"] = 0.028  # needs to be checked
             stddev["spect_stddev_ele"] = 1.4365  # needs to be checked
 
-            magI = 2.89/.3746 *1.118  # um / px times strech factor accounting for tilt in view
-            magE = 5.13/.36175*1.118  # um / px times strech factor accounting for tilt in view
+            magI = 2.89 / 0.3746 * 1.118  # um / px times strech factor accounting for tilt in view
+            magE = 5.13 / 0.36175 * 1.118  # um / px times strech factor accounting for tilt in view
 
             EPWtcc = 1024 - 503  # 562;
             IAWtcc = 1024 - 578  # 469;
-            
+
         else:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.27093
@@ -141,13 +170,13 @@ def get_calibrations(shotNum, tstype, CCDsize):
             stddev["spect_stddev_ion"] = 0.028  # needs to be checked
             stddev["spect_stddev_ele"] = 1.4365  # needs to be checked
 
-            magI = 2.89 *1.079  # um / px times strech factor accounting for tilt in view
-            magE = 5.13 *1.079 # um / px times strech factor accounting for tilt in view
+            magI = 2.89 * 1.079  # um / px times strech factor accounting for tilt in view
+            magE = 5.13 * 1.079  # um / px times strech factor accounting for tilt in view
 
             EPWtcc = 1024 - 516  # 562;
             IAWtcc = 1024 - 450  # 469;
 
-        #IAWtime = 0  # means nothing here just kept to allow one code to be used for both
+        # IAWtime = 0  # means nothing here just kept to allow one code to be used for both
 
     ## Apply calibrations
     axisy = np.arange(1, CCDsize[0] + 1)
@@ -161,7 +190,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         if tstype == "imaging":
             axisxE = axisxE - EPWtcc * magE
             axisxI = axisxI - IAWtcc * magI
-            #axisxI = axisxI + 200
+            # axisxI = axisxI + 200
     else:
         imp = sio.loadmat(join("files", "angsFRED.mat"), variable_names="angsFRED")
         axisxE = imp["angsFRED"][0, :]
@@ -172,6 +201,23 @@ def get_calibrations(shotNum, tstype, CCDsize):
 
 
 def get_scattering_angles(config):
+    """
+    Loads and returns a scattering angle dictionary based off the input deck. The scattering angle dictionary has 2
+    fields 'sa' and 'weights'. The field 'sa' is an array of the scattering angles present based off the geometry
+    specified in the input deck. Multiple scattering angles are present due to the finite size of the apertures. The
+    field 'weights' is an array of the same size as 'sa' with the relative weights of each scattering angle in the final
+    spectrum.
+
+    Known geometries are for OMEGA and more would need to be added for another system.
+
+
+    Args:
+        config: Dictionary built from the input deck
+
+    Returns:
+        sa: Dictionary with scattering angles and weights
+
+    """
     if config["other"]["extraoptions"]["spectype"] != "angular":
         sa = sa_lookup(config["data"]["probe_beam"])
     else:
