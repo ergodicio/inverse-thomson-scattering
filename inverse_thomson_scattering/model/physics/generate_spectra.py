@@ -138,11 +138,11 @@ class FitModel:
                 * jnp.sum(Z**2)
                 / (jnp.sum(Z) ** 2 * cur_Te)
             )
-            mcur = 2.0 + 3.0 / (1 + 1.66 / (alpha**0.724))
+            mcur = 2.0 + 3.0 / (1.0 + 1.66 / (alpha**0.724))
             (
                 self.config["parameters"][self.e_species]["fe"]["velocity"],
                 all_params[self.e_species]["fe"],
-            ) = self.num_dist_func(mcur)
+            ) = self.num_dist_func(mcur.squeeze())
             all_params[self.e_species]["fe"] = jnp.log(all_params[self.e_species]["fe"])
 
         fecur = jnp.exp(all_params[self.e_species]["fe"])

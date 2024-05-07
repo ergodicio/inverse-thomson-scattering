@@ -66,7 +66,7 @@ class DistFunc:
 
 
         Args:
-            mval: super-gaussian order to be used in calculation
+            mval: super-gaussian order to be used in calculation must be a float or shape (1,)
 
         Returns:
             v: Velocity grid, for 1D distribution this is a single array, for 2D this is a tuple of arrays

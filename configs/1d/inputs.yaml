@@ -18,6 +18,8 @@ parameters:
             active: False
             lb: 2.0
             ub: 5.0
+            matte: True
+            intens: 10.0
         fe:
             val: [ ]
             active: False
@@ -106,7 +108,7 @@ parameters:
             ub: 50.5
 
 data:
-    shotnum: 98612
+    shotnum: 101675
     lineouts:
         type:
             ps
