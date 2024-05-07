@@ -29,7 +29,7 @@ parameters:
             fe_decrease_strict: False
             symmetric: False
             dim: 2
-            v_res: 0.2
+            v_res: 0.025
             temp_asym: 1.0
             m_theta: 0.0
             m_asym: 1.

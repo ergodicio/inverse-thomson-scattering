@@ -77,7 +77,7 @@ class FormFactor:
             self.coords = jnp.concatenate([np.copy(vax[0][..., None]), np.copy(vax[1][..., None])], axis=-1)
             self.v = vax[0][0]
 
-        self._calc_all_chi_vals_ = vmap(self.calc_chi_vals, in_axes=(None, 0, 0, 0), out_axes=0)
+        self._calc_all_chi_vals_ = vmap(checkpoint(self.calc_chi_vals), in_axes=(None, 0, 0, 0), out_axes=0)
 
     def __call__(self, params, cur_ne, cur_Te, A, Z, Ti, fract, sa, f_and_v, lam):
         """
@@ -242,8 +242,8 @@ class FormFactor:
             (self.v.size, self.v.size), order="F"
         )
 
-    # def calc_chi_vals(self, carry, xs):
-    def calc_chi_vals(self, x_DF, element, xie_mag_at, klde_mag_at):
+    def calc_chi_vals(self, carry, xs):
+        # def calc_chi_vals(self, x_DF, element, xie_mag_at, klde_mag_at):
         """
         Calculate the values of the susceptibility at a given point in the distribution function
 
@@ -262,9 +262,9 @@ class FormFactor:
             chiERrat: float, value of the real part of the electron susceptibility at the point xie
 
         """
-        # x, DF = carry
-        # element, xie_mag_at, klde_mag_at = xs
-        x, DF = x_DF
+        x, DF = carry
+        element, xie_mag_at, klde_mag_at = xs
+        # x, DF = x_DF
 
         fe_2D_k = checkpoint(self.rotate)(DF, element * 180 / jnp.pi, reshape=False)
         fe_1D_k = jnp.sum(fe_2D_k, axis=0) * (x[1] - x[0])
@@ -286,7 +286,8 @@ class FormFactor:
         chiERrat = (
             -1.0 / (klde_mag_at**2) * jnp.real(ratintn.ratintn(df, x - xie_mag_at, x))
         )  # this may need to be downsampled for run time
-        return fe_vphi, chiEI, chiERrat
+        # return fe_vphi, chiEI, chiERrat
+        return (x, DF), (fe_vphi, chiEI, chiERrat)
 
     def calc_all_chi_vals(self, x, beta, DF, xie_mag, klde_mag):
         """
@@ -310,12 +311,12 @@ class FormFactor:
         # fn = vmap(fn, in_axes=(None, 2, None, 2, 2), out_axes=2)
 
         # all_vals = fn(x, beta, DF, xie_mag, klde_mag)
-        # _, (fe_vphi, chiEI, chiERrat) = scan(
-        #     self.calc_chi_vals, (x, DF), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=32
-        # )
-        fe_vphi, chiEI, chiERrat = self._calc_all_chi_vals_(
-            (x, DF), beta.flatten(), xie_mag.flatten(), klde_mag.flatten()
+        _, (fe_vphi, chiEI, chiERrat) = scan(
+            checkpoint(self.calc_chi_vals), (x, DF), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=32
         )
+        # fe_vphi, chiEI, chiERrat = self._calc_all_chi_vals_(
+        #     (x, DF), beta.flatten(), xie_mag.flatten(), klde_mag.flatten()
+        # )
         # for arr in (fe_vphi, chiEI, chiERrat):
         # arr = arr.reshape(beta.shape)
 
