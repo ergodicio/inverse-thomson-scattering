@@ -9,8 +9,8 @@ dependencies:
   - pip:
       # works for regular pip packages
       - --find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-      - jaxlib==0.4.14+cuda12.cudnn89
-      - jax==0.4.14
+      - jaxlib==0.4.26+cuda12.cudnn89
+      - jax==0.4.26
       - jaxopt
       - numpy
       - scipy

@@ -3,7 +3,7 @@ from typing import Dict
 from inverse_thomson_scattering.model.physics.form_factor import FormFactor
 
 # from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.misc.gen_num_dist_func import DistFunc
+from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 
 from jax import numpy as jnp
 
@@ -94,7 +94,7 @@ class FitModel:
                         (1 - all_params["general"]["Te_gradient"] / 200) * all_params[species]["Te"],
                         (1 + all_params["general"]["Te_gradient"] / 200) * all_params[species]["Te"],
                         self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"],
-                    ).squeeze(-1)
+                    ).squeeze()
                 )
 
                 cur_ne = cur_ne.at[:, ele_c].set(
@@ -105,18 +105,18 @@ class FitModel:
                             self.config["parameters"]["general"]["ne_gradient"]["num_grad_points"],
                         )
                         * 1e20
-                    ).squeeze(-1)
+                    ).squeeze()
                 )
                 ele_c += 1
 
             elif "ion" in self.config["parameters"][species]["type"].keys():
-                A = A.at[ion_c].set(all_params[species]["A"].squeeze(-1))
-                Z = Z.at[ion_c].set(all_params[species]["Z"].squeeze(-1))
+                A = A.at[ion_c].set(all_params[species]["A"].squeeze())
+                Z = Z.at[ion_c].set(all_params[species]["Z"].squeeze())
                 if self.config["parameters"][species]["Ti"]["same"]:
                     Ti = Ti.at[ion_c].set(Ti[ion_c - 1])
                 else:
-                    Ti = Ti.at[ion_c].set(all_params[species]["Ti"].squeeze(-1))
-                fract = fract.at[ion_c].set(all_params[species]["fract"].squeeze(-1))
+                    Ti = Ti.at[ion_c].set(all_params[species]["Ti"].squeeze())
+                fract = fract.at[ion_c].set(all_params[species]["fract"].squeeze())
                 ion_c += 1
 
         # cur_ne = jnp.array(cur_ne).squeeze()

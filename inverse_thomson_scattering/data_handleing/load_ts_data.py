@@ -8,24 +8,24 @@ from inverse_thomson_scattering.process.warpcorr import perform_warp_correction
 
 def loadData(sNum, sDay, loadspecs):
     """
-    This function loads the appropriate data based off the provided shot number (sNum) automaticaly determining the
-    type of data in the file. The flag sDay changes the default path to the temporary archive on the redwood server and will
-    only work if connected to the LLE redwood server.
+    This function loads the appropriate data based off the provided shot number (sNum) automatically determining the
+    type of data in the file. The flag sDay changes the default path to the temporary archive on the redwood server and
+    will only work if connected to the LLE redwood server (depreciated).
 
     If the data is time resolved an attempt will be made to locate t=0 based off the fiducials. The relationship
-    between the fiducials and t=0 changes from one shot day to the next.
+    between the fiducials and t=0 changes from one shot day to the next. (depreciated)
 
     Known Issues:
         If there are mutliple data types from the same shot number such as ATS and imaging data, this algorithm will
         fail.
         The fiducial finding and timing has been depreciated and will need to be reinstated.
+        This only works for OMEGA data and will need to be reworked for non-OMEGA data.
 
     Args:
-        sNum:
-        sDay:
-        specType:
-        magE:
-        loadspecs:
+        sNum: Shot number
+        sDay: N/A
+        loadspecs: Dictionary containing the options of which spectra should be loaded, sub-dictionary of the input
+            deck
 
     Returns:
 
@@ -67,9 +67,9 @@ def loadData(sNum, sDay, loadspecs):
             iDat = sds_obj.get()  # get sds data
             iDat = iDat.astype("float64")
             iDat = iDat[0, :, :] - iDat[1, :, :]
-            
+
             if specType == "imaging":
-                iDat = np.rot90(np.squeeze(iDat),3)
+                iDat = np.rot90(np.squeeze(iDat), 3)
         except BaseException:
             print("Unable to find IAW")
             iDat = []
@@ -84,21 +84,21 @@ def loadData(sNum, sDay, loadspecs):
             eDat = sds_obj.get()  # get sds data
             eDat = eDat.astype("float64")
             eDat = eDat[0, :, :] - eDat[1, :, :]
-            
+
             if specType == "angular":
                 eDat = np.fliplr(eDat)
             elif specType == "temporal":
-                eDat = perform_warp_correction(eDat) 
+                eDat = perform_warp_correction(eDat)
             elif specType == "imaging":
-                eDat = np.rot90(np.squeeze(eDat),3)
+                eDat = np.rot90(np.squeeze(eDat), 3)
         except BaseException:
             print("Unable to find EPW")
             eDat = []
             loadspecs["load_ele_spec"] = False
     else:
         eDat = []
-        
+
     if not loadspecs["load_ele_spec"] and not loadspecs["load_ion_spec"]:
-        raise LookupError(f"No data found for shotnumber {sNum} in the data folder") 
+        raise LookupError(f"No data found for shotnumber {sNum} in the data folder")
 
     return eDat, iDat, xlab, specType

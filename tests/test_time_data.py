@@ -30,9 +30,9 @@ def test_data(nn):
     config = unflatten(defaults)
 
     config["nn"]["use"] = nn
-    config["parameters"]["Te"]["val"] = 0.5
-    config["parameters"]["ne"]["val"] = 0.2  # 0.25
-    config["parameters"]["m"]["val"] = 3.0  # 2.2
+    # config["parameters"]["Te"]["val"] = 0.5
+    # config["parameters"]["ne"]["val"] = 0.2  # 0.25
+    # config["parameters"]["m"]["val"] = 3.0  # 2.2
 
     mlflow.set_experiment(config["mlflow"]["experiment"])
 

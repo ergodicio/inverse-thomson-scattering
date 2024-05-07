@@ -14,7 +14,7 @@ parameters:
             ub: 1.0
         m:
             val: 3.0
-            active: True
+            active: False
             lb: 2.0
             ub: 5.0
         fe:
@@ -58,7 +58,7 @@ parameters:
             general:
         amp1:
             val: 1.
-            active: True
+            active: False
             lb: 0.01
             ub: 3.75
         amp2:
@@ -129,10 +129,10 @@ data:
     shotDay: False
     launch_data_visualizer: True
     fit_rng:
-        blue_min: 425
+        blue_min: 450
         blue_max: 510
-        red_min: 545
-        red_max: 660
+        red_min: 540
+        red_max: 625
         iaw_min: 525.5
         iaw_max: 527.5
         iaw_cf_min: 526.49
@@ -144,12 +144,12 @@ data:
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1
-    ion_loss_scale: 2.0
-    ele_t0: 1700
-    ion_t0_shift: 700.0
+    ion_loss_scale: 1.0
+    ele_t0: 0
+    ion_t0_shift: 0
     ele_lam_shift: 0.0
     probe_beam: P9
-    dpixel: 3
+    dpixel: 2
     lineouts:
         type:
             pixel
@@ -180,8 +180,8 @@ optimizer:
     y_norm: True
     x_norm: False
     grad_method: AD
-    batch_size: 3
-    num_epochs: 10
+    batch_size: 2
+    num_epochs: 200
     learning_rate: 1.0e-4
     parameter_norm: True
     refine_factor: 0

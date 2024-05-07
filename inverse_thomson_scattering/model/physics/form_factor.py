@@ -10,21 +10,22 @@ from jax.lax import scan
 from jax import jit
 
 from inverse_thomson_scattering.model.physics import ratintn
-from inverse_thomson_scattering.misc import lam_parse
-from inverse_thomson_scattering.misc.vector_tools import vadd, vsub, vdot, vdiv, v_add_dim, rotate
+from inverse_thomson_scattering.data_handleing import lam_parse
+from inverse_thomson_scattering.misc.vector_tools import vsub, vdot, vdiv
 
 
 def zprimeMaxw(xi):
     """
-    This function calculates the derivitive of the Z - function given an array of normilzed phase velocities(xi) as
-    defined in Chapter 5. For values of xi between - 10 and 10 a table is used. Outside of this range the assumtotic
-    approximation(see Eqn. 5.2.10) is used.
-    xi is expected to be ascending
+    This function calculates the derivative of the Z - function given an array of normalized phase velocities(xi) as
+    defined in Chapter 5 of the Thomson scattering book. For values of xi between - 10 and 10 a table is used. Outside
+    of this range the asymptotic approximation(see Eqn. 5.2.10) is used.
+
 
     Args:
-        xi:
+        xi: normalized phase velocities to calculate the zprime function at, these values must be in ascending order
 
     Returns:
+        Zp: array with the real and imaginary components of Z-prime
 
     """
 
@@ -45,6 +46,20 @@ def zprimeMaxw(xi):
 
 class FormFactor:
     def __init__(self, lamrang, npts, fe_dim, vax=None):
+        """
+        Creates a FormFactor object holding all the static values to use for repeated calculations of the Thomson
+        scattering structure factor or spectral density function.
+
+        Args:
+            lamrang: list of the starting and ending wavelengths over which to calculate the spectrum.
+            npts: number of wavelength points to use in the calculation
+            fe_dim: dimension of the electron velocity distribution function (EDF), should be 1 or 2
+            vax: (optional) velocity axis coordinates that the 2D EDF is defined on
+
+        Returns:
+            Instance of the FormFactor object
+
+        """
         # basic quantities
         self.C = 2.99792458e10
         self.Me = 510.9896 / self.C**2  # electron mass keV/C^2
@@ -64,29 +79,28 @@ class FormFactor:
 
     def __call__(self, params, cur_ne, cur_Te, A, Z, Ti, fract, sa, f_and_v, lam):
         """
-        Calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions
-        and scattering angles. The spectral density function is calculated with and without the ion contribution
-        which can be set to an independent grid from the electron contribution. Distribution functions can be one or
-        two dimensional and the appropriate susceptibility is calculated with the rational integration.
+        Calculates the standard collisionless Thomson spectral density function S(k,omg) and is capable of handling
+        multiple plasma conditions and scattering angles. Distribution functions can be arbitrary as calculations of the
+        susceptibility is done on-the-fly. Calculations are done in 4 dimension with the following shape,
+        [number of gradient-points, number of wavelength points, number of angles, number of ion-species].
 
-        In angular, `fe` is a Tuple, Distribution function (DF), normalized velocity (x), and angles from k_L to f1 in radians
+        In angular, `fe` is a Tuple, Distribution function (DF), normalized velocity (x), and angles from k_L to f1 in
+        radians
 
+        Args:
+            params: parameter dictionary, must contain the drift 'ud' and flow 'Va' velocities in the 'general' field
+            cur_ne: electron density in 1/cm^3 [1 by number of gradient points]
+            cur_Te: electron temperature in keV [1 by number of gradient points]
+            A: atomic mass [1 by number of ion species]
+            Z: ionization state [1 by number of ion species]
+            Ti: ion temperature in keV [1 by number of ion species]
+            fract: relative ion composition [1 by number of ion species]
+            sa: scattering angle in degrees [1 by number of angles]
+            f_and_v: a distribution function object, contains the numerical distribution function and its velocity grid
 
-
-        :param Te: electron temperature in keV [1 by number of plasma conditions]
-        :param Ti: ion temperature in keV [1 by number of ion species]
-        :param Z: ionization state [1 by number of ion species]
-        :param A: atomic mass [1 by number of ion species]
-        :param fract: relative ion composition [1 by number of ion species]
-        :param ne: electron density in 1e20 cm^-3 [1 by number of plasma conditions]
-        :param Va: flow velocity
-        :param ud: drift velocity
-        :param lamrang: wavelength range in nm [1 by 2]
-        :param lam: probe wavelength in nm
-        :param sa: scattering angle in degrees [1 by n]
-        :param fe: Distribution function (DF) and normalized velocity (x) for 1D distributions
-
-        :return:
+        Returns:
+            formfactor: array of the calculated spectrum, has the shape [number of gradient-points, number of
+                wavelength points, number of angles]
         """
 
         Te, ne, Va, ud, fe = (
@@ -197,13 +211,6 @@ class FormFactor:
         PsLam = PsOmg * 2 * jnp.pi * self.C / lams**2
         # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam
-        # formfactorE = PsLamE # commented because unused
-        # from matplotlib import pyplot as plt
-
-        # fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
-        # ax[0].plot(x, DF)
-        # ax[1].plot(fe_vphi[1, :, 0])
-        # plt.show()
 
         return formfactor, lams
 
@@ -238,16 +245,18 @@ class FormFactor:
         Calculate the values of the susceptibility at a given point in the distribution function
 
         Args:
-            x: 1D array
-            element: angle in radians
-            DF: 2D array
-            xie_mag_at: float
-            klde_mag_at: float
+            carry: container for
+                x: 1D array
+                DF: 2D array
+            xs: container for
+                element: angle in radians
+                xie_mag_at: float
+                klde_mag_at: float
 
         Returns:
-            fe_vphi: float
-            chiEI: float
-            chiERrat: float
+            fe_vphi: float, value of the projected distribution function at the point xie
+            chiEI: float, value of the imaginary part of the electron susceptibility at the point xie
+            chiERrat: float, value of the real part of the electron susceptibility at the point xie
 
         """
         x, DF = carry
@@ -276,6 +285,22 @@ class FormFactor:
         return (x, DF), (fe_vphi, chiEI, chiERrat)
 
     def calc_all_chi_vals(self, x, beta, DF, xie_mag, klde_mag):
+        """
+        Calculate the susceptibility values for all the desired points xie
+
+        Args:
+            x: normalized velocity grid
+            beta: angle of the k-vector form the x-axis
+            DF: 2D array, distribution function
+            xie_mag: magnitude of the normalized velocity points where the calculations need to be performed
+            klde_mag: magnitude of the wavevector time debye length where the calculations need to be performed
+
+        Returns:
+            fe_vphi: projected distribution function
+            chiEI: imaginary part of the electron susceptibility
+            chiERrat: real part of the electron susceptibility
+
+        """
         # fn = vmap(self.calc_chi_vals, in_axes=(None, 0, None, 0, 0), out_axes=0)
         # fn = vmap(fn, in_axes=(None, 1, None, 1, 1), out_axes=1)
         # fn = vmap(fn, in_axes=(None, 2, None, 2, 2), out_axes=2)
@@ -291,26 +316,33 @@ class FormFactor:
 
     def calc_in_2D(self, params, ud_ang, va_ang, cur_ne, cur_Te, A, Z, Ti, fract, sa, f_and_v, lam):
         """
-        NONMAXWTHOMSON calculates the Thomson spectral density function S(k,omg) and is capable of handeling multiple plasma conditions and scattering angles. The spectral density function is calculated with and without the ion contribution which can be set to an independent grid from the electron contribution. Distribution functions can be one or two dimensional and the appropriate susceptibility is calculated with the rational integration.
+        Calculates the collisionless Thomson spectral density function S(k,omg) for a 2D numerical EDF, capable of
+        handling multiple plasma conditions and scattering angles. Distribution functions can be arbitrary as
+        calculations of the susceptibility are done on-the-fly. Calculations are done in 4 dimension with the following
+        shape, [number of gradient-points, number of wavelength points, number of angles, number of ion-species].
 
+        In angular, `fe` is a Tuple, Distribution function (DF), normalized velocity (x), and angles from k_L to f1 in
+        radians
 
+        Args:
+            params: parameter dictionary, must contain the drift 'ud' and flow 'Va' velocities in the 'general' field
+            ud_ang: angle between electron drift and x-axis
+            va_ang: angle between ion flow and x-axis
+            cur_ne: electron density in 1/cm^3 [1 by number of gradient points]
+            cur_Te: electron temperature in keV [1 by number of gradient points]
+            A: atomic mass [1 by number of ion species]
+            Z: ionization state [1 by number of ion species]
+            Ti: ion temperature in keV [1 by number of ion species]
+            fract: relative ion composition [1 by number of ion species]
+            sa: scattering angle in degrees [1 by number of angles]
+            f_and_v: a distribution function object, contains the numerical distribution function and its velocity grid
+            lam: probe wavelength
 
-        :param Te: electron temperature in keV [1 by number of plasma conditions]
-        :param Ti: ion temperature in keV [1 by number of ion species]
-        :param Z: ionization state [1 by number of ion species]
-        :param A: atomic mass [1 by number of ion species]
-        :param fract: relative ion composition [1 by number of ion species]
-        :param ne: electron density in 1e20 cm^-3 [1 by number of plasma conditions]
-        :param Va: flow velocity 2D vector
-        :param ud: drift velocity 2D vector
-        :param lamrang: wavelength range in nm [1 by 2]
-        :param lam: probe wavelength in nm
-        :param sa: scattering angle in degrees [1 by n]
-        :param fe: Distribution function (DF) and normalized velocity (x) for 1D distributions and
-        Distribution function (DF), normalized velocity (x), and angles from k_L to f1 in radians
-        :return:
+        Returns:
+            formfactor: array of the calculated spectrum, has the shape [number of gradient-points, number of
+                wavelength points, number of angles]
         """
-        # trying with rotations this time
+
         Te, ne, Va, ud, fe = (
             cur_Te.squeeze(-1),
             cur_ne.squeeze(-1),
