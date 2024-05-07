@@ -17,7 +17,6 @@ parameters:
             active: False
             lb: 2.0
             ub: 5.0
-            matte: False
         fe:
             val: [ ]
             active: False
@@ -40,7 +39,6 @@ parameters:
         Ti:
             val: 0.12
             active: False
-            same: False
             lb: 0.001
             ub: 1.0
         Z:
@@ -119,7 +117,7 @@ other:
     CCDsize: [1024, 1024]
     flatbg: 0
     gain: 1
-    points_per_pixel: 5
+    points_per_pixel: 1
     ang_res_unit: 10
     lam_res_unit: 5
     refit: False
@@ -157,7 +155,7 @@ data:
             pixel
         start: 500
         end: 510
-        skip: 5
+        skip: 1
     background:
         type:
             pixel
@@ -166,13 +164,13 @@ data:
 plotting:
     n_sigmas: 3
     rolling_std_width: 5
-    data_cbar_u: 10
+    data_cbar_u: data
     data_cbar_l: 0
     ion_window_start: 525
     ion_window_end: 528
     ele_window_start: 425
     ele_window_end: 625
-    
+
 optimizer:
     # use adam for nn / stochastic gradient descent
     # use L-BFGS-B for full batch / parameter learning
@@ -183,11 +181,12 @@ optimizer:
     x_norm: False
     grad_method: AD
     batch_size: 2
-    num_epochs: 1000
-    learning_rate: 1.0e-2
+    num_epochs: 200
+    learning_rate: 1.0e-4
     parameter_norm: True
     refine_factor: 0
-    num_mins: 1
+    num_mins: 8
+    sequential: False
 
 nn:
     use: false
@@ -198,7 +197,7 @@ dist_fit:
     window:
         len: 0.2 #should be even
         type: hamming # one of [hamming, hann, bartlett]
-        
+
 mlflow:
     experiment: inverse-thomson-scattering
     run: base

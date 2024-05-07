@@ -1,14 +1,12 @@
 from typing import Dict
 
 import numpy as np
-from scipy.signal import convolve2d as conv2
-from inverse_thomson_scattering.misc import plotters
 from inverse_thomson_scattering.process.evaluate_background import get_shot_bg
-from inverse_thomson_scattering.misc.load_ts_data import loadData
+from inverse_thomson_scattering.data_handleing.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
-from inverse_thomson_scattering.misc.calibration import get_calibrations, get_scattering_angles
+from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_calibrations, get_scattering_angles
 from inverse_thomson_scattering.process.lineouts import get_lineouts
-from inverse_thomson_scattering.misc.data_visualizer import launch_data_visualizer
+from inverse_thomson_scattering.data_handleing.data_visualizer import launch_data_visualizer
 
 
 def prepare_data(config: Dict) -> Dict:
@@ -33,7 +31,7 @@ def prepare_data(config: Dict) -> Dict:
     [axisxE, axisxI, axisyE, axisyI, magE, stddev] = get_calibrations(
         config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
     )
-    all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI, "x_label": xlab} 
+    all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI, "x_label": xlab}
 
     # turn off ion or electron fitting if the corresponding spectrum was not loaded
     if not config["other"]["extraoptions"]["load_ion_spec"]:
@@ -49,31 +47,17 @@ def prepare_data(config: Dict) -> Dict:
         elecData = correctThroughput(
             elecData, config["other"]["extraoptions"]["spectype"], axisyE, config["data"]["shotnum"]
         )
+        #temp fix for zeros
+        elecData = elecData+10.0
 
-    # Lauch the data visualizer to show linout selection, not currently interactable
-    if config["data"]["launch_data_visualizer"]:
-        launch_data_visualizer(elecData, ionData, all_axes, config)
-    
     # load and correct background
     [BGele, BGion] = get_shot_bg(config, axisyE, elecData)
 
     # extract ARTS section
     if (config["data"]["lineouts"]["type"] == "range") & (config["other"]["extraoptions"]["spectype"] == "angular"):
         config["other"]["extraoptions"]["spectype"] = "angular_full"
-        #config["other"]["PhysParams"]["amps"] = np.array([np.amax(elecData), 1])
+        # config["other"]["PhysParams"]["amps"] = np.array([np.amax(elecData), 1])
         sa["angAxis"] = axisxE
-
-        #this currently does nothing since the figure is not logged
-        if config["other"]["extraoptions"]["plot_raw_data"]:
-            plotters.ColorPlots(
-                axisxE,
-                axisyE,
-                conv2(elecData - BGele, np.ones([5, 5]) / 25, mode="same"),
-                vmin=0,
-                XLabel=xlab,
-                YLabel="Wavelength (nm)",
-                title="Shot : " + str(config["data"]["shotnum"]) + " : " + "TS : Corrected and background subtracted",
-            )
 
         # down sample image to resolution units by summation
         ang_res_unit = config["other"]["ang_res_unit"]  # in pixels
@@ -99,29 +83,46 @@ def prepare_data(config: Dict) -> Dict:
         )
 
         axisyE = np.array(
-            [np.average(axisyE[i : i + lam_res_unit], axis=0) for i in range(0, axisyE.shape[0], lam_res_unit)])
-        all_axes["epw_y"] = axisyE.reshape((-1,1))
+            [np.average(axisyE[i : i + lam_res_unit], axis=0) for i in range(0, axisyE.shape[0], lam_res_unit)]
+        )
+        all_axes["epw_y"] = axisyE.reshape((-1, 1))
         axisxE = np.array(
-            [np.average(axisxE[i : i + ang_res_unit], axis=0) for i in range(0, axisxE.shape[0], ang_res_unit)])
-        all_axes["epw_x"] = axisxE.reshape((-1,1))
-        all_data = {"e_data": data_res_unit, "e_amps": np.amax(data_res_unit, axis = 1, keepdims = True)}
+            [np.average(axisxE[i : i + ang_res_unit], axis=0) for i in range(0, axisxE.shape[0], ang_res_unit)]
+        )
+        all_axes["epw_x"] = axisxE.reshape((-1, 1))
+        all_data = {"e_data": data_res_unit, "e_amps": np.amax(data_res_unit, axis=1, keepdims=True)}
         all_data["i_data"] = all_data["i_amps"] = np.zeros(len(data_res_unit))
-        #changed this 8-29-23 not sure how it worked with =0?
+        # changed this 8-29-23 not sure how it worked with =0?
         config["other"]["PhysParams"]["noiseI"] = np.zeros(np.shape(bg_res_unit))
         config["other"]["PhysParams"]["noiseE"] = bg_res_unit
         config["other"]["CCDsize"] = np.shape(data_res_unit)
-        config["data"]["lineouts"]["start"] = int(config["data"]["lineouts"]["start"]/ ang_res_unit)
-        config["data"]["lineouts"]["end"] = int(config["data"]["lineouts"]["end"]/ ang_res_unit)
+        config["data"]["lineouts"]["start"] = int(config["data"]["lineouts"]["start"] / ang_res_unit)
+        config["data"]["lineouts"]["end"] = int(config["data"]["lineouts"]["end"] / ang_res_unit)
 
     else:
         all_data = get_lineouts(
-            elecData, ionData, BGele, BGion, axisxE, axisxI, axisyE, axisyI, config["data"]["ele_t0"],
-            config["data"]["ion_t0_shift"], xlab, sa, config
+            elecData,
+            ionData,
+            BGele,
+            BGion,
+            axisxE,
+            axisxI,
+            axisyE,
+            axisyI,
+            config["data"]["ele_t0"],
+            config["data"]["ion_t0_shift"],
+            xlab,
+            sa,
+            config,
         )
+
+    # Lauch the data visualizer to show linout selection, not currently interactable
+    if config["data"]["launch_data_visualizer"]:
+        launch_data_visualizer(elecData, ionData, all_axes, config)
 
     config["other"]["PhysParams"]["widIRF"] = stddev
     config["other"]["lamrangE"] = [axisyE[0], axisyE[-1]]
     config["other"]["lamrangI"] = [axisyI[0], axisyI[-1]]
     config["other"]["npts"] = int(config["other"]["CCDsize"][1] * config["other"]["points_per_pixel"])
-    
+
     return all_data, sa, all_axes

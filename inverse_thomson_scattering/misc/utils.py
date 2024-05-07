@@ -1,9 +1,19 @@
-import os, mlflow, flatten_dict, boto3, botocore, shutil, time, tempfile
+import os, mlflow, flatten_dict, boto3, yaml, botocore, shutil, time, tempfile
 from urllib.parse import urlparse
 
 
 def log_params(cfg):
-    flattened_dict = flatten_dict.flatten(cfg, reducer="dot")
+    """
+    Logs the parameters form the input deck in the parameters section of MLFlow.
+
+
+    Args:
+        cfg: input dictionary
+
+    Returns:
+
+    """
+    flattened_dict = flatten_dict.flatten(cfg, reducer="dot")  # dict(flatdict.FlatDict(cfg, delimiter="."))
     num_entries = len(flattened_dict.keys())
 
     if num_entries > 100:
@@ -18,6 +28,18 @@ def log_params(cfg):
 
 
 def update(base_dict, new_dict):
+    """
+    Combines 2 dictionaries overwriting common fields
+
+
+    Args:
+        base_dict: dictionary to be modified
+        new_dict: dictionary containing new or additional values to be inserted
+
+    Returns:
+        combined_dict: combined dictionary with the updated values
+
+    """
     combined_dict = {}
     for k, v in new_dict.items():
         combined_dict[k] = base_dict[k]
@@ -30,6 +52,17 @@ def update(base_dict, new_dict):
 
 
 def upload_dir_to_s3(local_directory: str, bucket: str, destination: str, run_id: str, prefix="ingest", step=0):
+    """
+    TODO
+
+
+    Args:
+
+
+    Returns:
+
+
+    """
     client = boto3.client("s3")
 
     # enumerate local files recursively
@@ -53,6 +86,17 @@ def upload_dir_to_s3(local_directory: str, bucket: str, destination: str, run_id
 
 
 def export_run(run_id, prefix="ingest", step=0):
+    """
+    TODO
+
+
+    Args:
+
+
+    Returns:
+
+
+    """
     t0 = time.time()
     from mlflow_export_import.run.export_run import RunExporter
 
@@ -66,6 +110,17 @@ def export_run(run_id, prefix="ingest", step=0):
 
 
 def get_cfg(artifact_uri, temp_path):
+    """
+    TODO
+
+
+    Args:
+
+
+    Returns:
+
+
+    """
     dest_file_path = download_file("defaults.yaml", artifact_uri, temp_path)
     dest_file_path = download_file("inputs.yaml", artifact_uri, temp_path)
     # with open(dest_file_path, "r") as file:
@@ -75,6 +130,17 @@ def get_cfg(artifact_uri, temp_path):
 
 
 def download_file(fname, artifact_uri, destination_path):
+    """
+    TODO
+
+
+    Args:
+
+
+    Returns:
+
+
+    """
     file_uri = mlflow.get_artifact_uri(fname)
     dest_file_path = os.path.join(destination_path, fname)
 

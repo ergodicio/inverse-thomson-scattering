@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -A m4434_g
+#SBATCH -A m4490_g
 #SBATCH -C gpu
 #SBATCH -q debug
 #SBATCH -t 0:30:00

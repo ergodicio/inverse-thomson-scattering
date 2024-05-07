@@ -5,12 +5,15 @@ import tempfile, mlflow, os
 
 def launch_data_visualizer(elecData, ionData, all_axes, config):
     """
+    Plots the raw data with solid lines indicating the beginning and ending of the analysis and dashed lines indicating
+    the portions of the spectrum that are included in the analysis.
 
     Args:
-        elecData:
-        ionData:
-        all_axes:
-        config:
+        elecData: Electron data to be plotted, if electron data is not loaded a dummy can be placed here
+        ionData: Ion data to be plotted, if ion data is not loaded a dummy can be placed here
+        all_axes: A dictionary containing the axes for the data being plotted. If electron data is plotted 'epw_x' and
+        'epw_y' are required fields. If ion data is plotted 'iaw_x' and 'iaw_y' are required fields.
+        config: Dictionary constructed from input deck
 
     Returns:
 
@@ -50,41 +53,41 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
                 vmin=np.amin(ionData),
                 vmax=np.amax(ionData),
             )
-            sline = ax.plot(
+            (sline,) = ax.plot(
                 [all_axes["iaw_x"][LineoutPixelI[0]], all_axes["iaw_x"][LineoutPixelI[0]]],
                 [all_axes["iaw_y"][0], all_axes["iaw_y"][-1]],
                 lw=2,
                 color="w",
             )
-            eline = ax.plot(
+            (eline,) = ax.plot(
                 [all_axes["iaw_x"][LineoutPixelI[-1]], all_axes["iaw_x"][LineoutPixelI[-1]]],
                 [all_axes["iaw_y"][0], all_axes["iaw_y"][-1]],
                 lw=2,
                 color="w",
             )
 
-            lamsline = ax.plot(
+            (lamsline,) = ax.plot(
                 [all_axes["iaw_x"][0], all_axes["iaw_x"][-1]],
                 [config["data"]["fit_rng"]["iaw_min"], config["data"]["fit_rng"]["iaw_min"]],
                 lw=2,
                 color="w",
                 linestyle="--",
             )
-            lamsline = ax.plot(
+            (lamsline,) = ax.plot(
                 [all_axes["iaw_x"][0], all_axes["iaw_x"][-1]],
                 [config["data"]["fit_rng"]["iaw_cf_min"], config["data"]["fit_rng"]["iaw_cf_min"]],
                 lw=2,
                 color="w",
                 linestyle="--",
             )
-            lamsline = ax.plot(
+            (lamsline,) = ax.plot(
                 [all_axes["iaw_x"][0], all_axes["iaw_x"][-1]],
                 [config["data"]["fit_rng"]["iaw_cf_max"], config["data"]["fit_rng"]["iaw_cf_max"]],
                 lw=2,
                 color="w",
                 linestyle="--",
             )
-            lameline = ax.plot(
+            (lameline,) = ax.plot(
                 [all_axes["iaw_x"][0], all_axes["iaw_x"][-1]],
                 [config["data"]["fit_rng"]["iaw_max"], config["data"]["fit_rng"]["iaw_max"]],
                 lw=2,
@@ -107,41 +110,41 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
                 vmin=np.amin(elecData),
                 vmax=np.amax(elecData),
             )
-            sline = ax.plot(
+            (sline,) = ax.plot(
                 [all_axes["epw_x"][LineoutPixelE[0]], all_axes["epw_x"][LineoutPixelE[0]]],
                 [all_axes["epw_y"][0], all_axes["epw_y"][-1]],
                 lw=2,
                 color="w",
             )
-            eline = ax.plot(
+            (eline,) = ax.plot(
                 [all_axes["epw_x"][LineoutPixelE[-1]], all_axes["epw_x"][LineoutPixelE[-1]]],
                 [all_axes["epw_y"][0], all_axes["epw_y"][-1]],
                 lw=2,
                 color="w",
             )
 
-            lamsline = ax.plot(
+            (lamsline,) = ax.plot(
                 [all_axes["epw_x"][0], all_axes["epw_x"][-1]],
                 [config["data"]["fit_rng"]["blue_min"], config["data"]["fit_rng"]["blue_min"]],
                 lw=2,
                 color="w",
                 linestyle="--",
             )
-            lameline = ax.plot(
+            (lameline,) = ax.plot(
                 [all_axes["epw_x"][0], all_axes["epw_x"][-1]],
                 [config["data"]["fit_rng"]["blue_max"], config["data"]["fit_rng"]["blue_max"]],
                 lw=2,
                 color="w",
                 linestyle="--",
             )
-            lamsline = ax.plot(
+            (lamsline,) = ax.plot(
                 [all_axes["epw_x"][0], all_axes["epw_x"][-1]],
                 [config["data"]["fit_rng"]["red_min"], config["data"]["fit_rng"]["red_min"]],
                 lw=2,
                 color="w",
                 linestyle="--",
             )
-            lameline = ax.plot(
+            (lameline,) = ax.plot(
                 [all_axes["epw_x"][0], all_axes["epw_x"][-1]],
                 [config["data"]["fit_rng"]["red_max"], config["data"]["fit_rng"]["red_max"]],
                 lw=2,

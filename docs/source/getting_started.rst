@@ -29,12 +29,12 @@ Getting Started
 
 .. code-block:: bash
 
-   conda env create -f env-gpu.yml
+   conda env create -f env_gpu.yml
    conda activate tsadar-gpu
 
 **Run command**
 
-There are two run "modes".
+There are three run "modes".
 
 One performs a fitting procedure
 
@@ -42,14 +42,20 @@ One performs a fitting procedure
 
    python run_tsadar.py --cfg <path>/<to>/<inputs>/<folder> --mode fit
 
-And the other just performs a forward pass and gives you the spectra given some input parameters
+The second just performs a forward pass and gives you the spectra given some input parameters
 
 .. code-block:: bash
 
    python run_tsadar.py --cfg <path>/<to>/<inputs>/<folder> --mode forward
 
+The last can be used to perform forward passes and get spectra for a series of plasma conditions. For more information on specifying the inputs see `Configuring the inputs`_
+
+.. code-block:: bash
+
+   python run_tsadar.py --cfg <path>/<to>/<inputs>/<folder> --mode series
+
 
 The inputs for the code are stored in an input deck. The default location for this input deck and therefore
-the starting path for running jobs is :code:`inverse_thomson_scattering/config/1d`. These inputs should be
+the starting path for running jobs is :code:`inverse_thomson_scattering/configs/1d`. These inputs should be
 modified to change the specific to fit your analysis needs. More information on the Input deck can be found 
-on the :ref:`inputs` page.
+on the `Configuring the inputs`_ page.
