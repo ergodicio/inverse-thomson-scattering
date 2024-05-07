@@ -5,7 +5,7 @@ import jax
 from jax import numpy as jnp
 
 
-from jax import jit, value_and_grad
+from jax import jit, value_and_grad, checkpoint
 from jax.flatten_util import ravel_pytree
 import numpy as np
 

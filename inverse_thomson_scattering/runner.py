@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import mlflow, tempfile, yaml
 import multiprocessing as mp
 import xarray as xr
+from tqdm import tqdm
 from flatten_dict import flatten, unflatten
 
 from inverse_thomson_scattering import fitter
@@ -77,7 +78,7 @@ def run(cfg_path: str, mode: str) -> str:
     defaults = flatten(all_configs["defaults"])
     defaults.update(flatten(all_configs["inputs"]))
     config = unflatten(defaults)
-    with mlflow.start_run(run_id=run_id) as mlflow_run:
+    with mlflow.start_run(run_id=run_id, log_system_metrics=True) as mlflow_run:
         _run_(config, mode=mode)
 
     return run_id
@@ -202,7 +203,7 @@ def calc_series(config):
     lamAxisI = [None] * serieslen
 
     t_start = time.time()
-    for i in range(serieslen):
+    for i in tqdm(range(serieslen), total=serieslen):
         if "series" in config.keys():
             config["parameters"][config["series"]["param1"]]["val"] = config["series"]["vals1"][i]
             if "param2" in config["series"].keys():
