@@ -270,6 +270,21 @@ class TSFitter:
         return loss, sqdev, used_points, [ThryE, ThryI, params]
 
     def calc_ei_error(self, batch, ThryI, lamAxisI, ThryE, lamAxisE, denom, reduce_func=jnp.mean):
+        """
+        This function calculates the error in the fit of the IAW and EPW
+
+        Args:
+            batch:
+            ThryI:
+            lamAxisI:
+            ThryE:
+            lamAxisE:
+            denom:
+            reduce_func:
+
+        Returns:
+
+        """
         i_error = 0.0
         e_error = 0.0
         i_data = batch["i_data"]
@@ -426,7 +441,17 @@ class TSFitter:
 
         return i_error + e_error
 
-    def __loss__(self, weights, batch):
+    def __loss__(self, weights, batch: Dict):
+        """
+        This function calculates the value of the loss function
+
+        Args:
+            weights:
+            batch:
+
+        Returns:
+
+        """
         params = self.weights_to_params(weights)
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
         i_error, e_error = self.calc_ei_error(
@@ -447,7 +472,7 @@ class TSFitter:
         total_loss = ion_error + e_error + density_loss + temperature_loss + momentum_loss
         return total_loss, [ThryE, normed_e_data, params]
 
-    def _get_normed_batch_(self, batch):
+    def _get_normed_batch_(self, batch: Dict):
         """
         Normalizes the batch
 
@@ -462,7 +487,17 @@ class TSFitter:
         normed_batch["e_data"] = normed_batch["e_data"] / self.e_input_norm
         return normed_batch
 
-    def loss(self, weights, batch):
+    def loss(self, weights, batch: Dict):
+        """
+        High level function that returns the value of the loss function
+
+        Args:
+            weights:
+            batch: Dict
+
+        Returns:
+
+        """
         if self.cfg["optimizer"]["method"] == "l-bfgs-b":
             pytree_weights = self.unravel_pytree(weights)
             value, _ = self._loss_(pytree_weights, batch)
