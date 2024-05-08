@@ -10,20 +10,12 @@ from tqdm import tqdm
 from flatten_dict import flatten, unflatten
 
 from inverse_thomson_scattering import fitter
-from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_scattering_angles
-
-# from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
-from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
-from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_scattering_angles
-
-# from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.fitter import init_param_norm_and_shift
 from inverse_thomson_scattering.misc import utils
-from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_calibrations
-from inverse_thomson_scattering.plotting import plottersfrom inverse_thomson_scattering.data_handleing.calibrations.calibration import get_calibrations
 from inverse_thomson_scattering.plotting import plotters
+from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_calibrations, get_scattering_angles
 
 if "BASE_TEMPDIR" in os.environ:
     BASE_TEMPDIR = os.environ["BASE_TEMPDIR"]
@@ -115,7 +107,7 @@ def _run_(config: Dict, mode: str = "fit"):
     mlflow.set_tag("status", "completed")
 
 
-def run_job(run_id: str, mode: str, mode: str, nested: bool):
+def run_job(run_id: str, mode: str, nested: bool):
     """
     This is used to run queued runs on NERSC. It picks up the `run_id` and finds that using MLFlow and does the fitting
 
@@ -139,10 +131,8 @@ def run_job(run_id: str, mode: str, mode: str, nested: bool):
             config = unflatten(defaults)
 
         _run_(config, mode)
-        _run_(config, mode)
 
 
-def calc_series(config):
 def calc_series(config):
     """
     Calculates a spectrum or series of spectra from the input deck, i.e. performs a forward pass or series of forward
@@ -235,7 +225,6 @@ def calc_series(config):
             if "param4" in config["series"].keys():
                 config["parameters"][config["series"]["param4"]]["val"] = config["series"]["vals4"][i]
 
-    
     if config["other"]["extraoptions"]["spectype"] == "angular":
         [axisxE, _, _, _, _, _] = get_calibrations(
             104000, config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
@@ -267,8 +256,8 @@ def calc_series(config):
                 config["parameters"][config["series"]["param4"]]["val"] = config["series"]["vals4"][i]
 
         ts_fitter = TSFitter(config, sas, dummy_batch)
-            params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
-            ThryE[i][i], ThryI[i][i], lamAxisE[i][i], lamAxisI[i][i] = ts_fitter.spec_calc(params, dummy_batch)
+        params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
+        ThryE[i][i], ThryI[i][i], lamAxisE[i][i], lamAxisI[i][i] = ts_fitter.spec_calc(params, dummy_batch)
 
     spectime = time.time() - t_start
     ThryE = np.array(ThryE)

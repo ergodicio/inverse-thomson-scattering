@@ -164,14 +164,13 @@ class FormFactor:
 
         # ions
         Z = jnp.reshape(jnp.array(Z), [1, 1, 1, -1])
-        Z = jnp.reshape(jnp.array(Z), [1, 1, 1, -1])
         Mi = jnp.reshape(Mi, [1, 1, 1, -1])
-        fract = jnp.reshape(jnp.array(jnp.array(fract)), [1, 1, 1, -1])
+        fract = jnp.reshape(jnp.array(fract), [1, 1, 1, -1])
         Zbar = jnp.sum(Z * fract)
         ni = fract * ne[..., jnp.newaxis, jnp.newaxis, jnp.newaxis] / Zbar
         omgpi = constants * Z * jnp.sqrt(ni * self.Me / Mi)
 
-        vTi = jnp.sqrt(jnp.array(jnp.array(Ti)) / Mi)  # ion thermal velocity
+        vTi = jnp.sqrt(jnp.array(Ti) / Mi)  # ion thermal velocity
         kldi = (vTi / omgpi) * (k[..., jnp.newaxis])
         # ion susceptibilities
         # finding derivative of plasma dispersion function along xii array
