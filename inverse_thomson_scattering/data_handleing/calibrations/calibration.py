@@ -64,9 +64,9 @@ def get_calibrations(shotNum, tstype, CCDsize):
         if 98610 < shotNum < 98620:
             # These are valid for the 8-26-21 shot day, not sure how far back they are valid
             EPWDisp = 0.4104
-            IAWDisp = -0.00678
+            IAWDisp = 0.00678
             EPWoff = 319.3
-            IAWoff = 539.83  # 522.90
+            IAWoff = 522.894  # 522.90
             stddev["spect_stddev_ion"] = 0.0238  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
             stddev["spect_stddev_ele"] = 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
 

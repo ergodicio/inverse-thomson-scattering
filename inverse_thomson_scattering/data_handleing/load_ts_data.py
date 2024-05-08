@@ -67,6 +67,7 @@ def loadData(sNum, sDay, loadspecs):
             iDat = sds_obj.get()  # get sds data
             iDat = iDat.astype("float64")
             iDat = iDat[0, :, :] - iDat[1, :, :]
+            iDat = np.flipud(iDat)
 
             if specType == "imaging":
                 iDat = np.rot90(np.squeeze(iDat), 3)

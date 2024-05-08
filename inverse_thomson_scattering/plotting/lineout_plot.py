@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 
-def lineout_plot(data, fits, sqdev, yaxis, s_ind, e_ind, titlestr, filename, td, tag):
+def lineout_plot(data, fits, sqdev, yaxis, ylim, s_ind, e_ind, titlestr, filename, td, tag):
     """
     Plots lineout comparing the fits to the data. If the data has both electron and ion data they will both be plotted.
     The value of the fit metric chi^2 per point is plotted beneath the data and fit.
@@ -43,7 +43,7 @@ def lineout_plot(data, fits, sqdev, yaxis, s_ind, e_ind, titlestr, filename, td,
         ax[0][col].set_ylabel("Amp (arb. units)")
         ax[0][col].legend(fontsize=14)
         ax[0][col].grid()
-        # ax[0][col].set_ylim((0,1000))
+        ax[0][col].set_ylim(ylim)
 
         ax[1][col].plot(
             yaxis[col][s_ind[col] : e_ind[col]],

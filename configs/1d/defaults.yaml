@@ -150,7 +150,7 @@ data:
     ion_t0_shift: 0.0
     ele_lam_shift: 0.0
     probe_beam: P9
-    dpixel: 5
+    dpixel: 9
     lineouts:
         type:
             pixel
@@ -164,7 +164,7 @@ data:
 
 plotting:
     n_sigmas: 3
-    rolling_std_width: 20
+    rolling_std_width: 10
     data_cbar_u: 2000
     data_cbar_l: 0
     ion_window_start: 525
