@@ -100,8 +100,9 @@ def _run_(config: Dict, mode: str = "fit"):
         fit_results, loss = fitter.fit(config=config)
     elif mode == "forward" or mode == "series":
         calc_series(config=config)
-    elif mode == "forward" or mode == "series":
-        calc_series(config=config)
+    else:
+        raise NotImplementedError(f"Mode {mode} not implemented")
+
     metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
     mlflow.log_metrics(metrics=metrics_dict)
     mlflow.set_tag("status", "completed")
@@ -185,10 +186,6 @@ def calc_series(config):
     dummy_batch = {
         "i_data": np.array([1]),
         "e_data": np.array([1]),
-        "noise_e": np.array([0]),
-        "noise_i": np.array([0]),
-        "e_amps": np.array([1]),
-        "i_amps": np.array([1]),
         "noise_e": np.array([0]),
         "noise_i": np.array([0]),
         "e_amps": np.array([1]),
