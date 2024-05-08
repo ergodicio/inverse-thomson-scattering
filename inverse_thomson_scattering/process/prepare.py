@@ -47,6 +47,8 @@ def prepare_data(config: Dict) -> Dict:
         elecData = correctThroughput(
             elecData, config["other"]["extraoptions"]["spectype"], axisyE, config["data"]["shotnum"]
         )
+        #temp fix for zeros
+        elecData = elecData+10.0
 
     # load and correct background
     [BGele, BGion] = get_shot_bg(config, axisyE, elecData)

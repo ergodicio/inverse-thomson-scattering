@@ -10,7 +10,7 @@ config.update("jax_enable_x64", True)
 from numpy.testing import assert_allclose
 from scipy.signal import find_peaks
 from inverse_thomson_scattering.model.physics.form_factor import FormFactor
-from inverse_thomson_scattering.distribution_functions import DistFunc
+from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 
 
 def test_iaw():

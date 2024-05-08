@@ -66,7 +66,7 @@ class DistFunc:
 
 
         Args:
-            mval: super-gaussian order to be used in calculation
+            mval: super-gaussian order to be used in calculation must be a float or shape (1,)
 
         Returns:
             v: Velocity grid, for 1D distribution this is a single array, for 2D this is a tuple of arrays
@@ -78,12 +78,17 @@ class DistFunc:
                 v, fe = dist_functional_forms.DLM_1D(mval, self.velocity_res)
             elif self.dim == 2:
                 # v, fe = dist_functional_forms.DLM_2D(mdict["val"], self.velocity_res)
+                # v, fe = dist_functional_forms.BiDLM(
+                #    mval,
+                #    jnp.max(jnp.array([mval * self.m_asym, 2.0])),
+                #    jnp.max(jnp.array([jnp.array(mval * self.m_asym).squeeze(), 2.0])),
+                #    self.temp_asym,
+                #    self.m_theta,
+                #    self.velocity_res,
+                # )
+                # this will cause issues if my is less then 2
                 v, fe = dist_functional_forms.BiDLM(
-                    mval,
-                    jnp.max(jnp.array([jnp.array(mval * self.m_asym).squeeze(), 2.0])),
-                    self.temp_asym,
-                    self.m_theta,
-                    self.velocity_res,
+                    mval, mval * self.m_asym, self.temp_asym, self.m_theta, self.velocity_res
                 )
 
         elif self.fe_name == "Spitzer":

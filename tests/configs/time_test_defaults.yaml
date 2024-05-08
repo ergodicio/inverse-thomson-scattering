@@ -17,6 +17,7 @@ parameters:
             active: False
             lb: 2.0
             ub: 5.0
+            matte: False
         fe:
             val: [ ]
             active: False
@@ -156,7 +157,7 @@ data:
             pixel
         start: 500
         end: 510
-        skip: 1
+        skip: 5
     background:
         type:
             pixel
@@ -182,8 +183,8 @@ optimizer:
     x_norm: False
     grad_method: AD
     batch_size: 2
-    num_epochs: 200
-    learning_rate: 1.0e-4
+    num_epochs: 1000
+    learning_rate: 1.0e-2
     parameter_norm: True
     refine_factor: 0
     num_mins: 1

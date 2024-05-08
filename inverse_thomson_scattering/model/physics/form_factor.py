@@ -4,10 +4,15 @@ from jax import vmap
 import scipy.interpolate as sp
 
 # import scipy.ndimage as snd
+
+# import scipy.ndimage as snd
 import numpy as np
 from interpax import interp2d
 from jax.lax import scan
 from jax import jit, checkpoint
+from interpax import interp2d
+from jax.lax import scan
+from jax import jit
 
 from inverse_thomson_scattering.model.physics import ratintn
 from inverse_thomson_scattering.data_handleing import lam_parse
@@ -60,6 +65,20 @@ class FormFactor:
             Instance of the FormFactor object
 
         """
+        """
+        Creates a FormFactor object holding all the static values to use for repeated calculations of the Thomson
+        scattering structure factor or spectral density function.
+
+        Args:
+            lamrang: list of the starting and ending wavelengths over which to calculate the spectrum.
+            npts: number of wavelength points to use in the calculation
+            fe_dim: dimension of the electron velocity distribution function (EDF), should be 1 or 2
+            vax: (optional) velocity axis coordinates that the 2D EDF is defined on
+
+        Returns:
+            Instance of the FormFactor object
+
+        """
         # basic quantities
         self.C = 2.99792458e10
         self.Me = 510.9896 / self.C**2  # electron mass keV/C^2
@@ -68,7 +87,7 @@ class FormFactor:
         self.npts = npts
         self.h = 0.01
         minmax = 8.2
-        h1 = 1024  # 1024
+        h1 = 1024  # 1024  # 1024
         self.xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
         self.xi2 = jnp.array(jnp.arange(-minmax, minmax, self.h))
         self.Zpi = jnp.array(zprimeMaxw(self.xi2))
@@ -145,13 +164,14 @@ class FormFactor:
 
         # ions
         Z = jnp.reshape(jnp.array(Z), [1, 1, 1, -1])
+        Z = jnp.reshape(jnp.array(Z), [1, 1, 1, -1])
         Mi = jnp.reshape(Mi, [1, 1, 1, -1])
-        fract = jnp.reshape(jnp.array(fract), [1, 1, 1, -1])
+        fract = jnp.reshape(jnp.array(jnp.array(fract)), [1, 1, 1, -1])
         Zbar = jnp.sum(Z * fract)
         ni = fract * ne[..., jnp.newaxis, jnp.newaxis, jnp.newaxis] / Zbar
         omgpi = constants * Z * jnp.sqrt(ni * self.Me / Mi)
 
-        vTi = jnp.sqrt(jnp.array(Ti) / Mi)  # ion thermal velocity
+        vTi = jnp.sqrt(jnp.array(jnp.array(Ti)) / Mi)  # ion thermal velocity
         kldi = (vTi / omgpi) * (k[..., jnp.newaxis])
         # ion susceptibilities
         # finding derivative of plasma dispersion function along xii array
@@ -160,6 +180,8 @@ class FormFactor:
         num_species = len(fract)
         num_ion_pts = jnp.shape(xii)
         chiI = jnp.zeros(num_ion_pts)
+        ZpiR = jnp.interp(xii, self.xi2, self.Zpi[0, :], left=xii**-2, right=xii**-2)
+        ZpiI = jnp.interp(xii, self.xi2, self.Zpi[1, :], left=0, right=0)
         ZpiR = jnp.interp(xii, self.xi2, self.Zpi[0, :], left=xii**-2, right=xii**-2)
         ZpiI = jnp.interp(xii, self.xi2, self.Zpi[1, :], left=0, right=0)
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
@@ -176,6 +198,7 @@ class FormFactor:
 
         chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
+        ratmod = jnp.exp(jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF))))
         ratmod = jnp.exp(jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF))))
         ratdf = jnp.gradient(ratmod, self.xi1[1] - self.xi1[0])
 
