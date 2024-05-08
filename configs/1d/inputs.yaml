@@ -108,7 +108,7 @@ parameters:
             ub: 50.5
 
 data:
-    shotnum: 98612
+    shotnum: 101675
     lineouts:
         type:
             ps
