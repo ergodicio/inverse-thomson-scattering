@@ -306,19 +306,14 @@ class FormFactor:
             chiERrat: real part of the electron susceptibility
 
         """
-        # fn = vmap(self.calc_chi_vals, in_axes=(None, 0, None, 0, 0), out_axes=0)
-        # fn = vmap(fn, in_axes=(None, 1, None, 1, 1), out_axes=1)
-        # fn = vmap(fn, in_axes=(None, 2, None, 2, 2), out_axes=2)
 
-        # all_vals = fn(x, beta, DF, xie_mag, klde_mag)
         _, (fe_vphi, chiEI, chiERrat) = scan(
-            checkpoint(self.calc_chi_vals), (x, DF), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=32
+            self.calc_chi_vals, (x, DF), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=8
         )
+
         # fe_vphi, chiEI, chiERrat = self._calc_all_chi_vals_(
         #     (x, DF), beta.flatten(), xie_mag.flatten(), klde_mag.flatten()
         # )
-        # for arr in (fe_vphi, chiEI, chiERrat):
-        # arr = arr.reshape(beta.shape)
 
         return fe_vphi.reshape(beta.shape), chiEI.reshape(beta.shape), chiERrat.reshape(beta.shape)
 
