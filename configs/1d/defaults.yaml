@@ -130,11 +130,11 @@ data:
     shotDay: False
     launch_data_visualizer: True
     fit_rng:
-        blue_min: 475
+        blue_min: 430
         blue_max: 510
         red_min: 545
-        red_max: 580
-        iaw_min: 525.3
+        red_max: 660
+        iaw_min: 525.5
         iaw_max: 527.5
         iaw_cf_min: 526.49
         iaw_cf_max: 526.51
@@ -145,12 +145,12 @@ data:
     bgscaleE: 1.0
     bgscaleI: 0.1
     bgshotmult: 1
-    ion_loss_scale: 0.1
-    ele_t0: 100
-    ion_t0_shift: 0.0
+    ion_loss_scale: 2.0
+    ele_t0: 1700
+    ion_t0_shift: 700.0
     ele_lam_shift: 0.0
     probe_beam: P9
-    dpixel: 5
+    dpixel: 3
     lineouts:
         type:
             pixel
@@ -164,8 +164,8 @@ data:
 
 plotting:
     n_sigmas: 3
-    rolling_std_width: 20
-    data_cbar_u: 2000
+    rolling_std_width: 5
+    data_cbar_u: data
     data_cbar_l: 0
     ion_window_start: 525
     ion_window_end: 528
@@ -181,7 +181,7 @@ optimizer:
     y_norm: True
     x_norm: False
     grad_method: AD
-    batch_size: 4
+    batch_size: 6
     num_epochs: 500
     learning_rate: 1.0e-4
     parameter_norm: True
