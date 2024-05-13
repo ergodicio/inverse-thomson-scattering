@@ -3,16 +3,10 @@ from jax import vmap
 
 import scipy.interpolate as sp
 
-# import scipy.ndimage as snd
-
-# import scipy.ndimage as snd
 import numpy as np
 from interpax import interp2d
 from jax.lax import scan
-from jax import jit, checkpoint
-from interpax import interp2d
-from jax.lax import scan
-from jax import jit
+from jax import checkpoint
 
 from inverse_thomson_scattering.model.physics import ratintn
 from inverse_thomson_scattering.data_handleing import lam_parse
@@ -181,8 +175,6 @@ class FormFactor:
         chiI = jnp.zeros(num_ion_pts)
         ZpiR = jnp.interp(xii, self.xi2, self.Zpi[0, :], left=xii**-2, right=xii**-2)
         ZpiI = jnp.interp(xii, self.xi2, self.Zpi[1, :], left=0, right=0)
-        ZpiR = jnp.interp(xii, self.xi2, self.Zpi[0, :], left=xii**-2, right=xii**-2)
-        ZpiI = jnp.interp(xii, self.xi2, self.Zpi[1, :], left=0, right=0)
         chiI = jnp.sum(-0.5 / (kldi**2) * (ZpiR + jnp.sqrt(-1 + 0j) * ZpiI), 3)
 
         # electron susceptibility
@@ -197,7 +189,6 @@ class FormFactor:
 
         chiEI = jnp.pi / (klde**2) * jnp.sqrt(-1 + 0j) * df
 
-        ratmod = jnp.exp(jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF))))
         ratmod = jnp.exp(jnp.interp(self.xi1, x, jnp.log(jnp.squeeze(DF))))
         ratdf = jnp.gradient(ratmod, self.xi1[1] - self.xi1[0])
 
@@ -445,50 +436,7 @@ class FormFactor:
         # find the rotation angle beta, the heaviside changes the angles to [0, 2pi)
         beta = jnp.arctan(xie[1] / xie[0]) + jnp.pi * (-jnp.heaviside(xie[0], 1) + 1)
 
-        # preallocate chiEI and chiER and fe
-        # chiEI = jnp.zeros_like(beta)
-        # chiERrat = jnp.zeros_like(beta)
-        # fe_vphi = jnp.zeros_like(beta)
-        # x1D = x[0, :]
-
-        # fe_2D_k = snd.rotate(DF, 45, reshape=False)
-        #
-        # fe_2D_k_v2 = rotate(DF, jnp.pi / 4.0)
-        #
-        # from matplotlib import pyplot as plt
-        #
-        # fig, ax = plt.subplots(1, 3, figsize=(18, 6), tight_layout=True, sharex=False)
-        # ax[0].contour(DF)
-        # ax[1].contour(fe_2D_k)
-        # ax[2].contour(fe_2D_k_v2)
-        # plt.show()
-
-        # def this_ratintn(this_beta, this_xie_mag, this_klde_mag):
-        #     return self.calc_chi_vals(
-        #         x1D,
-        #         this_beta,
-        #         DF,
-        #         this_xie_mag,
-        #         this_klde_mag,
-        #     )
-        #
-        # #
-        # # print(len(beta.flatten()))
         fe_vphi, chiEI, chiERrat = self.calc_all_chi_vals(x[0, :], beta, DF, xie_mag, klde_mag)
-
-        # for each rotation or element of vector in xie
-        # for ind, element in enumerate(beta.flatten()):
-        #     v1, v2, v3 = self.calc_chi_vals(
-        #         x[0, :],
-        #         element,
-        #         DF,
-        #         xie_mag[jnp.unravel_index(ind, beta.shape)],
-        #         klde_mag[jnp.unravel_index(ind, beta.shape)],
-        #     )
-
-        #     fe_vphi = fe_vphi.at[jnp.unravel_index(ind, beta.shape)].set(v1)
-        #     chiEI = chiEI.at[jnp.unravel_index(ind, beta.shape)].set(v2)
-        #     chiERrat = chiERrat.at[jnp.unravel_index(ind, beta.shape)].set(v3)
 
         chiE = chiERrat + jnp.sqrt(-1 + 0j) * chiEI
         epsilon = 1.0 + chiE + chiI
