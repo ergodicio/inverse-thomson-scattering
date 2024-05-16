@@ -6,18 +6,16 @@ import matplotlib.pyplot as plt
 import mlflow, tempfile, yaml
 import multiprocessing as mp
 import xarray as xr
+from tqdm import tqdm
 from flatten_dict import flatten, unflatten
 
 from inverse_thomson_scattering import fitter
-from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_scattering_angles
-
-# from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.fitter import init_param_norm_and_shift
 from inverse_thomson_scattering.misc import utils
-from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_calibrations
 from inverse_thomson_scattering.plotting import plotters
+from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_calibrations, get_scattering_angles
 
 if "BASE_TEMPDIR" in os.environ:
     BASE_TEMPDIR = os.environ["BASE_TEMPDIR"]
@@ -77,7 +75,7 @@ def run(cfg_path: str, mode: str) -> str:
     defaults = flatten(all_configs["defaults"])
     defaults.update(flatten(all_configs["inputs"]))
     config = unflatten(defaults)
-    with mlflow.start_run(run_id=run_id) as mlflow_run:
+    with mlflow.start_run(run_id=run_id, log_system_metrics=True) as mlflow_run:
         _run_(config, mode=mode)
 
     return run_id
@@ -102,6 +100,9 @@ def _run_(config: Dict, mode: str = "fit"):
         fit_results, loss = fitter.fit(config=config)
     elif mode == "forward" or mode == "series":
         calc_series(config=config)
+    else:
+        raise NotImplementedError(f"Mode {mode} not implemented")
+
     metrics_dict = {"total_time": time.time() - t0, "num_cores": int(mp.cpu_count())}
     mlflow.log_metrics(metrics=metrics_dict)
     mlflow.set_tag("status", "completed")
@@ -170,6 +171,15 @@ def calc_series(config):
             )
             config["parameters"][species]["fe"]["val"] = np.log(config["parameters"][species]["fe"]["val"])[None, :]
 
+    for species in config["parameters"].keys():
+        if "electron" in config["parameters"][species]["type"].keys():
+            elec_species = species
+            dist_obj = DistFunc(config["parameters"][species])
+            config["parameters"][species]["fe"]["velocity"], config["parameters"][species]["fe"]["val"] = dist_obj(
+                config["parameters"][species]["m"]["val"]
+            )
+            config["parameters"][species]["fe"]["val"] = np.log(config["parameters"][species]["fe"]["val"])[None, :]
+
     config["units"] = init_param_norm_and_shift(config)
 
     sas = get_scattering_angles(config)
@@ -181,6 +191,36 @@ def calc_series(config):
         "e_amps": np.array([1]),
         "i_amps": np.array([1]),
     }
+
+    if config["other"]["extraoptions"]["spectype"] == "angular":
+        [axisxE, _, _, _, _, _] = get_calibrations(
+            104000, config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
+        )  # shot number hardcoded to get calibration
+        config["other"]["extraoptions"]["spectype"] = "angular_full"
+
+        sas["angAxis"] = axisxE
+        dummy_batch["i_data"] = np.ones((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1]))
+        dummy_batch["e_data"] = np.ones((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1]))
+
+    if "series" in config.keys():
+        serieslen = len(config["series"]["vals1"])
+    else:
+        serieslen = 1
+    ThryE = [None] * serieslen
+    ThryI = [None] * serieslen
+    lamAxisE = [None] * serieslen
+    lamAxisI = [None] * serieslen
+
+    t_start = time.time()
+    for i in tqdm(range(serieslen), total=serieslen):
+        if "series" in config.keys():
+            config["parameters"][config["series"]["param1"]]["val"] = config["series"]["vals1"][i]
+            if "param2" in config["series"].keys():
+                config["parameters"][config["series"]["param2"]]["val"] = config["series"]["vals2"][i]
+            if "param3" in config["series"].keys():
+                config["parameters"][config["series"]["param3"]]["val"] = config["series"]["vals3"][i]
+            if "param4" in config["series"].keys():
+                config["parameters"][config["series"]["param4"]]["val"] = config["series"]["vals4"][i]
 
     if config["other"]["extraoptions"]["spectype"] == "angular":
         [axisxE, _, _, _, _, _] = get_calibrations(
@@ -214,7 +254,46 @@ def calc_series(config):
 
         ts_fitter = TSFitter(config, sas, dummy_batch)
         params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
-        ThryE[i], ThryI[i], lamAxisE[i], lamAxisI[i] = ts_fitter.spec_calc(params, dummy_batch)
+        ThryE[i][i], ThryI[i][i], lamAxisE[i][i], lamAxisI[i][i] = ts_fitter.spec_calc(params, dummy_batch)
+
+    spectime = time.time() - t_start
+    ThryE = np.array(ThryE)
+    ThryI = np.array(ThryI)
+    lamAxisE = np.array(lamAxisE)
+    lamAxisI = np.array(lamAxisI)
+
+    with tempfile.TemporaryDirectory() as td:
+        os.makedirs(os.path.join(td, "plots"), exist_ok=True)
+        os.makedirs(os.path.join(td, "binary"), exist_ok=True)
+        os.makedirs(os.path.join(td, "csv"), exist_ok=True)
+        if config["other"]["extraoptions"]["spectype"] == "angular_full":
+            savedata = plotters.plot_data_angular(
+                config,
+                {"ele": np.squeeze(ThryE)},
+                {"e_data": np.zeros((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1]))},
+                {"epw_x": sas["angAxis"], "epw_y": lamAxisE},
+                td,
+            )
+            plotters.plot_dist(
+                config,
+                {
+                    "fe": config["parameters"][elec_species]["fe"]["val"],
+                    "v": config["parameters"][elec_species]["fe"]["velocity"],
+                },
+                np.zeros_like(config["parameters"][elec_species]["fe"]["val"]),
+                td,
+            )
+        else:
+            if config["parameters"][elec_species]["fe"]["dim"] == 2:
+                plotters.plot_dist(
+                    config,
+                    {
+                        "fe": config["parameters"][elec_species]["fe"]["val"],
+                        "v": config["parameters"][elec_species]["fe"]["velocity"],
+                    },
+                    np.zeros_like(config["parameters"][elec_species]["fe"]["val"]),
+                    td,
+                )
 
     spectime = time.time() - t_start
     ThryE = np.array(ThryE)

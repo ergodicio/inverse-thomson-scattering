@@ -3,11 +3,10 @@ from jax import vmap
 
 import scipy.interpolate as sp
 
-# import scipy.ndimage as snd
 import numpy as np
 from interpax import interp2d
 from jax.lax import scan
-from jax import jit
+from jax import checkpoint
 
 from inverse_thomson_scattering.model.physics import ratintn
 from inverse_thomson_scattering.data_handleing import lam_parse
@@ -60,6 +59,20 @@ class FormFactor:
             Instance of the FormFactor object
 
         """
+        """
+        Creates a FormFactor object holding all the static values to use for repeated calculations of the Thomson
+        scattering structure factor or spectral density function.
+
+        Args:
+            lamrang: list of the starting and ending wavelengths over which to calculate the spectrum.
+            npts: number of wavelength points to use in the calculation
+            fe_dim: dimension of the electron velocity distribution function (EDF), should be 1 or 2
+            vax: (optional) velocity axis coordinates that the 2D EDF is defined on
+
+        Returns:
+            Instance of the FormFactor object
+
+        """
         # basic quantities
         self.C = 2.99792458e10
         self.Me = 510.9896 / self.C**2  # electron mass keV/C^2
@@ -68,14 +81,16 @@ class FormFactor:
         self.npts = npts
         self.h = 0.01
         minmax = 8.2
-        h1 = 1024  # 1024
+        h1 = 1024  # 1024  # 1024
         self.xi1 = jnp.linspace(-minmax - jnp.sqrt(2.0) / h1, minmax + jnp.sqrt(2.0) / h1, h1)
         self.xi2 = jnp.array(jnp.arange(-minmax, minmax, self.h))
         self.Zpi = jnp.array(zprimeMaxw(self.xi2))
 
         if (vax is not None) and (fe_dim == 2):
-            self.coords = jnp.concatenate([vax[0][..., None], vax[1][..., None]], axis=-1)
+            self.coords = jnp.concatenate([np.copy(vax[0][..., None]), np.copy(vax[1][..., None])], axis=-1)
             self.v = vax[0][0]
+
+        self._calc_all_chi_vals_ = vmap(checkpoint(self.calc_chi_vals), in_axes=(None, 0, 0, 0), out_axes=0)
 
     def __call__(self, params, cur_ne, cur_Te, A, Z, Ti, fract, sa, f_and_v, lam):
         """
@@ -236,11 +251,12 @@ class FormFactor:
         )
         xq = rotated_mesh[..., 0].flatten()
         yq = rotated_mesh[..., 1].flatten()
-        return interp2d(xq, yq, self.v, self.v, df, extrap=True, method="cubic").reshape(
+        return interp2d(xq, yq, self.v, self.v, df, extrap=True, method="linear").reshape(
             (self.v.size, self.v.size), order="F"
         )
 
     def calc_chi_vals(self, carry, xs):
+        # def calc_chi_vals(self, x_DF, element, xie_mag_at, klde_mag_at):
         """
         Calculate the values of the susceptibility at a given point in the distribution function
 
@@ -261,8 +277,9 @@ class FormFactor:
         """
         x, DF = carry
         element, xie_mag_at, klde_mag_at = xs
+        # x, DF = x_DF
 
-        fe_2D_k = self.rotate(DF, element * 180 / jnp.pi, reshape=False)
+        fe_2D_k = checkpoint(self.rotate)(DF, element * 180 / jnp.pi, reshape=False)
         fe_1D_k = jnp.sum(fe_2D_k, axis=0) * (x[1] - x[0])
 
         # find the location of xie in axis array
@@ -282,6 +299,7 @@ class FormFactor:
         chiERrat = (
             -1.0 / (klde_mag_at**2) * jnp.real(ratintn.ratintn(df, x - xie_mag_at, x))
         )  # this may need to be downsampled for run time
+        # return fe_vphi, chiEI, chiERrat
         return (x, DF), (fe_vphi, chiEI, chiERrat)
 
     def calc_all_chi_vals(self, x, beta, DF, xie_mag, klde_mag):
@@ -301,16 +319,14 @@ class FormFactor:
             chiERrat: real part of the electron susceptibility
 
         """
-        # fn = vmap(self.calc_chi_vals, in_axes=(None, 0, None, 0, 0), out_axes=0)
-        # fn = vmap(fn, in_axes=(None, 1, None, 1, 1), out_axes=1)
-        # fn = vmap(fn, in_axes=(None, 2, None, 2, 2), out_axes=2)
 
-        # all_vals = fn(x, beta, DF, xie_mag, klde_mag)
         _, (fe_vphi, chiEI, chiERrat) = scan(
-            self.calc_chi_vals, (x, DF), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=32
+            self.calc_chi_vals, (x, DF), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=8
         )
-        # for arr in (fe_vphi, chiEI, chiERrat):
-        # arr = arr.reshape(beta.shape)
+
+        # fe_vphi, chiEI, chiERrat = self._calc_all_chi_vals_(
+        #     (x, DF), beta.flatten(), xie_mag.flatten(), klde_mag.flatten()
+        # )
 
         return fe_vphi.reshape(beta.shape), chiEI.reshape(beta.shape), chiERrat.reshape(beta.shape)
 
@@ -420,7 +436,7 @@ class FormFactor:
         # find the rotation angle beta, the heaviside changes the angles to [0, 2pi)
         beta = jnp.arctan(xie[1] / xie[0]) + jnp.pi * (-jnp.heaviside(xie[0], 1) + 1)
 
-        fe_vphi, chiEI, chiERrat = jit(self.calc_all_chi_vals)(x[0, :], beta, DF, xie_mag, klde_mag)
+        fe_vphi, chiEI, chiERrat = self.calc_all_chi_vals(x[0, :], beta, DF, xie_mag, klde_mag)
 
         chiE = chiERrat + jnp.sqrt(-1 + 0j) * chiEI
         epsilon = 1.0 + chiE + chiI
@@ -437,10 +453,20 @@ class FormFactor:
 
         SKW_ion_omg = jnp.sum(SKW_ion_omg, 3)
         SKW_ele_omg = 1.0 / k_mag * (ele_comp) / ((jnp.abs(epsilon)) ** 2)
+        # SKW_ele_omgE = 2 * jnp.pi * 1.0 / klde * (ele_compE) / ((jnp.abs(1 + (chiE))) ** 2) * vTe / omgpe # commented because unused
 
         PsOmg = (SKW_ion_omg + SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * ne[:, None, None]
+        # PsOmgE = (SKW_ele_omg) * (1 + 2 * omgdop / omgL) * re**2.0 * jnp.transpose(ne) # commented because unused
         lams = 2 * jnp.pi * self.C / omgs
         PsLam = PsOmg * 2 * jnp.pi * self.C / lams**2
+        # PsLamE = PsOmgE * 2 * jnp.pi * C / lams**2 # commented because unused
         formfactor = PsLam
+        # formfactorE = PsLamE # commented because unused
+        #
+        # from matplotlib import pyplot as plt
+        #
+        # fig, ax = plt.subplots(1, 2, figsize=(12, 6), tight_layout=True, sharex=False)
+        # ax[0].plot(fe_vphi[1, :, 0])
+        # plt.show()
 
         return formfactor, lams

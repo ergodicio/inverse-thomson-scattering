@@ -1,9 +1,11 @@
 import argparse, os
 
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+# os.environ["JAX_TRACEBACK_FILTERING"] = "off"
 from jax import config
 
 config.update("jax_enable_x64", True)
-config.update("jax_disable_jit", True)
+# config.update("jax_disable_jit", True)
 
 from inverse_thomson_scattering.runner import run, run_job
 from inverse_thomson_scattering.misc.utils import export_run
@@ -18,6 +20,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.run_id is not None:
+        run_job(args.run_id, args.mode, nested=None)
         run_job(args.run_id, args.mode, nested=None)
         run_id = args.run_id
     else:
