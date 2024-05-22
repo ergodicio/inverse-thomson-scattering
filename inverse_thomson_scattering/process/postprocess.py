@@ -103,7 +103,11 @@ def recalculate_with_chosen_weights(
             # these_params = ts_fitter.weights_to_params(fitted_weights[i_batch], return_static_params=False)
 
             if calc_sigma:
-                hess = ts_fitter.h_loss_wrt_params(fitted_weights[i_batch], batch)
+                try:
+                    hess = ts_fitter.h_loss_wrt_params(fitted_weights[i_batch], batch)
+                except:
+                    print("Error calculating Hessian, no hessian based uncertainties have been calculated")
+                    calc_sigma = False
 
             losses[inds] = loss
             sqdevs["ele"][inds] = sqds["ele"]
@@ -120,7 +124,7 @@ def recalculate_with_chosen_weights(
                     if np.size(np.shape(params[species][k])) == 3:
                         all_params[species][k][inds] = np.squeeze(params[species][k][inds])
                     else:
-                        all_params[species][k][inds] = params[species][k][inds]
+                        all_params[species][k][inds] = params[species][k]
 
     return losses, sqdevs, used_points, fits, sigmas, all_params
 
