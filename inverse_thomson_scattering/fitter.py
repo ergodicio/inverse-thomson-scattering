@@ -9,7 +9,6 @@ import jaxopt, mlflow, optax
 from tqdm import trange
 from jax.flatten_util import ravel_pytree
 
-# from inverse_thomson_scattering.misc.num_dist_func import get_num_dist_func
 from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 from inverse_thomson_scattering.process import prepare, postprocess

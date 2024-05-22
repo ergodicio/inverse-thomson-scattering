@@ -1,6 +1,8 @@
 from typing import Dict
 
 from inverse_thomson_scattering.model.physics.form_factor import FormFactor
+
+# from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 
 from jax import numpy as jnp
@@ -10,6 +12,11 @@ class FitModel:
     """
     The FitModel Class wraps the FormFactor class adding finite aperture effects and finite volume effects. This class
     also handles the options for calculating the form factor.
+
+    Args:
+        config: Dict- configuration dictionary built from input deck
+        sa: Dict- has fields containing the scattering angles the spectrum will be calculated at and the relative
+        weights of each of the scattering angles in the final spectrum
     """
 
     def __init__(self, config: Dict, sa):
@@ -73,6 +80,25 @@ class FitModel:
             all_params: The input all_params is returned
 
         """
+
+        # not sure why this is required
+        # for key in self.config["parameters"].keys():
+        #     if key != "fe":
+        #         all_params[key] = jnp.squeeze(all_params[key])
+
+        if self.config["parameters"][self.e_species]["m"]["active"]:
+            (
+                self.config["parameters"][self.e_species]["fe"]["velocity"],
+                all_params[self.e_species]["fe"],
+            ) = self.num_dist_func(all_params[self.e_species]["m"])
+            # self.config["velocity"], all_params["fe"] = self.num_dist_func(self.config["parameters"]["m"]["val"])
+            all_params[self.e_species]["fe"] = jnp.log(all_params[self.e_species]["fe"])
+            # all_params["fe"] = jnp.log(self.num_dist_func(self.config["parameters"]["m"]))
+            if (
+                self.config["parameters"][self.e_species]["m"]["active"]
+                and self.config["parameters"][self.e_species]["fe"]["active"]
+            ):
+                raise ValueError("m and fe cannot be actively fit at the same time")
 
         # Add gradients to electron temperature and density just being applied to EPW
         cur_Te = jnp.zeros((self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"], self.num_electrons))
@@ -161,7 +187,26 @@ class FitModel:
                     all_params,
                     self.config["parameters"]["general"]["ud"]["angle"],
                     self.config["parameters"]["general"]["ud"]["angle"],
-                    cur_ne * jnp.array([1e20]),
+                    cur_ne,
+                    cur_Te,
+                    A,
+                    Z,
+                    Ti,
+                    fract,
+                    self.sa["sa"],
+                    (fecur, vcur),
+                    lam,
+                )
+            if self.num_dist_func.dim == 1:
+                ThryI, lamAxisI = self.ion_form_factor(
+                    all_params, cur_ne, cur_Te, A, Z, Ti, fract, self.sa["sa"], (fecur, vcur), lam
+                )
+            else:
+                ThryI, lamAxisI = self.ion_form_factor.calc_in_2D(
+                    all_params,
+                    self.config["parameters"]["general"]["ud"]["angle"],
+                    self.config["parameters"]["general"]["ud"]["angle"],
+                    cur_ne,
                     cur_Te,
                     A,
                     Z,
@@ -211,6 +256,34 @@ class FitModel:
                     (fecur, vcur),
                     lam + self.config["data"]["ele_lam_shift"],
                 )
+            if self.num_dist_func.dim == 1:
+                ThryE, lamAxisE = self.electron_form_factor(
+                    all_params,
+                    cur_ne,
+                    cur_Te,
+                    A,
+                    Z,
+                    Ti,
+                    fract,
+                    self.sa["sa"],
+                    (fecur, vcur),
+                    lam + self.config["data"]["ele_lam_shift"],
+                )
+            else:
+                ThryE, lamAxisE = self.electron_form_factor.calc_in_2D(
+                    all_params,
+                    self.config["parameters"]["general"]["ud"]["angle"],
+                    self.config["parameters"]["general"]["ud"]["angle"],
+                    cur_ne,
+                    cur_Te,
+                    A,
+                    Z,
+                    Ti,
+                    fract,
+                    self.sa["sa"],
+                    (fecur, vcur),
+                    lam + self.config["data"]["ele_lam_shift"],
+                )
 
             # remove extra dimensions and rescale to nm
             lamAxisE = jnp.squeeze(lamAxisE) * 1e7  # TODO hardcoded
@@ -227,9 +300,12 @@ class FitModel:
             ):
                 # set the ion feature to 0 #should be switched to a range about lam
                 lamlocb = jnp.argmin(jnp.abs(lamAxisE - lam - 3.0))
-                lamlocr = jnp.argmin(jnp.abs(lamAxisE - lam + 3.0))
+                lamlocrb = jnp.argmin(jnp.abs(lamAxisE - lam - 3.0))
+                lamlocr = jnp.argmin(jnp.abs(lamAxisE - lam + 3.0 + 3.0))
                 modlE = jnp.concatenate(
-                    [modlE[:lamlocb], jnp.zeros(lamlocr - lamlocb), modlE[lamlocr:]]
+                    [modlE[:lamlocb], jnp.zeros(lamlocr - lamlocb), modlE[lamlocr:]][
+                        modlE[:lamlocb], jnp.zeros(lamlocr - lamlocb), modlE[lamlocr:]
+                    ]
                 )  # TODO hardcoded
 
             if self.config["other"]["iawfilter"][0]:
