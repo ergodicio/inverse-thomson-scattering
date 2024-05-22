@@ -202,3 +202,5 @@ dist_fit:
 mlflow:
     experiment: inverse-thomson-scattering
     run: base
+
+machine: gpu

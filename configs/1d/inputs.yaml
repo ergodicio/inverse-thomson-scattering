@@ -142,5 +142,3 @@ other:
 mlflow:
     experiment: inverse-thomson-scattering
     run: test
-
-machine: gpu
