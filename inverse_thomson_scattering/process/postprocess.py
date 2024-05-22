@@ -298,6 +298,8 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
                 config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], fitted_weights
             )
+            if "losses_init" not in locals():
+                losses_init = losses
             mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
             mlflow.set_tag("status", "plotting")
             t1 = time.time()
