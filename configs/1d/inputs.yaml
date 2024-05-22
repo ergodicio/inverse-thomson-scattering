@@ -4,22 +4,22 @@ parameters:
             electron:
             active: False
         Te:
-            val: .2
+            val: .5
             active: True
             lb: 0.01
-            ub: 1.5
+            ub: 2.0
         ne:
-            val: 0.08
+            val: .4
             active: True
             lb: 0.03
-            ub: 1.0
+            ub: 2.0
         m:
-            val: 2.0
-            active: False
+            val: 2.5
+            active: True
             lb: 2.0
-            ub: 5.0
-            matte: True
-            intens: 10.0
+            ub: 4.8
+            matte: False
+            intens: 2.0
         fe:
             val: [ ]
             active: False
@@ -41,21 +41,43 @@ parameters:
             ion:
             active: False
         Ti:
-            val: 2.0
+            val: 0.08
             active: True
             same: False
             lb: 0.01
-            ub: 3.0
+            ub: 1.0
         Z:
-            val: 20.0
+            val: 10.0
             active: True
-            lb: 0.5
-            ub: 29.0
+            lb: 1.0
+            ub: 18.0
         A:
-            val: 63.5
+            val: 40.0
             active: False
         fract:
+            val: 0.1
+            active: False
+
+    species3:
+        type:
+            ion:
+            active: False
+        Ti:
+            val: 0.06
+            active: False
+            same: True
+            lb: 0.01
+            ub: 1.0
+        Z:
             val: 1.0
+            active: False
+            lb: 0.5
+            ub: 1.0
+        A:
+            val: 1.0
+            active: False
+        fract:
+            val: 0.9
             active: False
 
     general:
@@ -97,28 +119,29 @@ parameters:
         ud:
             val: 0.0
             angle: 0.0
-            active: False
+            active: True
             lb: -10.0
             ub: 10.0
         Va:
-            val: 40.0
+            val: -10.0
             angle: 0.0
             active: True
-            lb: -30.5
-            ub: 50.5
+            lb: -20.5
+            ub: 20.5
 
 data:
-    shotnum: 101675
+    shotnum: 111416
     lineouts:
         type:
             ps
-        start: 800
-        end: 3500
-        skip: 10
+        start: 0
+        end: 2200
+        skip: 2
     background:
         type:
             pixel
         slice: 900
+        show: False
 
 other:
     extraoptions:
@@ -134,13 +157,13 @@ other:
             spect_stddev_ele: 0.1
             spect_FWHM_ele: 0.9
             ang_FWHM_ele: 1.0
-    refit: False
-    refit_thresh: 5.0
+    refit: True
+    refit_thresh: 20.0
     calc_sigmas: False
 
 
 mlflow:
-    experiment: inverse-thomson-scattering
-    run: shot98612_comb_16_fine
+    experiment: shot_day_3_27_24
+    run: shot111416_full_fine_5
 
 machine: gpu

@@ -103,6 +103,7 @@ def recalculate_with_chosen_weights(
             # these_params = ts_fitter.weights_to_params(fitted_weights[i_batch], return_static_params=False)
 
             if calc_sigma:
+                hess = ts_fitter.h_loss_wrt_params(fitted_weights[i_batch], batch)
                 try:
                     hess = ts_fitter.h_loss_wrt_params(fitted_weights[i_batch], batch)
                 except:
@@ -224,7 +225,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             }
 
             # previous_weights = {}
-            temp_cfg = copy.deepcopy(config)
+            temp_cfg = copy.copy(config)
             temp_cfg["optimizer"]["batch_size"] = 1
             for species in fitted_weights[(i - 1) // true_batch_size].keys():
                 for key in fitted_weights[(i - 1) // true_batch_size][species].keys():
@@ -263,7 +264,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             #     new_vals = new_vals.at[tuple([i % true_batch_size, 0])].set(cur_value)
             #     fitted_weights[i // true_batch_size][key] = new_vals
 
-        # config["optimizer"]["batch_size"] = true_batch_size
+        config["optimizer"]["batch_size"] = true_batch_size
 
     mlflow.log_metrics({"refitting time": round(time.time() - t1, 2)})
 
@@ -302,7 +303,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             t1 = time.time()
 
             final_params = plotters.get_final_params(config, all_params, all_axes, td)
-            red_losses = plotters.plot_loss_hist(config, losses, all_params, used_points, td)
+            red_losses = plotters.plot_loss_hist(config, losses_init, losses, all_params, used_points, td)
             savedata = plotters.plot_ts_data(config, fits, all_data, all_axes, td)
             plotters.model_v_actual(config, all_data, all_axes, fits, losses, red_losses, sqdevs, td)
             sigma_ds = plotters.save_sigmas_params(config, all_params, sigmas, all_axes, td)
