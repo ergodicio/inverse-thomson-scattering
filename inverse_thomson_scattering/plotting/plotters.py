@@ -104,7 +104,7 @@ def plot_final_params(config, all_params, sigmas_ds, td):
     return
 
 
-def plot_loss_hist(config, losses, all_params, used_points, td):
+def plot_loss_hist(config, losses_init, losses, all_params, used_points, td):
     """
     Plots histograms of the raw loss and reduced loss. Each histogram contains 2 data sets, blue for before refitting
     and orange for after refitting. The losses and reduced losses are saved to file as well. Note: A fit metric of
@@ -128,15 +128,14 @@ def plot_loss_hist(config, losses, all_params, used_points, td):
     """
     losses[losses > 1e10] = 1e10
     red_losses = losses / (1.1 * (used_points - len(all_params)))
+    red_losses_init = losses_init / (1.1 * (used_points - len(all_params)))
     mlflow.log_metrics(
         {"number of fits above threshold after refit": int(np.sum(red_losses > config["other"]["refit_thresh"]))}
     )
 
     # make histogram
     fig, ax = plt.subplots(1, 2, figsize=(12, 4), tight_layout=True)
-    if "red_losses_init" not in locals():
-        red_losses_init = red_losses
-        losses_init = losses
+    
     ax[0].hist([red_losses_init, red_losses], 40)
     # ax[0].hist(red_losses, 128)
     ax[0].set_yscale("log")

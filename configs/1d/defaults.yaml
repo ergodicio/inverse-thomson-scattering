@@ -146,8 +146,8 @@ data:
     bgscaleI: 0.1
     bgshotmult: 1
     ion_loss_scale: 2.0
-    ele_t0: 1700
-    ion_t0_shift: 700.0
+    ele_t0: 1500
+    ion_t0_shift: 900.0
     ele_lam_shift: 0.0
     probe_beam: P9
     dpixel: 3
@@ -170,7 +170,7 @@ plotting:
     ion_window_start: 525
     ion_window_end: 528
     ele_window_start: 425
-    ele_window_end: 625
+    ele_window_end: 660
 
 optimizer:
     # use adam for nn / stochastic gradient descent

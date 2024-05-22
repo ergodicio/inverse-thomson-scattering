@@ -4,17 +4,17 @@ parameters:
             electron:
             active: False
         Te:
-            val: .6
+            val: .5
             active: True
             lb: 0.01
-            ub: 1.5
+            ub: 2.0
         ne:
-            val: 0.4
+            val: .4
             active: True
             lb: 0.03
-            ub: 1.0
+            ub: 2.0
         m:
-            val: 2.0
+            val: 2.5
             active: True
             lb: 2.0
             ub: 4.8
@@ -41,15 +41,15 @@ parameters:
             ion:
             active: False
         Ti:
-            val: 0.10
+            val: 0.08
             active: True
             same: False
-            lb: 0.001
+            lb: 0.01
             ub: 1.0
         Z:
             val: 10.0
             active: True
-            lb: 0.5
+            lb: 1.0
             ub: 18.0
         A:
             val: 40.0
@@ -63,10 +63,10 @@ parameters:
             ion:
             active: False
         Ti:
-            val: 0.10
+            val: 0.06
             active: False
             same: True
-            lb: 0.001
+            lb: 0.01
             ub: 1.0
         Z:
             val: 1.0
@@ -86,12 +86,12 @@ parameters:
             active: False
         amp1:
             val: 1.
-            active: False
+            active: True
             lb: 0.01
             ub: 3.75
         amp2:
             val: 1.
-            active: False
+            active: True
             lb: 0.01
             ub: 3.75
         amp3:
@@ -123,20 +123,20 @@ parameters:
             lb: -10.0
             ub: 10.0
         Va:
-            val: 0.0
+            val: -10.0
             angle: 0.0
             active: True
             lb: -20.5
             ub: 20.5
 
 data:
-    shotnum: 111411
+    shotnum: 111416
     lineouts:
         type:
             ps
         start: 0
         end: 2200
-        skip: 10
+        skip: 2
     background:
         type:
             pixel
@@ -157,13 +157,13 @@ other:
             spect_stddev_ele: 0.1
             spect_FWHM_ele: 0.9
             ang_FWHM_ele: 1.0
-    refit: False
-    refit_thresh: 5.0
+    refit: True
+    refit_thresh: 20.0
     calc_sigmas: False
 
 
 mlflow:
     experiment: shot_day_3_27_24
-    run: shot111411_full_mfit_1Z
+    run: shot111416_full_fine_5
 
 machine: gpu

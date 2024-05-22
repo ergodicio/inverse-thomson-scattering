@@ -425,6 +425,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     mlflow.log_metrics({"fit_time": round(time.time() - t1, 2)})
     mlflow.set_tag("status", "postprocessing")
     print("postprocessing")
+    print(batch_indices)
 
     final_params = postprocess.postprocess(config, batch_indices, all_data, all_axes, ts_fitter, sa, fitted_weights)
 
