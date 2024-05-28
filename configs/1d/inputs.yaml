@@ -4,21 +4,21 @@ parameters:
             electron:
             active: False
         Te:
-            val: .2
+            val: .6
             active: True
             lb: 0.01
-            ub: 1.5
+            ub: 2.0
         ne:
-            val: 0.08
+            val: 1.2
             active: True
             lb: 0.03
-            ub: 1.0
+            ub: 2.0
         m:
-            val: 2.0
+            val: 2.5
             active: False
             lb: 2.0
             ub: 5.0
-            matte: False
+            matte: True
             intens: 2.0
         fe:
             val: [ ]
@@ -78,8 +78,8 @@ parameters:
             lb: 0.01
             ub: 3.75
         lam:
-            val: 526.5
-            active: False
+            val: 525.5
+            active: True
             lb: 523.0
             ub: 528.0
         Te_gradient:
@@ -101,19 +101,19 @@ parameters:
             lb: -10.0
             ub: 10.0
         Va:
-            val: 0.0
+            val: -10.0
             angle: 0.0
             active: False
             lb: -20.5
             ub: 20.5
 
 data:
-    shotnum: 101675
+    shotnum: 111412
     lineouts:
         type:
             ps
-        start: 800
-        end: 3500
+        start: 0
+        end: 700
         skip: 10
     background:
         type:
@@ -128,17 +128,11 @@ other:
         fit_EPWb: True
         fit_EPWr: True
         spectype: temporal
-    PhysParams:
-        widIRF:
-            spect_stddev_ion: 0.015
-            spect_stddev_ele: 0.1
-            spect_FWHM_ele: 0.9
-            ang_FWHM_ele: 1.0
     refit: False
     refit_thresh: 5.0
     calc_sigmas: False
 
 
 mlflow:
-    experiment: inverse-thomson-scattering
-    run: test
+    experiment: shot_day_3_27_24
+    run: shot111412_early_epw_4_matte
