@@ -146,8 +146,8 @@ data:
     bgscaleI: 0.1
     bgshotmult: 1
     ion_loss_scale: 2.0
-    ele_t0: 1550
-    ion_t0_shift: 850.0
+    ele_t0: 1500
+    ion_t0_shift: 900.0
     ele_lam_shift: 0.0
     probe_beam: P9
     dpixel: 3
