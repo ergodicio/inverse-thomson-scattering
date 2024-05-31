@@ -18,8 +18,8 @@ parameters:
             active: False
             lb: 2.0
             ub: 5.0
-            matte: True
-            intens: 10.0
+            matte: False
+            intens: 2.0
         fe:
             val: [ ]
             active: False
@@ -41,18 +41,18 @@ parameters:
             ion:
             active: False
         Ti:
-            val: 2.0
-            active: True
+            val: 0.08
+            active: False
             same: False
             lb: 0.01
-            ub: 3.0
+            ub: 1.0
         Z:
-            val: 20.0
-            active: True
-            lb: 0.5
-            ub: 29.0
+            val: 10.0
+            active: False
+            lb: 1.0
+            ub: 18.0
         A:
-            val: 63.5
+            val: 40.0
             active: False
         fract:
             val: 1.0
@@ -74,7 +74,7 @@ parameters:
             ub: 3.75
         amp3:
             val: 1.0
-            active: True
+            active: False
             lb: 0.01
             ub: 3.75
         lam:
@@ -101,11 +101,11 @@ parameters:
             lb: -10.0
             ub: 10.0
         Va:
-            val: 40.0
+            val: 0.0
             angle: 0.0
-            active: True
-            lb: -30.5
-            ub: 50.5
+            active: False
+            lb: -20.5
+            ub: 20.5
 
 data:
     shotnum: 101675
@@ -124,7 +124,7 @@ other:
     extraoptions:
         load_ion_spec: False
         load_ele_spec: True
-        fit_IAW: True
+        fit_IAW: False
         fit_EPWb: True
         fit_EPWr: True
         spectype: temporal
@@ -136,11 +136,9 @@ other:
             ang_FWHM_ele: 1.0
     refit: False
     refit_thresh: 5.0
-    calc_sigmas: True
+    calc_sigmas: False
 
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: shot98612_comb_16_fine
-
-machine: gpu
+    run: test

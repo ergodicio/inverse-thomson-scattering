@@ -21,7 +21,6 @@ if __name__ == "__main__":
 
     if args.run_id is not None:
         run_job(args.run_id, args.mode, nested=None)
-        run_job(args.run_id, args.mode, nested=None)
         run_id = args.run_id
     else:
         run_id = run(args.cfg, mode=args.mode)

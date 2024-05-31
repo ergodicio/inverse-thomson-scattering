@@ -212,14 +212,25 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
             config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
         ],
     }
-    func_dict = get_loss_function(config, sa, test_batch)
+
+    ts_fitter = TSFitter(config, sa, test_batch)
+
     jaxopt_kwargs = dict(
-        fun=func_dict["vg_func"], maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+        fun=ts_fitter.vg_loss, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
     )
     opt = optax.adam(config["optimizer"]["learning_rate"])
     solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
 
-    weights = func_dict["init_weights"]
+    weights = ts_fitter.pytree_weights["active"]
+    # if previous_weights is None:
+    #     init_weights = ts_fitter.pytree_weights["active"]
+    # else:
+    #     init_weights = previous_weights
+
+    # if "sequential" in config["optimizer"]:
+    #     if config["optimizer"]["sequential"]:
+    #         if previous_weights is not None:
+    #             init_weights = previous_weights
     opt_state = solver.init_state(weights, batch=test_batch)
 
     # start train loop
@@ -243,7 +254,7 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
             best_weights = weights
 
         mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
-
+    return best_weights, best_loss, ts_fitter
 
 def _1d_adam_loop_(
     config: Dict, ts_fitter: TSFitter, previous_weights: np.ndarray, batch: Dict, tbatch

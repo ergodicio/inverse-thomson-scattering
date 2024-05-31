@@ -1,5 +1,4 @@
-# Supplies wavelength, space, time, and throughput calibrations based off of shot numbers including historical values
-# new calibration values should be added here as they are calculated
+from typing import Dict
 import numpy as np
 import scipy.io as sio
 from os.path import join
@@ -79,7 +78,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
             EPWDisp = 0.4104
             IAWDisp = 0.00678
             EPWoff = 319.3
-            IAWoff = 522.9  # 522.90
+            IAWoff = 523.1  # 522.90
             stddev["spect_stddev_ion"] = 0.02262  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
             stddev["spect_stddev_ele"] = 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
 
@@ -90,9 +89,9 @@ def get_calibrations(shotNum, tstype, CCDsize):
         elif shotNum < 108950:
             # these are calibrations for shot 108135
             EPWDisp = 0.4104
-            IAWDisp = -0.005749
+            IAWDisp = 0.005749
             EPWoff = 319.3
-            IAWoff = 529.1749  # 522.90
+            IAWoff = 523.3438  # 522.90
             stddev["spect_stddev_ion"] = 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
             stddev["spect_stddev_ele"] = 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
 
@@ -103,9 +102,9 @@ def get_calibrations(shotNum, tstype, CCDsize):
         elif shotNum < 108990:
             # these are calibrations for shots 108964-
             EPWDisp = 0.4104
-            IAWDisp = -0.00959
+            IAWDisp = 0.00959
             EPWoff = 135.0
-            IAWoff = 355.9
+            IAWoff = 346.09
             stddev["spect_stddev_ion"] = 0.0153  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
             stddev["spect_stddev_ele"] = 1.4294  # spectral EPW IRF for 200um pinhole used on 8 / 26 / 21
 
@@ -116,9 +115,9 @@ def get_calibrations(shotNum, tstype, CCDsize):
         elif 111410 < shotNum < 111426:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.4104
-            IAWDisp = -0.00678  # needs to be updated
+            IAWDisp = 0.00678  # needs to be updated
             EPWoff = 317.6
-            IAWoff = 529.258
+            IAWoff = 523.12
             stddev["spect_stddev_ion"] = 0.0187  # needs to be updated
             stddev["spect_stddev_ele"] = 1.4294  # needs to be updated
 
@@ -129,7 +128,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         else:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.4104
-            IAWDisp = -0.00678
+            IAWDisp = 0.00678
             EPWoff = 319.3
             IAWoff = 522.90
             stddev["spect_stddev_ion"] = 0.02262  # spectral IAW IRF for 8 / 26 / 21(grating was masked)
@@ -144,7 +143,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
     else:
         if shotNum < 104000:
             EPWDisp = 0.27093
-            IAWDisp = -0.00438
+            IAWDisp = 0.00438
             EPWoff = 396.256  # needs to be checked
             IAWoff = 524.275
 
@@ -160,7 +159,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         elif 106303 <= shotNum <= 106321:
             # refractive teloscope used on 11/8/22
             EPWDisp = 0.27594
-            IAWDisp = -0.00437
+            IAWDisp = 0.00437
             EPWoff = 388.256  # 390.256 worked for 106317
             IAWoff = 524.345
 
@@ -176,7 +175,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
         else:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.27093
-            IAWDisp = -0.00437
+            IAWDisp = 0.00437
             EPWoff = 396.256  # needs to be checked
             IAWoff = 524.275
 
@@ -213,7 +212,7 @@ def get_calibrations(shotNum, tstype, CCDsize):
     return axisxE, axisxI, axisyE, axisyI, magE, stddev
 
 
-def get_scattering_angles(config):
+def get_scattering_angles(config: Dict) -> Dict:
     """
     Loads and returns a scattering angle dictionary based off the input deck. The scattering angle dictionary has 2
     fields 'sa' and 'weights'. The field 'sa' is an array of the scattering angles present based off the geometry
