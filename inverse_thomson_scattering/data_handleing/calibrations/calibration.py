@@ -115,12 +115,12 @@ def get_calibrations(shotNum, tstype, CCDsize):
         elif 111410 < shotNum < 111426:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.4104
-            IAWDisp = 0.00678  # needs to be updated
-            EPWoff = 317.6
-            IAWoff = 523.12
-            stddev["spect_stddev_ion"] = 0.0187  # needs to be updated
-            stddev["spect_stddev_ele"] = 1.4294  # needs to be updated
-
+            IAWDisp = 0.00678
+            EPWoff = 317.4
+            IAWoff = 522.92
+            stddev["spect_stddev_ion"] = 0.0153#0.0095  # needs to be updated
+            stddev["spect_stddev_ele"] = 0.668 #based of hg lamp data
+            print("used 0.668 nm irf")
             # Sweep speed calculated from 5 Ghz comb (should be updated, date unknown)
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess

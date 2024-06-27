@@ -291,6 +291,19 @@ class TSFitter:
         e_data = batch["e_data"]
         if self.cfg["other"]["extraoptions"]["fit_IAW"]:
             _error_ = jnp.square(i_data - ThryI) / denom[0]
+            #_error_ = jnp.square(i_data - ThryI) / ThryI
+            # _error_ = jnp.where(
+            #     (
+            #         (lamAxisI > self.cfg["data"]["fit_rng"]["iaw_min"])
+            #         & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_cf_min"])
+            #     )
+            #     | (
+            #         (lamAxisI > self.cfg["data"]["fit_rng"]["iaw_cf_max"])
+            #         & (lamAxisI < self.cfg["data"]["fit_rng"]["iaw_max"])
+            #     ),
+            #     _error_,
+            #     0.0,
+            # )
             _error_ = jnp.where(
                 (
                     (lamAxisI > self.cfg["data"]["fit_rng"]["iaw_min"])
@@ -303,7 +316,12 @@ class TSFitter:
                 _error_,
                 0.0,
             )
+            _error_ = jnp.where((lamAxisI > 526.25) & (lamAxisI < 526.75),
+                10.0*_error_,
+                _error_,
+            )
 
+            #i_error += reduce_func(jnp.log(_error_))
             i_error += reduce_func(_error_)
 
         if self.cfg["other"]["extraoptions"]["fit_EPWb"]:
