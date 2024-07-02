@@ -305,6 +305,10 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             t1 = time.time()
 
             final_params = plotters.get_final_params(config, all_params, all_axes, td)
+            # for species in config["parameters"].keys():
+            #     if m in config["parameters"][species].keys():
+            #         if config["parameters"][species]["m"]["active"]
+                
             red_losses = plotters.plot_loss_hist(config, losses_init, losses, all_params, used_points, td)
             savedata = plotters.plot_ts_data(config, fits, all_data, all_axes, td)
             plotters.model_v_actual(config, all_data, all_axes, fits, losses, red_losses, sqdevs, td)

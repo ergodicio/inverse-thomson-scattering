@@ -7,16 +7,16 @@ data:
     skip: 20
     start: 150
     type: ps
-  shotnum: 111411
+  shotnum: 111416
 mlflow:
   experiment: shot_day_3_27_24
-  run: shot111411_direct_repeat_ele_m25
+  run: shot111416_mfix_comb_5
 other:
   calc_sigmas: false
   extraoptions:
     fit_EPWb: true
     fit_EPWr: true
-    fit_IAW: false
+    fit_IAW: true
     load_ele_spec: true
     load_ion_spec: true
     spectype: temporal
@@ -31,7 +31,7 @@ parameters:
       ub: 10.0
       val: 0.0
     Va:
-      active: false
+      active: true
       angle: 0.0
       lb: -20.5
       ub: 20.5
@@ -47,7 +47,7 @@ parameters:
       ub: 3.75
       val: 1.0
     amp3:
-      active: false
+      active: true
       lb: 0.01
       ub: 3.75
       val: 1.0
@@ -66,17 +66,17 @@ parameters:
       active: false
       general: null
     ud:
-      active: false
+      active: true
       angle: 0.0
       lb: -10.0
       ub: 10.0
-      val: 9.0
+      val: 5.0
   species1:
     Te:
       active: true
       lb: 0.01
       ub: 2.0
-      val: 0.8
+      val: 0.35
     fe:
       active: false
       dim: 1
@@ -94,9 +94,9 @@ parameters:
       val: []
     m:
       active: false
-      intens: 10.0
+      intens: 1.0
       lb: 2.0
-      matte: false
+      matte: true
       ub: 5.0
       val: 2.5
     ne:
@@ -112,16 +112,16 @@ parameters:
       active: false
       val: 40.0
     Ti:
-      active: false
+      active: true
       lb: 0.01
       same: false
       ub: 1.0
-      val: 0.05
+      val: 0.03
     Z:
-      active: false
+      active: true
       lb: 1.0
       ub: 18.0
-      val: 8.0
+      val: 6.0
     fract:
       active: false
       val: 0.1

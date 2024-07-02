@@ -161,8 +161,8 @@ class FitModel:
                 0.042
                 * self.config["parameters"][self.e_species]["m"]["intens"]
                 / 9.0
-                * jnp.sum(Z**2)
-                / (jnp.sum(Z) ** 2 * cur_Te)
+                * jnp.sum(Z**2 * fract)
+                / (jnp.sum(Z * fract) * cur_Te)
             )
             mcur = 2.0 + 3.0 / (1.0 + 1.66 / (alpha**0.724))
             (
