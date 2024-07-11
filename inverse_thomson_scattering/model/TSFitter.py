@@ -471,6 +471,10 @@ class TSFitter:
 
         """
         params = self.weights_to_params(weights)
+        param_penalty = 0.0
+        for species in weights.keys():
+            for k in weights[species].keys():
+                param_penalty += jnp.maximum(0.0, jnp.log(weights[species][k]))
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
         i_error, e_error = self.calc_ei_error(
             batch,
@@ -487,7 +491,7 @@ class TSFitter:
         normed_e_data = normed_batch["e_data"]
         ion_error = self.cfg["data"]["ion_loss_scale"] * i_error
 
-        total_loss = ion_error + e_error + density_loss + temperature_loss + momentum_loss
+        total_loss = ion_error + e_error + density_loss + temperature_loss + momentum_loss + jnp.sum(jnp.nan_to_num(param_penalty))
         return total_loss, [ThryE, normed_e_data, params]
 
     def _get_normed_batch_(self, batch: Dict):

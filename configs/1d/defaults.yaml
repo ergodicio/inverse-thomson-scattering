@@ -50,7 +50,7 @@ optimizer:
   hessian: false
   learning_rate: 0.0001
   method: adam
-  num_epochs: 5000
+  num_epochs: 3000
   num_mins: 8
   parameter_norm: true
   refine_factor: 0

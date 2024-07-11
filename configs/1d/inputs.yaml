@@ -10,7 +10,7 @@ data:
   shotnum: 111416
 mlflow:
   experiment: shot_day_3_27_24
-  run: shot111416_mfix_comb_5
+  run: shot111416_newtime_comb_5
 other:
   calc_sigmas: false
   extraoptions:
@@ -34,7 +34,7 @@ parameters:
       active: true
       angle: 0.0
       lb: -20.5
-      ub: 20.5
+      ub: 70.5
       val: 0.0
     amp1:
       active: true
@@ -69,14 +69,14 @@ parameters:
       active: true
       angle: 0.0
       lb: -10.0
-      ub: 10.0
+      ub: 40.0
       val: 5.0
   species1:
     Te:
       active: true
       lb: 0.01
       ub: 2.0
-      val: 0.35
+      val: 0.55
     fe:
       active: false
       dim: 1
@@ -103,7 +103,7 @@ parameters:
       active: true
       lb: 0.03
       ub: 2.0
-      val: 0.5
+      val: 0.45
     type:
       active: false
       electron: null
@@ -116,7 +116,7 @@ parameters:
       lb: 0.01
       same: false
       ub: 1.0
-      val: 0.03
+      val: 0.04
     Z:
       active: true
       lb: 1.0

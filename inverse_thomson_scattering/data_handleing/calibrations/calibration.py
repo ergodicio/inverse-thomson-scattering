@@ -122,8 +122,8 @@ def get_calibrations(shotNum, tstype, CCDsize):
             stddev["spect_stddev_ele"] = 0.668 #based of hg lamp data
             print("used 0.668 nm irf")
             # Sweep speed calculated from 5 Ghz comb (should be updated, date unknown)
-            magI = 5  # (ps / px) this is just a rough guess
-            magE = 5  # (ps / px) this is just a rough guess
+            magI = 5.23  # (ps / px) this is just a rough guess
+            magE = 5.35  # (ps / px) this is just a rough guess
 
         else:
             # needs to be updated with the calibrations from 7-26-22
