@@ -291,7 +291,7 @@ class TSFitter:
         e_data = batch["e_data"]
         if self.cfg["other"]["extraoptions"]["fit_IAW"]:
             _error_ = jnp.square(i_data - ThryI) / denom[0]
-            #_error_ = jnp.square(i_data - ThryI) / ThryI
+            # _error_ = jnp.square(i_data - ThryI) / ThryI
             # _error_ = jnp.where(
             #     (
             #         (lamAxisI > self.cfg["data"]["fit_rng"]["iaw_min"])
@@ -316,12 +316,13 @@ class TSFitter:
                 _error_,
                 0.0,
             )
-            _error_ = jnp.where((lamAxisI > 526.25) & (lamAxisI < 526.75),
-                10.0*_error_,
+            _error_ = jnp.where(
+                (lamAxisI > 526.25) & (lamAxisI < 526.75),
+                10.0 * _error_,
                 _error_,
             )
 
-            #i_error += reduce_func(jnp.log(_error_))
+            # i_error += reduce_func(jnp.log(_error_))
             i_error += reduce_func(_error_)
 
         if self.cfg["other"]["extraoptions"]["fit_EPWb"]:
@@ -446,6 +447,11 @@ class TSFitter:
     def _loss_for_hess_fn_(self, weights, batch):
         # params = params | self.static_params
         params = self.weights_to_params(weights)
+        param_penalty = 0.0
+        for species in weights.keys():
+            for k in weights[species].keys():
+                param_penalty += jnp.maximum(0.0, jnp.log(weights[species][k]))
+
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
         i_error, e_error = self.calc_ei_error(
             batch,
@@ -487,6 +493,7 @@ class TSFitter:
         )
         density_loss, temperature_loss, momentum_loss = self._moment_loss_(params)
         # other_losses = calc_other_losses(params)
+
         normed_batch = self._get_normed_batch_(batch)
         normed_e_data = normed_batch["e_data"]
         ion_error = self.cfg["data"]["ion_loss_scale"] * i_error

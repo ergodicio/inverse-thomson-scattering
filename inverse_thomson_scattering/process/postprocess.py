@@ -306,9 +306,21 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
 
             final_params = plotters.get_final_params(config, all_params, all_axes, td)
             # for species in config["parameters"].keys():
-            #     if m in config["parameters"][species].keys():
-            #         if config["parameters"][species]["m"]["active"]
-                
+            #     if "m" in config["parameters"][species].keys():
+            #         if not config["parameters"][species]["m"]["active"] and config["parameters"][species]["matte"]:
+            #             alpha = (
+            #                 0.042
+            #                 * config["parameters"][species]["m"]["intens"]
+            #                 / 9.0
+            #                 * np.sum(Z**2 * fract)
+            #                 / (np.sum(Z * fract) * all_params[species]["Te"])
+            #             )
+            #             mcur = 2.0 + 3.0 / (1.0 + 1.66 / (alpha**0.724))
+            #             (
+            #                 self.config["parameters"][self.e_species]["fe"]["velocity"],
+            #                 all_params[self.e_species]["fe"],
+            #             ) = self.num_dist_func(mcur.squeeze())
+
             red_losses = plotters.plot_loss_hist(config, losses_init, losses, all_params, used_points, td)
             savedata = plotters.plot_ts_data(config, fits, all_data, all_axes, td)
             plotters.model_v_actual(config, all_data, all_axes, fits, losses, red_losses, sqdevs, td)

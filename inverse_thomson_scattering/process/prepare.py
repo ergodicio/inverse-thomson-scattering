@@ -20,7 +20,7 @@ def prepare_data(config: Dict) -> Dict:
 
     """
     # load data
-    [elecData, ionData, xlab, config["other"]["extraoptions"]["spectype"]] = loadData(
+    [elecData, ionData, xlab, t0, config["other"]["extraoptions"]["spectype"]] = loadData(
         config["data"]["shotnum"], config["data"]["shotDay"], config["other"]["extraoptions"]
     )
 
@@ -29,7 +29,7 @@ def prepare_data(config: Dict) -> Dict:
 
     # Calibrate axes
     [axisxE, axisxI, axisyE, axisyI, magE, stddev] = get_calibrations(
-        config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
+        config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], t0, config["other"]["CCDsize"]
     )
     all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI, "x_label": xlab}
 
@@ -47,8 +47,8 @@ def prepare_data(config: Dict) -> Dict:
         elecData = correctThroughput(
             elecData, config["other"]["extraoptions"]["spectype"], axisyE, config["data"]["shotnum"]
         )
-        #temp fix for zeros
-        elecData = elecData+10.0
+        # temp fix for zeros
+        elecData = elecData + 10.0
 
     # load and correct background
     [BGele, BGion] = get_shot_bg(config, axisyE, elecData)

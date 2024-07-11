@@ -23,7 +23,7 @@ def get_shot_bg(config, axisyE, elecData):
 
     """
     if config["data"]["background"]["type"] == "Shot":
-        [BGele, BGion, _, _] = loadData(
+        [BGele, BGion, _, _, _] = loadData(
             config["data"]["background"]["slice"], config["data"]["shotDay"], config["other"]["extraoptions"]
         )
         if config["other"]["extraoptions"]["load_ion_spec"]:
@@ -41,7 +41,7 @@ def get_shot_bg(config, axisyE, elecData):
         else:
             BGele = 0
     elif config["other"]["extraoptions"]["spectype"] == "angular" and config["data"]["background"]["type"] == "Fit":
-        [BGele, _, _, _] = loadData(
+        [BGele, _, _, _, _] = loadData(
             config["data"]["background"]["slice"], config["data"]["shotDay"], config["other"]["extraoptions"]
         )
 

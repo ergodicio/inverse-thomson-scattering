@@ -6,7 +6,7 @@ from os.path import join
 from inverse_thomson_scattering.data_handleing.calibrations.sa_table import sa_lookup
 
 
-def get_calibrations(shotNum, tstype, CCDsize):
+def get_calibrations(shotNum, tstype, t0, CCDsize):
     """
     Contains and loads the appropriate instrument calibrations based off the shot number and type of Thomson scattering
     performed. The calibrations loaded are the spectral dispersion, offset for the spectral axis, spectral instrument
@@ -118,8 +118,8 @@ def get_calibrations(shotNum, tstype, CCDsize):
             IAWDisp = 0.00678
             EPWoff = 317.4
             IAWoff = 522.92
-            stddev["spect_stddev_ion"] = 0.0153#0.0095  # needs to be updated
-            stddev["spect_stddev_ele"] = 0.668 #based of hg lamp data
+            stddev["spect_stddev_ion"] = 0.0153  # 0.0095  # needs to be updated
+            stddev["spect_stddev_ele"] = 0.668  # based of hg lamp data
             print("used 0.668 nm irf")
             # Sweep speed calculated from 5 Ghz comb (should be updated, date unknown)
             magI = 5.23  # (ps / px) this is just a rough guess
@@ -197,8 +197,8 @@ def get_calibrations(shotNum, tstype, CCDsize):
 
     if tstype != "angular":
         axisx = np.arange(1, CCDsize[1] + 1)
-        axisxE = axisx * magE  # ps,um
-        axisxI = axisx * magI  # ps,um
+        axisxE = (axisx - t0[1]) * magE  # ps,um
+        axisxI = (axisx - t0[0]) * magI  # ps,um
         if tstype == "imaging":
             axisxE = axisxE - EPWtcc * magE
             axisxI = axisxI - IAWtcc * magI
