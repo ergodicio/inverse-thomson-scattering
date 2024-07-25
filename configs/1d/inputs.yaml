@@ -4,19 +4,19 @@ data:
     type: Fit
   lineouts:
     end: 1000
-    skip: 100
+    skip: 20
     start: -1000
     type: um
   shotnum: 106310
 mlflow:
   experiment: inverse-thomson-scattering
-  run: shot106310_t2
+  run: shot106310_ele_4
 other:
   calc_sigmas: false
   extraoptions:
     fit_EPWb: true
     fit_EPWr: true
-    fit_IAW: true
+    fit_IAW: false
     load_ele_spec: true
     load_ion_spec: true
     spectype: temporal
@@ -31,7 +31,7 @@ parameters:
       ub: 10.0
       val: 0.0
     Va:
-      active: true
+      active: false
       angle: 0.0
       lb: -40.5
       ub: 40.5
@@ -47,7 +47,7 @@ parameters:
       ub: 3.75
       val: 1.0
     amp3:
-      active: true
+      active: false
       lb: 0.01
       ub: 3.75
       val: 1.0
@@ -66,7 +66,7 @@ parameters:
       active: false
       general: null
     ud:
-      active: true
+      active: false
       angle: 0.0
       lb: -10.0
       ub: 30.0
@@ -76,7 +76,7 @@ parameters:
       active: true
       lb: 0.01
       ub: 2.0
-      val: 0.4
+      val: 0.2
     fe:
       active: false
       dim: 1
@@ -93,8 +93,8 @@ parameters:
       v_res: 0.05
       val: []
     m:
-      active: false
-      intens: 2.0
+      active: true
+      intens: 4.55
       lb: 2.0
       matte: false
       ub: 5.0
@@ -103,7 +103,7 @@ parameters:
       active: true
       lb: 0.03
       ub: 2.0
-      val: 0.35
+      val: 0.15
     type:
       active: false
       electron: null
@@ -112,7 +112,7 @@ parameters:
       active: false
       val: 1.0
     Ti:
-      active: true
+      active: false
       lb: 0.01
       same: false
       ub: 1.0

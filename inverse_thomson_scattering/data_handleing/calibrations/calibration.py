@@ -112,7 +112,7 @@ def get_calibrations(shotNum, tstype, t0, CCDsize):
             magI = 5  # (ps / px) this is just a rough guess
             magE = 5  # (ps / px) this is just a rough guess
 
-        elif 111410 < shotNum < 111426:
+        elif 111410 < shotNum < 111435:
             # needs to be updated with the calibrations from 7-26-22
             EPWDisp = 0.4104
             IAWDisp = 0.00678

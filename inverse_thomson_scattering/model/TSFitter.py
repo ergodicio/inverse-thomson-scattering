@@ -447,11 +447,6 @@ class TSFitter:
     def _loss_for_hess_fn_(self, weights, batch):
         # params = params | self.static_params
         params = self.weights_to_params(weights)
-        param_penalty = 0.0
-        for species in weights.keys():
-            for k in weights[species].keys():
-                param_penalty += jnp.maximum(0.0, jnp.log(weights[species][k]))
-
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
         i_error, e_error = self.calc_ei_error(
             batch,
@@ -480,7 +475,7 @@ class TSFitter:
         param_penalty = 0.0
         for species in weights.keys():
             for k in weights[species].keys():
-                param_penalty += jnp.maximum(0.0, jnp.log(weights[species][k]))
+                param_penalty += jnp.maximum(0.0, jnp.log(jnp.abs(weights[species][k]-0.5)+0.5))
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
         i_error, e_error = self.calc_ei_error(
             batch,

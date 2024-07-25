@@ -10,13 +10,13 @@ data:
   ele_t0: 0
   fit_rng:
     blue_max: 510
-    blue_min: 430
+    blue_min: 460
     forward_epw_end: 700
     forward_epw_start: 400
     forward_iaw_end: 527.25
     forward_iaw_start: 525.75
-    iaw_cf_max: 526.501
-    iaw_cf_min: 526.499
+    iaw_cf_max: 526.6
+    iaw_cf_min: 526.4
     iaw_max: 527.3
     iaw_min: 525.7
     red_max: 660
