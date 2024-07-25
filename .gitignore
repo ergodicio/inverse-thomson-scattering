@@ -242,3 +242,4 @@ fabric.properties
 .idea/inspectionProfiles/profiles_settings.xml
 .vscode/launch.json
 mlruns/
+data/
