@@ -102,7 +102,7 @@ class FitModel:
 
         # Add gradients to electron temperature and density just being applied to EPW
         cur_Te = jnp.zeros((self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"], self.num_electrons))
-        cur_ne = jnp.zeros((self.config["parameters"]["general"]["Te_gradient"]["num_grad_points"], self.num_electrons))
+        cur_ne = jnp.zeros((self.config["parameters"]["general"]["ne_gradient"]["num_grad_points"], self.num_electrons))
         A = jnp.zeros(self.num_ions)
         Z = jnp.zeros(self.num_ions)
         Ti = jnp.zeros(self.num_ions)
