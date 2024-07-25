@@ -104,12 +104,12 @@ def loadData(sNum, sDay, loadspecs):
             elif specType == "imaging":
                 eDat = np.rot90(np.squeeze(eDat), 3)
 
-            if loadspecs["absolute_timing"]:
+            if specType == "temporal" and loadspecs["absolute_timing"]:
                 # this sets t0 by locating the fiducial and placing t0 164px earlier
-                fidu = np.sum(iDat[0:100, :], 0)
+                fidu = np.sum(eDat[0:100, :], 0)
                 res = find_peaks(fidu, prominence=1000, width=10)
                 peak_center = res[1]["left_ips"][0] + (res[1]["right_ips"][0] - res[1]["left_ips"][0]) / 2.0
-                t0[1] = round(peak_center - 128)
+                t0[1] = round(peak_center - 95)
         except BaseException:
             print("Unable to find EPW")
             eDat = []
