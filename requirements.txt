@@ -10,10 +10,11 @@ mlflow
 mlflow_export_import
 boto3
 flatten-dict
-flatdict
 optax
 tqdm
 jaxopt
 xarray
 mlflow_export_import
 pandas
+interpax
+tabulate

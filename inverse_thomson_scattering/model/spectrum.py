@@ -10,6 +10,9 @@ class SpectrumCalculator:
     The SpectrumCalculator class wraps the FitModel class adding instrumental effects to the calculated spectrum so it
     can be compared to data.
 
+    Notes:
+        This Class will eventually be combined with FitModel in generate_spectra
+
     Args:
         cfg: Dict- configuration dictionary built from input deck
         sas: Dict- has fields containing the scattering angles the spectrum will be calculated at and the relative
@@ -23,12 +26,13 @@ class SpectrumCalculator:
         self.sas = sas
 
         self.forward_pass = FitModel(cfg, sas)
-        self.lam = cfg["parameters"]["lam"]["val"]
+        self.lam = cfg["parameters"]["general"]["lam"]["val"]
 
-        if (
-            cfg["other"]["extraoptions"]["spectype"] == "angular_full"
-            or max(dummy_batch["e_data"].shape[0], dummy_batch["i_data"].shape[0]) <= 1
-        ):
+        if cfg["other"]["extraoptions"]["spectype"] == "angular_full":
+            # if (
+            #     cfg["other"]["extraoptions"]["spectype"] == "angular_full"
+            #     or max(dummy_batch["e_data"].shape[0], dummy_batch["i_data"].shape[0]) <= 1
+            # ):
             # ATS data can't be vmaped and single lineouts cant be vmapped
             self.vmap_forward_pass = self.forward_pass
             self.vmap_postprocess_thry = self.postprocess_thry
@@ -38,14 +42,14 @@ class SpectrumCalculator:
 
     def postprocess_thry(self, modlE, modlI, lamAxisE, lamAxisI, amps, TSins):
         """
-        TODO
+        Adds instrumental broadening to the synthetic Thomson spectrum.
 
         Args:
-            modlE:
-            modlI:
-            lamAxisE:
-            lamAxisI:
-            amps:
+            modlE: Synthetic EPW Thomson spectra produced by FitModel
+            modlI: Synthetic IAW Thomson spectra produced by FitModel
+            lamAxisE: EPW wavelength axis produced by FitModel
+            lamAxisI: IAW wavelength axis produced by FitModel
+            amps: dictionary containing the scaling facotrs for
             TSins:
 
         Returns:

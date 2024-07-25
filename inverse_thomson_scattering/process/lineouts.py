@@ -12,7 +12,7 @@ def get_lineouts(
     # Convert lineout locations to pixel
     if config["data"]["lineouts"]["type"] == "ps" or config["data"]["lineouts"]["type"] == "um":
         LineoutPixelE = [np.argmin(abs(axisxE - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
-        IAWtime = IAWtime / axisxI[1]  # corrects the iontime to be in the same units as the lineout
+        IAWtime = IAWtime / (axisxI[1] - axisxI[0])  # corrects the iontime to be in the same units as the lineout
         LineoutPixelI = [np.argmin(abs(axisxI - loc - shift_zero)) for loc in config["data"]["lineouts"]["val"]]
     elif config["data"]["lineouts"]["type"] == "pixel":
         LineoutPixelE = config["data"]["lineouts"]["val"]
@@ -62,7 +62,7 @@ def get_lineouts(
             for a in LineoutPixelI
         ]
         LineoutTSI_smooth = [
-            np.convolve(LineoutTSI[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelE)
+            np.convolve(LineoutTSI[i], np.ones(span) / span, "same") for i, _ in enumerate(LineoutPixelI)
         ]  # was divided by 10 for some reason (removed 8-9-22)
 
     # Find background signal combining information from a background shot and background lineout
@@ -76,13 +76,30 @@ def get_lineouts(
         noiseI = noiseI / gain
         LineoutTSI_norm = [LineoutTSI_smooth[i] / gain for i, _ in enumerate(LineoutPixelI)]
         LineoutTSI_norm = np.array(LineoutTSI_norm)
-        ampI = np.amax(LineoutTSI_norm - noiseI, axis=1)
+        ampI = np.amax(
+            LineoutTSI_norm[
+                :,
+                ((config["data"]["fit_rng"]["iaw_min"] < axisyI) & (axisyI < config["data"]["fit_rng"]["iaw_cf_min"]))
+                | (
+                    (config["data"]["fit_rng"]["iaw_cf_max"] < axisyI) & (axisyI < config["data"]["fit_rng"]["iaw_max"])
+                ),
+            ],
+            axis=1,
+        )
 
     if config["other"]["extraoptions"]["load_ele_spec"]:
         noiseE = noiseE / gain
         LineoutTSE_norm = [LineoutTSE_smooth[i] / gain for i, _ in enumerate(LineoutPixelE)]
         LineoutTSE_norm = np.array(LineoutTSE_norm)
-        ampE = np.amax(LineoutTSE_norm[:, 100:-1] - noiseE[:, 100:-1], axis=1)  # attempts to ignore 3w comtamination
+        # ampE = np.amax(LineoutTSE_norm[:, 100:-1] - noiseE[:, 100:-1], axis=1)  # attempts to ignore 3w comtamination
+        ampE = np.amax(
+            LineoutTSE_norm[
+                :,
+                ((config["data"]["fit_rng"]["blue_min"] < axisyE) & (axisyE < config["data"]["fit_rng"]["blue_max"]))
+                | ((config["data"]["fit_rng"]["red_min"] < axisyE) & (axisyE < config["data"]["fit_rng"]["red_max"])),
+            ],
+            axis=1,
+        )
 
     config["other"]["PhysParams"]["noiseI"] = noiseI
     config["other"]["PhysParams"]["noiseE"] = noiseE

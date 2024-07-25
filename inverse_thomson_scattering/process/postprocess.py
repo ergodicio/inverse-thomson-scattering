@@ -1,11 +1,11 @@
-from typing import Dict, List
+from typing import Dict
 
-import time, tempfile, mlflow, os
+import time, tempfile, mlflow, os, copy
 
 import numpy as np
 import scipy.optimize as spopt
 
-from inverse_thomson_scattering.misc import plotters
+from inverse_thomson_scattering.plotting import plotters
 from inverse_thomson_scattering.model.TSFitter import TSFitter
 
 
@@ -28,11 +28,16 @@ def recalculate_with_chosen_weights(
     """
 
     all_params = {}
-    for key in config["parameters"].keys():
-        if config["parameters"][key]["active"]:
-            all_params[key] = np.zeros(
-                (batch_indices.flatten()[-1] + 1, np.size(config["parameters"][key]["val"])), dtype=np.float64
-            )
+    num_params = 0
+    for species in config["parameters"].keys():
+        all_params[species] = {}
+        for key in config["parameters"][species].keys():
+            if config["parameters"][species][key]["active"]:
+                all_params[species][key] = np.zeros(
+                    (batch_indices.flatten()[-1] + 1, np.size(config["parameters"][species][key]["val"])),
+                    dtype=np.float64,
+                )
+                num_params += np.shape(all_params[species][key])[1]
     batch_indices.sort()
     losses = np.zeros(batch_indices.flatten()[-1] + 1, dtype=np.float64)
     batch_indices = np.reshape(batch_indices, (-1, config["optimizer"]["batch_size"]))
@@ -44,9 +49,9 @@ def recalculate_with_chosen_weights(
     fits["ele"] = np.zeros(all_data["e_data"].shape)
     sqdevs["ele"] = np.zeros(all_data["e_data"].shape)
 
-    num_params = 0
-    for key, vec in all_params.items():
-        num_params += np.shape(vec)[1]
+    # num_params = 0
+    # for key, vec in all_params.items():
+    #     num_params += np.shape(vec)[1]
 
     if config["other"]["extraoptions"]["load_ion_spec"]:
         sigmas = np.zeros((all_data["i_data"].shape[0], num_params))
@@ -71,14 +76,16 @@ def recalculate_with_chosen_weights(
         fits["ele"] = ThryE
         sqdevs["ele"] = sqds["ele"]
 
-        for k in all_params.keys():
-            # all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
-            all_params[k] = params[k].reshape(-1)
+        for species in all_params.keys():
+            for k in all_params[species].keys():
+                # all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+                all_params[species][k] = params[species][k].reshape(-1)
 
         if calc_sigma:
+            # this line may need to be omited since the weights may be transformed by line 77
             active_params = ts_fitter.weights_to_params(fitted_weights, return_static_params=False)
             hess = ts_fitter.h_loss_wrt_params(active_params, batch)
-            sigmas = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
+            sigmas = get_sigmas(hess, config["optimizer"]["batch_size"])
             print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
 
     else:
@@ -93,71 +100,98 @@ def recalculate_with_chosen_weights(
             }
 
             loss, sqds, used_points, [ThryE, ThryI, params] = ts_fitter.array_loss(fitted_weights[i_batch], batch)
-            these_params = ts_fitter.weights_to_params(fitted_weights[i_batch], return_static_params=False)
+            # these_params = ts_fitter.weights_to_params(fitted_weights[i_batch], return_static_params=False)
+
             if calc_sigma:
-                hess = ts_fitter.h_loss_wrt_params(these_params, batch)
+                hess = ts_fitter.h_loss_wrt_params(fitted_weights[i_batch], batch)
+                try:
+                    hess = ts_fitter.h_loss_wrt_params(fitted_weights[i_batch], batch)
+                except:
+                    print("Error calculating Hessian, no hessian based uncertainties have been calculated")
+                    calc_sigma = False
 
             losses[inds] = loss
             sqdevs["ele"][inds] = sqds["ele"]
             sqdevs["ion"][inds] = sqds["ion"]
             if calc_sigma:
-                sigmas[inds] = get_sigmas(all_params.keys(), hess, config["optimizer"]["batch_size"])
-                print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}")
+                sigmas[inds] = get_sigmas(hess, config["optimizer"]["batch_size"])
+                # print(f"Number of 0s in sigma: {len(np.where(sigmas==0)[0])}") number of negatives?
 
             fits["ele"][inds] = ThryE
             fits["ion"][inds] = ThryI
 
-            for k in all_params.keys():
-                if np.size(np.shape(params[k])) == 3:
-                    all_params[k][inds] = np.squeeze(params[k][inds])
-                else:
-                    all_params[k][inds] = params[k][inds]
+            for species in all_params.keys():
+                for k in all_params[species].keys():
+                    if np.size(np.shape(params[species][k])) == 3:
+                        all_params[species][k][inds] = np.squeeze(params[species][k][inds])
+                    else:
+                        all_params[species][k][inds] = params[species][k]
 
     return losses, sqdevs, used_points, fits, sigmas, all_params
 
 
-def get_sigmas(keys: List, hess: Dict, batch_size: int) -> Dict:
+def get_sigmas(hess: Dict, batch_size: int) -> Dict:
     """
     Calculates the variance using the hessian with respect to the parameters and then using the hessian values
-    as the inverse of the covariance matrix and then inverting that
+    as the inverse of the covariance matrix and then inverting that. Negatives in the inverse hessian normally indicate
+    non-optimal points, to represent this in the final result the uncertainty of those values are reported as negative.
 
 
     Args:
-        keys:
-        hess:
-        batch_size:
+        hess: Hessian dictionary, the field for each fitted parameter has subfields corresponding to each of the other
+            fitted parameters. Within each nested subfield is a batch_size x batch_size array with the hessian values
+            for that parameter combination and that batch. The cross terms of this array are zero since separate
+            lineouts within a batch do not affect each other, they are therefore discarded
+        batch_size: int- number of lineouts in a batch
 
     Returns:
-
+        sigmas: batch_size x number_of_parameters array with the uncertainty values for each parameter
     """
-    sizes = {key: hess[key][key].shape[1] for key in keys}
+    sizes = {
+        key + species: hess[species][key][species][key].shape[1]
+        for species in hess.keys()
+        for key in hess[species].keys()
+    }
+    # sizes = {key: hess[key][key].shape[1] for key in keys}
     actual_num_params = sum([v for k, v in sizes.items()])
     sigmas = np.zeros((batch_size, actual_num_params))
 
     for i in range(batch_size):
         temp = np.zeros((actual_num_params, actual_num_params))
-        xc = 0
-        for k1, param in enumerate(keys):
-            yc = 0
-            for k2, param2 in enumerate(keys):
-                if i > 0:
-                    temp[k1, k2] = np.squeeze(hess[param][param2])[i, i]
-                else:
-                    temp[xc : xc + sizes[param], yc : yc + sizes[param2]] = hess[param][param2][0, :, 0, :]
+        k1 = 0
+        for species1 in hess.keys():
+            for key1 in hess[species1].keys():
+                k2 = 0
+                for species2 in hess.keys():
+                    for key2 in hess[species2].keys():
+                        temp[k1, k2] = np.squeeze(hess[species1][key1][species2][key2])[i, i]
+                        k2 += 1
+                k1 += 1
 
-                yc += sizes[param2]
-            xc += sizes[param]
+        # xc = 0
+        # for k1, param in enumerate(keys):
+        #     yc = 0
+        #     for k2, param2 in enumerate(keys):
+        #         if i > 0:
+        #             temp[k1, k2] = np.squeeze(hess[param][param2])[i, i]
+        #         else:
+        #             temp[xc : xc + sizes[param], yc : yc + sizes[param2]] = hess[param][param2][0, :, 0, :]
+        #
+        #         yc += sizes[param2]
+        #     xc += sizes[param]
 
         # print(temp)
         inv = np.linalg.inv(temp)
         # print(inv)
 
-        for k1, param in enumerate(keys):
-            sigmas[i, xc : xc + sizes[param]] = np.diag(
-                np.sign(inv[xc : xc + sizes[param], xc : xc + sizes[param]])
-                * np.sqrt(np.abs(inv[xc : xc + sizes[param], xc : xc + sizes[param]]))
-            )
-            # print(sigmas[i, k1])
+        sigmas[i, :] = np.sign(np.diag(inv)) * np.sqrt(np.abs(np.diag(inv)))
+        # for k1, param in enumerate(keys):
+        #     sigmas[i, xc : xc + sizes[param]] = np.diag(
+        #         np.sign(inv[xc : xc + sizes[param], xc : xc + sizes[param]])
+        #         * np.sqrt(np.abs(inv[xc : xc + sizes[param], xc : xc + sizes[param]]))
+        #     )
+        # print(sigmas[i, k1])
+        # change sigmas into a dictionary?
 
     return sigmas
 
@@ -173,7 +207,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
         # refit bad fits
         red_losses_init = losses_init / (1.1 * (used_points - len(all_params)))
         true_batch_size = config["optimizer"]["batch_size"]
-        config["optimizer"]["batch_size"] = 1
+        # config["optimizer"]["batch_size"] = 1
         mlflow.log_metrics({"number of fits": len(batch_indices.flatten())})
         mlflow.log_metrics({"number of refits": int(np.sum(red_losses_init > config["other"]["refit_thresh"]))})
 
@@ -190,31 +224,45 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
                 "noise_i": np.reshape(config["other"]["PhysParams"]["noiseI"][i], (1, -1)),
             }
 
-            ts_fitter_refit = TSFitter(config, sa, batch)
-            new_weights = np.zeros(ts_fitter_refit["init_weights"].shape)
+            # previous_weights = {}
+            temp_cfg = copy.copy(config)
+            temp_cfg["optimizer"]["batch_size"] = 1
+            for species in fitted_weights[(i - 1) // true_batch_size].keys():
+                for key in fitted_weights[(i - 1) // true_batch_size][species].keys():
+                    if config["parameters"][species][key]["active"]:
+                        temp_cfg["parameters"][species][key]["val"] = float(
+                            fitted_weights[(i - 1) // true_batch_size][species][key][(i - 1) % true_batch_size]
+                        )
 
-            for ii, key in enumerate(fitted_weights[i // true_batch_size].keys()):
-                new_weights[ii] = fitted_weights[(i - 1) // true_batch_size][key][(i - 1) % true_batch_size][0]
+            ts_fitter_refit = TSFitter(temp_cfg, sa, batch)
 
-            ts_fitter_refit["init_weights"] = new_weights
+            # ts_fitter_refit.flattened_weights, ts_fitter_refit.unravel_pytree = ravel_pytree(previous_weights)
 
             res = spopt.minimize(
                 ts_fitter_refit.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter_refit.loss,
-                ts_fitter_refit.flattened_weights,
+                np.copy(ts_fitter_refit.flattened_weights),
                 args=batch,
                 method=config["optimizer"]["method"],
                 jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-                # hess=hess_fn if config["optimizer"]["hessian"] else None,
-                bounds=ts_fitter_refit["bounds"],
-                options={"disp": True},
+                bounds=ts_fitter_refit.bounds,
+                options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
             )
-            cur_result = ts_fitter_refit["unravel_pytree"](res["x"])
+            cur_result = ts_fitter_refit.unravel_pytree(res["x"])
 
-            for key in fitted_weights[i // true_batch_size].keys():
-                cur_value = cur_result[key][0, 0]
-                new_vals = fitted_weights[i // true_batch_size][key]
-                new_vals = new_vals.at[tuple([i % true_batch_size, 0])].set(cur_value)
-                fitted_weights[i // true_batch_size][key] = new_vals
+            for species in cur_result.keys():
+                for key in cur_result[species].keys():
+                    fitted_weights[i // true_batch_size][species][key] = (
+                        fitted_weights[i // true_batch_size][species][key]
+                        .at[i % true_batch_size]
+                        .set(cur_result[species][key][0])
+                    )
+                    # fitted_weights[i // true_batch_size][species][key][i % true_batch_size] = cur_result[species][key]
+
+            # for key in fitted_weights[i // true_batch_size].keys():
+            #     cur_value = cur_result[key][0, 0]
+            #     new_vals = fitted_weights[i // true_batch_size][key]
+            #     new_vals = new_vals.at[tuple([i % true_batch_size, 0])].set(cur_value)
+            #     fitted_weights[i // true_batch_size][key] = new_vals
 
         config["optimizer"]["batch_size"] = true_batch_size
 
@@ -250,12 +298,30 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
                 config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], fitted_weights
             )
+            if "losses_init" not in locals():
+                losses_init = losses
             mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
             mlflow.set_tag("status", "plotting")
             t1 = time.time()
 
             final_params = plotters.get_final_params(config, all_params, all_axes, td)
-            red_losses = plotters.plot_loss_hist(config, losses, all_params, used_points, td)
+            # for species in config["parameters"].keys():
+            #     if "m" in config["parameters"][species].keys():
+            #         if not config["parameters"][species]["m"]["active"] and config["parameters"][species]["matte"]:
+            #             alpha = (
+            #                 0.042
+            #                 * config["parameters"][species]["m"]["intens"]
+            #                 / 9.0
+            #                 * np.sum(Z**2 * fract)
+            #                 / (np.sum(Z * fract) * all_params[species]["Te"])
+            #             )
+            #             mcur = 2.0 + 3.0 / (1.0 + 1.66 / (alpha**0.724))
+            #             (
+            #                 self.config["parameters"][self.e_species]["fe"]["velocity"],
+            #                 all_params[self.e_species]["fe"],
+            #             ) = self.num_dist_func(mcur.squeeze())
+
+            red_losses = plotters.plot_loss_hist(config, losses_init, losses, all_params, used_points, td)
             savedata = plotters.plot_ts_data(config, fits, all_data, all_axes, td)
             plotters.model_v_actual(config, all_data, all_axes, fits, losses, red_losses, sqdevs, td)
             sigma_ds = plotters.save_sigmas_params(config, all_params, sigmas, all_axes, td)

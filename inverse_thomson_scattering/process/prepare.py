@@ -1,14 +1,12 @@
 from typing import Dict
 
 import numpy as np
-from scipy.signal import convolve2d as conv2
-from inverse_thomson_scattering.misc import plotters
 from inverse_thomson_scattering.process.evaluate_background import get_shot_bg
-from inverse_thomson_scattering.misc.load_ts_data import loadData
+from inverse_thomson_scattering.data_handleing.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
-from inverse_thomson_scattering.misc.calibration import get_calibrations, get_scattering_angles
+from inverse_thomson_scattering.data_handleing.calibrations.calibration import get_calibrations, get_scattering_angles
 from inverse_thomson_scattering.process.lineouts import get_lineouts
-from inverse_thomson_scattering.misc.data_visualizer import launch_data_visualizer
+from inverse_thomson_scattering.data_handleing.data_visualizer import launch_data_visualizer
 
 
 def prepare_data(config: Dict) -> Dict:
@@ -22,7 +20,7 @@ def prepare_data(config: Dict) -> Dict:
 
     """
     # load data
-    [elecData, ionData, xlab, config["other"]["extraoptions"]["spectype"]] = loadData(
+    [elecData, ionData, xlab, t0, config["other"]["extraoptions"]["spectype"]] = loadData(
         config["data"]["shotnum"], config["data"]["shotDay"], config["other"]["extraoptions"]
     )
 
@@ -31,7 +29,7 @@ def prepare_data(config: Dict) -> Dict:
 
     # Calibrate axes
     [axisxE, axisxI, axisyE, axisyI, magE, stddev] = get_calibrations(
-        config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
+        config["data"]["shotnum"], config["other"]["extraoptions"]["spectype"], t0, config["other"]["CCDsize"]
     )
     all_axes = {"epw_x": axisxE, "epw_y": axisyE, "iaw_x": axisxI, "iaw_y": axisyI, "x_label": xlab}
 
@@ -49,6 +47,8 @@ def prepare_data(config: Dict) -> Dict:
         elecData = correctThroughput(
             elecData, config["other"]["extraoptions"]["spectype"], axisyE, config["data"]["shotnum"]
         )
+        # temp fix for zeros
+        elecData = elecData + 10.0
 
     # load and correct background
     [BGele, BGion] = get_shot_bg(config, axisyE, elecData)

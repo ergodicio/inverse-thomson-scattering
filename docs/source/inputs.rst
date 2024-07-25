@@ -9,11 +9,48 @@ to be altered and default values for all options.
 Parameters
 ---------------------
 
-All fitting parameters are found in the ``parameters:`` section of the input deck. Each parameter has at least 4
+All fitting parameters are found in the ``parameters:`` section of the input deck. These parameters are separated into
+species fields. These species can be called anything but best practice is to name them ``species1`` through
+``speciesn``.
+
+Each species must have a ``type`` field which specifies weather the species is an electron, ion, or the unique general
+type. These three key word should be entered as fields of the ``type`` field. Any number of ion species can be included,
+and while the code currently only supports one electron species this will be expanded in the future. The ``general``
+species is used to specify properties that apply to the system as a whole and are not unique to a species, therefore
+only one can be included.
+
+Within each species live the parameters that are relevent to fitting that species, each parameter has at least 4
 attributes. ``val`` is the initial value used as a starting condition for the minimizer. ``active`` is a boolean
 determining if a parameter is to be fit, i.e ``active: True`` means a parameter with be fit and ``active: False`` means
 a parameter with be held constant at ``val``. ``ub`` and ``lb`` are upper and lower bounds respectively for the
 parameters.
+
+Electron parameters
+^^^^^^^^^^^^^^^^^^^
+- ``Te`` is the electron temperature in keV
+
+- ``ne`` is the electron density in 10^20 cm^-3
+
+- ``m`` is the electron distribution function super-Gaussian parameter
+
+- ``fe`` contains additional options for controlling the distribution function *more info to come*
+
+
+Ion parameters
+^^^^^^^^^^^^^^^^^^^
+- ``Ti`` is the ion temperature in keV
+
+    - ``same`` is a special field for ion temperature, if multiple ions are used subsequent ions can have this boolean
+        set to True in order to use a single ion temperature for all ion species
+
+- ``Z`` is the average ionization state
+
+- ``A`` is the atomic mass
+
+- ``fract`` is the element ratio for multispecies plasmas, the sum of fract for all species should be 1
+
+General parameters
+^^^^^^^^^^^^^^^^^^^
 
 - ``amp1`` is the blue-shifted EPW amplitude multiplier with 1 being the maxmimum of the data
 
@@ -23,30 +60,13 @@ parameters.
 
 - ``lam`` is the probe wavelength in nanometers, small shift (<5nm) can be used to mimic wavelength calibration uncertainty
 
-- ``Te`` is the electron temperature in keV
-
 - ``Te_gradient`` is the electron temperature spatial gradient in % of ``Te``. ``Te`` will take the form ``linspace(Te-Te*Te_gradient.val/200, Te+Te*Te_gradient.val/200, Te_gradient.num_grad_points)``, A ``val!=0`` will calculate the spectrum with a gradient.
 
-- ``Ti`` is the ion temperature in keV
-
-- ``Z`` is the average ionization state
-
-- ``A`` is the atomic mass
+- ``ne_gradient`` is the electron density spatial gradient in % of ``ne``. ``ne`` will take the form ``linspace(ne-ne*ne_gradient.val/200, ne+ne*ne_gradient.val/200, ne_gradient.num_grad_points)``, A ``val!=0`` will calculate the spectrum with a gradient.
 
 - ``ud`` is the electron drift velocity (relative to the ions) in 10^6 cm/s
 
 - ``Va`` is the plasma fluid velocity or flow velocity in 10^6 cm/s
-
-- ``fract`` is the element ratio for multispecies
-
-- ``ne`` is the electron density in 10^20 cm^-3
-
-- ``ne_gradient`` is the electron density spatial gradient in % of ``ne``. ``ne`` will take the form ``linspace(ne-ne*ne_gradient.val/200, ne+ne*ne_gradient.val/200, ne_gradient.num_grad_points)``, A ``val!=0`` will calculate the spectrum with a gradient.
-
-- ``m`` is the electron distribution function super-Gaussian parameter
-
-- ``fe`` contains additional options for controlling the distribution function *more info to come*
-
 
 MLFlow
 --------------

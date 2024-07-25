@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from scipy.signal import convolve2d as conv2
 
-from inverse_thomson_scattering.misc.load_ts_data import loadData
+from inverse_thomson_scattering.data_handleing.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
 
 
@@ -23,7 +23,7 @@ def get_shot_bg(config, axisyE, elecData):
 
     """
     if config["data"]["background"]["type"] == "Shot":
-        [BGele, BGion, _, _] = loadData(
+        [BGele, BGion, _, _, _] = loadData(
             config["data"]["background"]["slice"], config["data"]["shotDay"], config["other"]["extraoptions"]
         )
         if config["other"]["extraoptions"]["load_ion_spec"]:
@@ -41,7 +41,7 @@ def get_shot_bg(config, axisyE, elecData):
         else:
             BGele = 0
     elif config["other"]["extraoptions"]["spectype"] == "angular" and config["data"]["background"]["type"] == "Fit":
-        [BGele, _, _, _] = loadData(
+        [BGele, _, _, _, _] = loadData(
             config["data"]["background"]["slice"], config["data"]["shotDay"], config["other"]["extraoptions"]
         )
 
@@ -123,10 +123,10 @@ def get_lineout_bg(
                 LineoutBGE = []
                 for i, _ in enumerate(config["data"]["lineouts"]["val"]):
                     [rat1bg, _] = spopt.curve_fit(rat11, bgfitx, LineoutTSE_smooth[i][bgfitx], [-16, 200000, 170])
-                    if config["data"]["background"]["show"]:
-                        plt.plot(rat11(np.arange(1024), *rat1bg))
-                        plt.plot(LineoutTSE_smooth[i])
-                        plt.show()
+                    # if config["data"]["background"]["show"]:
+                    #     plt.plot(rat11(np.arange(1024), *rat1bg))
+                    #     plt.plot(LineoutTSE_smooth[i])
+                    #     plt.show()
 
                     LineoutBGE.append(rat11(np.arange(1024), *rat1bg))
         # if not fit

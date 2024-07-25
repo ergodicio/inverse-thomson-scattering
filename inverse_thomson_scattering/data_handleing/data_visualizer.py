@@ -4,13 +4,27 @@ import tempfile, mlflow, os
 
 
 def launch_data_visualizer(elecData, ionData, all_axes, config):
+    """
+    Plots the raw data with solid lines indicating the beginning and ending of the analysis and dashed lines indicating
+    the portions of the spectrum that are included in the analysis.
+
+    Args:
+        elecData: Electron data to be plotted, if electron data is not loaded a dummy can be placed here
+        ionData: Ion data to be plotted, if ion data is not loaded a dummy can be placed here
+        all_axes: A dictionary containing the axes for the data being plotted. If electron data is plotted 'epw_x' and
+        'epw_y' are required fields. If ion data is plotted 'iaw_x' and 'iaw_y' are required fields.
+        config: Dictionary constructed from input deck
+
+    Returns:
+
+    """
     if config["data"]["lineouts"]["type"] == "ps" or config["data"]["lineouts"]["type"] == "um":
         LineoutPixelE = [
             np.argmin(abs(all_axes["epw_x"] - loc - config["data"]["ele_t0"]))
             for loc in config["data"]["lineouts"]["val"]
         ]
-        IAWtime = (
-            config["data"]["ion_t0_shift"] / all_axes["iaw_x"][1]
+        IAWtime = config["data"]["ion_t0_shift"] / (
+            all_axes["iaw_x"][1] - all_axes["iaw_x"][0]
         )  # corrects the iontime to be in the same units as the lineout
         LineoutPixelI = [
             np.argmin(abs(all_axes["iaw_x"] - loc - config["data"]["ele_t0"]))

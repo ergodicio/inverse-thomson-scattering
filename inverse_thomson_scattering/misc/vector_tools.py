@@ -2,17 +2,50 @@ from jax import numpy as jnp
 
 
 def vadd(a, b):
-    # custom function for vector addition where a and b are tuples of ND-arrays with the first element being the ND-array of x-values and the second element being the ND-array of y-values
+    """
+    Custom function for vector addition where a and b are tuples of ND-arrays with the first element being the ND-array
+    of x-values and the second element being the ND-array of y-values.
+
+    Args:
+        a: tuple of ND-arrays where the first element is x-values and the second is y-values
+        b: tuple of ND-arrays where the first element is x-values and the second is y-values
+
+    Returns:
+        c: tuple of ND-arrays where the first element is x-values and the second is y-values
+
+    """
     return (a[0] + b[0], a[1] + b[1])
 
 
 def vsub(a, b):
-    # custom function for vector subtraction where a and b are tuples of ND-arrays with the first element being the ND-array of x-values and the second element being the ND-array of y-values
+    """
+    Custom function for vector subtraction where a and b are tuples of ND-arrays with the first element being the ND-array
+    of x-values and the second element being the ND-array of y-values.
+
+    Args:
+        a: tuple of ND-arrays where the first element is x-values and the second is y-values
+        b: tuple of ND-arrays where the first element is x-values and the second is y-values
+
+    Returns:
+        c: tuple of ND-arrays where the first element is x-values and the second is y-values
+
+    """
     return (a[0] - b[0], a[1] - b[1])
 
 
 def vdot(a, b):
-    # custom function for vector dot product where a and b are tuples of ND-arrays with the first element being the ND-array of x-values and the second element being the ND-array of y-values
+    """
+    Custom function for vector dot product where a and b are tuples of ND-arrays with the first element being the
+    ND-array of x-values and the second element being the ND-array of y-values. If on of the vector only has one
+    component it is treated as a scalar.
+
+    Args:
+        a: tuple of ND-arrays where the first element is x-values and the second is y-values or an ND-array
+        b: tuple of ND-arrays where the first element is x-values and the second is y-values or an ND-array
+
+    Returns:
+        c: ND-array or tuple of ND-arrays based off the operation being a dot product or scalar product
+    """
     if type(a) is tuple:
         if type(b) is tuple:
             return a[0] * b[0] + a[1] * b[1]
@@ -23,6 +56,16 @@ def vdot(a, b):
 
 
 def vdiv(a, b):
+    """
+    Custom function for division of a vector by a scalar.
+
+    Args:
+        a: tuple of ND-arrays where the first element is x-values and the second is y-values
+        b: ND-array
+
+    Returns:
+        c: tuple of ND-arrays
+    """
     # custom function for vector divided by a scalar
     if type(a) is tuple:
         if type(b) is tuple:
@@ -34,11 +77,31 @@ def vdiv(a, b):
 
 
 def v_add_dim(a):
+    """
+    Custom function for adding an array dimension to the ND-arrays in vectors.
+
+    Args:
+        a: vector to add a dimension to, tuple of ND-arrays where the first element is x-values and the second is
+            y-values
+
+    Returns:
+        c: vector with additional dimension, tuple of ND-arrays
+    """
     return (a[0][..., jnp.newaxis], a[1][..., jnp.newaxis])
 
 
 # performs a counterclockwise rotation, rotation angle in radians
 def rotate(A, theta):
+    """
+    Rotates a matrix A by an angle theta in the counter-clockwise direction.
+
+    Args:
+        A: Matrix to be rotated
+        theta: rotation angle in radians
+
+    Returns:
+        A_rotated: rotated Matrix, same shape as A
+    """
     # create new grid
     rot_point = [A.shape[0] / 2, A.shape[1] / 2]
     x, y = jnp.meshgrid(jnp.arange(A.shape[0]), jnp.arange(A.shape[1]))
