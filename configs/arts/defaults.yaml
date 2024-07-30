@@ -179,18 +179,18 @@ optimizer:
     # use adam for nn / stochastic gradient descent
     # use L-BFGS-B for full batch / parameter learning
     # although adam will work here too
-    method: l-bfgs-b
+    method: adam
     hessian: False
     y_norm: True
     x_norm: False
     grad_method: AD
     grad_scalar: 1.0
-    batch_size: 5
+    batch_size: 6
     num_epochs: 1
-    learning_rate: 1.0e-4
+    learning_rate: 0.0001
     parameter_norm: True
     refine_factor: 1
-    num_mins: 2
+    num_mins: 1
 
 nn:
     use: false

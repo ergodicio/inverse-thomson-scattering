@@ -31,7 +31,7 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: angular_2D_forward_test
+    run: angular_2D_fit_test
     
 machine: gpu
 
@@ -91,15 +91,15 @@ parameters:
       ub: 2.0
       val: 1.0
     fe:
-      active: false
+      active: true
       dim: 2
       fe_decrease_strict: false
       lb: -100.0
-      length: 8
+      length: 16
       m_asym: 1.0
       m_theta: 0.0
       symmetric: false
-      temp_asym: 2.0
+      temp_asym: 1.0
       type:
         DLM: null
       ub: -0.5
