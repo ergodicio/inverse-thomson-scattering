@@ -194,7 +194,7 @@ def calc_series(config):
 
     if config["other"]["extraoptions"]["spectype"] == "angular":
         [axisxE, _, _, _, _, _] = get_calibrations(
-            104000, config["other"]["extraoptions"]["spectype"], config["other"]["CCDsize"]
+            104000, config["other"]["extraoptions"]["spectype"], 0.0, config["other"]["CCDsize"]
         )  # shot number hardcoded to get calibration
         config["other"]["extraoptions"]["spectype"] = "angular_full"
 

@@ -1,85 +1,104 @@
 parameters:
-    amp1:
-        val: 1.
-        active: False
-        lb: 0.
-        ub: 10.
-    amp2:
-        val: 1.
-        active: False
-        lb: 0.
-        ub: 10.
-    amp3:
-        val: 1.
-        active: False
-        lb: 0.
-        ub: 10.
-    lam:
-        val: 526.5
-        active: False
-        lb: 523.
-        ub: 528.
-    Te:
-        val: .5
-        active: False
-        lb: 0.01
-        ub: 3.
-        gradient: 0.0
-    Ti:
-        val: .2
-        active: False
-        lb: 0.01
-        ub: 3.
-    Z:
-        val: 1.
-        active: False
-        lb: 1.
-        ub: 25.
-    A:
-        val: 40
-        active: False
-    fract:
-        val: 1
-        active: False
-    ne:
-        val: .2
-        active: False
-        lb: .001
-        ub: 10.
-        gradient: 0.0
-    ud:
-        val: 0
-        active: False
+  general:
+    Te_gradient:
+      active: false
+      lb: 0.0
+      num_grad_points: 1
+      ub: 10.0
+      val: 0.0
     Va:
-        val: 0
-        active: False
-    m:
-        val: 2.
-        active: False
-        lb: 2.
-        ub: 5.
+      active: false
+      angle: 0.0
+      lb: -20.5
+      ub: 20.5
+      val: 0.0
+    amp1:
+      active: true
+      lb: 0.01
+      ub: 3.75
+      val: 1.0
+    amp2:
+      active: false
+      lb: 0.01
+      ub: 3.75
+      val: 1.0
+    amp3:
+      active: false
+      lb: 0.01
+      ub: 3.75
+      val: 1.0
+    lam:
+      active: false
+      lb: 523.0
+      ub: 528.0
+      val: 526.5
+    ne_gradient:
+      active: false
+      lb: 0.0
+      num_grad_points: 1
+      ub: 15.0
+      val: 0.0
+    type:
+      general: null
+    ud:
+      active: false
+      angle: 0.0
+      lb: -100.0
+      ub: 100.0
+      val: 0.0
+  species1:
+    Te:
+      active: false
+      lb: 0.01
+      ub: 1.5
+      val: 0.6
     fe:
-        val: []
-        active: False
-        length: 3999
-        type:
-            DLM:
-        lb: -100.
-        ub: -0.5
-        fe_decrease_strict: True
-    blur:
-        val: []
-        active: False
-        lb: 0.
-        ub: 10.
-    specCurvature:
-        val: []
-        active: False
-        lb: .1
-        ub: 10.
-    fitprops:
-        val: []
-        active: False
+      active: false
+      dim: 1
+      fe_decrease_strict: false
+      lb: -100.0
+      length: 3999
+      m_asym: 1.0
+      m_theta: 0.0
+      symmetric: false
+      temp_asym: 1.0
+      type:
+        DLM: null
+      ub: -0.5
+      v_res: 0.1
+      val: []
+    m:
+      active: true
+      lb: 2.0
+      matte: false
+      ub: 5.0
+      val: 3.0
+    ne:
+      active: false
+      lb: 0.001
+      ub: 1.0
+      val: 0.2
+    type:
+      electron: null
+  species2:
+    A:
+      active: false
+      val: 40.0
+    Ti:
+      active: false
+      lb: 0.001
+      ub: 1.0
+      val: 0.12
+    Z:
+      active: false
+      lb: 0.5
+      ub: 7.0
+      val: 14.0
+    fract:
+      active: false
+      val: 0.1
+    type:
+      ion: null
 
 other:
     crop_window: 1
@@ -120,7 +139,7 @@ plotting:
     
 
 data:
-    launch_data_visualizer: False
+    launch_data_visualizer: true
     shotnum: 101675
     shotDay: False
     fit_rng:
@@ -165,7 +184,7 @@ optimizer:
     y_norm: True
     x_norm: False
     grad_method: AD
-    grad_scalar: 0.5
+    grad_scalar: 1.0
     batch_size: 5
     num_epochs: 1
     learning_rate: 1.0e-4
