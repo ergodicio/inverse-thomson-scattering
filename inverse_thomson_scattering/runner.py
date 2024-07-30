@@ -170,16 +170,7 @@ def calc_series(config):
                 config["parameters"][species]["m"]["val"]
             )
             config["parameters"][species]["fe"]["val"] = np.log(config["parameters"][species]["fe"]["val"])[None, :]
-
-    for species in config["parameters"].keys():
-        if "electron" in config["parameters"][species]["type"].keys():
-            elec_species = species
-            dist_obj = DistFunc(config["parameters"][species])
-            config["parameters"][species]["fe"]["velocity"], config["parameters"][species]["fe"]["val"] = dist_obj(
-                config["parameters"][species]["m"]["val"]
-            )
-            config["parameters"][species]["fe"]["val"] = np.log(config["parameters"][species]["fe"]["val"])[None, :]
-
+    
     config["units"] = init_param_norm_and_shift(config)
 
     sas = get_scattering_angles(config)
@@ -254,7 +245,7 @@ def calc_series(config):
 
         ts_fitter = TSFitter(config, sas, dummy_batch)
         params = ts_fitter.weights_to_params(ts_fitter.pytree_weights["active"])
-        ThryE[i][i], ThryI[i][i], lamAxisE[i][i], lamAxisI[i][i] = ts_fitter.spec_calc(params, dummy_batch)
+        ThryE[i], ThryI[i], lamAxisE[i], lamAxisI[i] = ts_fitter.spec_calc(params, dummy_batch)
 
     spectime = time.time() - t_start
     ThryE = np.array(ThryE)
@@ -276,8 +267,9 @@ def calc_series(config):
             )
             plotters.plot_dist(
                 config,
+                elec_species,
                 {
-                    "fe": config["parameters"][elec_species]["fe"]["val"],
+                    "fe": np.squeeze(config["parameters"][elec_species]["fe"]["val"]),
                     "v": config["parameters"][elec_species]["fe"]["velocity"],
                 },
                 np.zeros_like(config["parameters"][elec_species]["fe"]["val"]),
@@ -287,45 +279,7 @@ def calc_series(config):
             if config["parameters"][elec_species]["fe"]["dim"] == 2:
                 plotters.plot_dist(
                     config,
-                    {
-                        "fe": config["parameters"][elec_species]["fe"]["val"],
-                        "v": config["parameters"][elec_species]["fe"]["velocity"],
-                    },
-                    np.zeros_like(config["parameters"][elec_species]["fe"]["val"]),
-                    td,
-                )
-
-    spectime = time.time() - t_start
-    ThryE = np.array(ThryE)
-    ThryI = np.array(ThryI)
-    lamAxisE = np.array(lamAxisE)
-    lamAxisI = np.array(lamAxisI)
-
-    with tempfile.TemporaryDirectory() as td:
-        os.makedirs(os.path.join(td, "plots"), exist_ok=True)
-        os.makedirs(os.path.join(td, "binary"), exist_ok=True)
-        os.makedirs(os.path.join(td, "csv"), exist_ok=True)
-        if config["other"]["extraoptions"]["spectype"] == "angular_full":
-            savedata = plotters.plot_data_angular(
-                config,
-                {"ele": np.squeeze(ThryE)},
-                {"e_data": np.zeros((config["other"]["CCDsize"][0], config["other"]["CCDsize"][1]))},
-                {"epw_x": sas["angAxis"], "epw_y": lamAxisE},
-                td,
-            )
-            plotters.plot_dist(
-                config,
-                {
-                    "fe": config["parameters"][elec_species]["fe"]["val"],
-                    "v": config["parameters"][elec_species]["fe"]["velocity"],
-                },
-                np.zeros_like(config["parameters"][elec_species]["fe"]["val"]),
-                td,
-            )
-        else:
-            if config["parameters"][elec_species]["fe"]["dim"] == 2:
-                plotters.plot_dist(
-                    config,
+                    elec_species,
                     {
                         "fe": config["parameters"][elec_species]["fe"]["val"],
                         "v": config["parameters"][elec_species]["fe"]["velocity"],

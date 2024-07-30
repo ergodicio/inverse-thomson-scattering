@@ -59,20 +59,6 @@ class FormFactor:
             Instance of the FormFactor object
 
         """
-        """
-        Creates a FormFactor object holding all the static values to use for repeated calculations of the Thomson
-        scattering structure factor or spectral density function.
-
-        Args:
-            lamrang: list of the starting and ending wavelengths over which to calculate the spectrum.
-            npts: number of wavelength points to use in the calculation
-            fe_dim: dimension of the electron velocity distribution function (EDF), should be 1 or 2
-            vax: (optional) velocity axis coordinates that the 2D EDF is defined on
-
-        Returns:
-            Instance of the FormFactor object
-
-        """
         # basic quantities
         self.C = 2.99792458e10
         self.Me = 510.9896 / self.C**2  # electron mass keV/C^2
@@ -321,7 +307,7 @@ class FormFactor:
         """
 
         _, (fe_vphi, chiEI, chiERrat) = scan(
-            self.calc_chi_vals, (x, DF), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=8
+            self.calc_chi_vals, (x, jnp.squeeze(DF)), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=8
         )
 
         # fe_vphi, chiEI, chiERrat = self._calc_all_chi_vals_(
@@ -436,7 +422,7 @@ class FormFactor:
         # find the rotation angle beta, the heaviside changes the angles to [0, 2pi)
         beta = jnp.arctan(xie[1] / xie[0]) + jnp.pi * (-jnp.heaviside(xie[0], 1) + 1)
 
-        fe_vphi, chiEI, chiERrat = self.calc_all_chi_vals(x[0, :], beta, DF, xie_mag, klde_mag)
+        fe_vphi, chiEI, chiERrat = self.calc_all_chi_vals(x[0,:], beta, DF, xie_mag, klde_mag)
 
         chiE = chiERrat + jnp.sqrt(-1 + 0j) * chiEI
         epsilon = 1.0 + chiE + chiI

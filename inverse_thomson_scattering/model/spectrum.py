@@ -75,15 +75,17 @@ class SpectrumCalculator:
 
     def reduce_ATS_to_resunit(self, ThryE, lamAxisE, TSins, batch):
         """
-        TODO
+        Integrate synthetic angularly resolved Thomson spectra over a resolution unit. A resolution unit is 2D with a width in the spectral and angular domains. 
 
         Args:
-            ThryE:
-            lamAxisE:
-            TSins:
-            batch:
+            ThryE: Synthetic angularly resolved spectrum
+            lamAxisE: calibrated wavelength axis, should have a length equal to one dimension of ThryE
+            TSins: dictionary of the Thomson scattering parameters
+            batch: dictionary containing the data and amplitudes
 
         Returns:
+            ThryE: The input synthetic angularly resolved spectrum integrated of the resolution unit and correspondingly downsized
+            lamAxisE: the input wavelength axis integrated over a wavelngth resolution unit and correspondingly downsized
 
         """
         lam_step = round(ThryE.shape[1] / batch["e_data"].shape[1])
@@ -97,7 +99,7 @@ class SpectrumCalculator:
         )
         ThryE = ThryE[self.cfg["data"]["lineouts"]["start"] : self.cfg["data"]["lineouts"]["end"], :]
         ThryE = batch["e_amps"] * ThryE / jnp.amax(ThryE, axis=1, keepdims=True)
-        ThryE = jnp.where(lamAxisE < self.lam, TSins["amp1"] * ThryE, TSins["amp2"] * ThryE)
+        ThryE = jnp.where(lamAxisE < self.lam, TSins["general"]["amp1"] * ThryE, TSins["general"]["amp2"] * ThryE)
         return ThryE, lamAxisE
 
     def __call__(self, params, batch):
