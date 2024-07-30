@@ -139,7 +139,7 @@ plotting:
     
 
 data:
-    launch_data_visualizer: true
+    launch_data_visualizer: false
     shotnum: 101675
     shotDay: False
     fit_rng:
@@ -160,6 +160,8 @@ data:
     bgshotmult: 1
     ele_lam_shift: 0.0
     ion_loss_scale: 1.0
+    ele_t0: 0
+    ion_t0_shift: 0
     probe_beam: P9
     dpixel: 2
     lineouts:

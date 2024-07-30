@@ -30,7 +30,7 @@ def launch_data_visualizer(elecData, ionData, all_axes, config):
             np.argmin(abs(all_axes["iaw_x"] - loc - config["data"]["ele_t0"]))
             for loc in config["data"]["lineouts"]["val"]
         ]
-    elif config["data"]["lineouts"]["type"] == "pixel":
+    elif config["data"]["lineouts"]["type"] == "pixel" or config["data"]["lineouts"]["type"] == "range":
         LineoutPixelE = config["data"]["lineouts"]["val"]
         LineoutPixelI = config["data"]["lineouts"]["val"]
         IAWtime = config["data"]["ion_t0_shift"]

@@ -91,7 +91,7 @@ parameters:
       ub: 2.0
       val: 1.0
     fe:
-      active: false
+      active: true
       dim: 2
       fe_decrease_strict: false
       lb: -100.0

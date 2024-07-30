@@ -77,7 +77,7 @@ class TSFitter:
         # this needs to be rethought and does not work in all cases
         if cfg["parameters"][self.e_species]["fe"]["active"]:
             if "dist_fit" in cfg:
-                if cfg["parameters"]["fe"]["dim"] == 1:
+                if cfg["parameters"][self.e_species]["fe"]["dim"] == 1:
                     self.smooth_window_len = round(
                         cfg["parameters"][self.e_species]["fe"]["velocity"].size * cfg["dist_fit"]["window"]["len"]
                     )
@@ -158,15 +158,20 @@ class TSFitter:
                 if param_config["active"]:
                     # if self.cfg["optimizer"]["method"] == "adam":
                     #     these_params[param_name] = 0.5 + 0.5 * jnp.tanh(these_params[param_name])
-
-                    these_params[species][param_name] = (
-                        these_params[species][param_name] * self.cfg["units"]["norms"][species][param_name]
-                        + self.cfg["units"]["shifts"][species][param_name]
-                    )
-                    if param_name == "fe":
-                        these_params[species]["fe"] = jnp.log(
-                            self.smooth(jnp.exp(these_params[species]["fe"][0]))[None, :]
+                    if param_name != 'fe':
+                        these_params[species][param_name] = (
+                            these_params[species][param_name] * self.cfg["units"]["norms"][species][param_name]
+                            + self.cfg["units"]["shifts"][species][param_name]
                         )
+                    else:
+                        these_params[species][param_name] = (
+                            these_params[species][param_name] * self.cfg["units"]["norms"][species][param_name].reshape(jnp.shape(these_params[species][param_name]))
+                            + self.cfg["units"]["shifts"][species][param_name].reshape(jnp.shape(these_params[species][param_name]))
+                        )
+                        if self.cfg['parameters'][species]["fe"]["dim"]==1:
+                            these_params[species]["fe"] = jnp.log(
+                                self.smooth(jnp.exp(these_params[species]["fe"][0]))[None, :]
+                            )
                         # these_params["fe"] = jnp.log(self.smooth(jnp.exp(these_params["fe"])))
 
                 else:
@@ -431,7 +436,7 @@ class TSFitter:
             # needs to be fixed
             # momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
             momentum_loss = 0.0
-            print(temperature_loss)
+            #print(temperature_loss)
         return density_loss, temperature_loss, momentum_loss
 
     def calc_other_losses(self, params):
@@ -618,8 +623,13 @@ def init_weights_and_bounds(config, num_slices):
                     [1.0 + 0 * config["units"]["ub"][species][k] for _ in range(num_slices)]
                 )
 
-                iw[active_or_inactive][species][k] = (
-                    iw[active_or_inactive][species][k] - config["units"]["shifts"][species][k]
-                ) / config["units"]["norms"][species][k]
+                if k!= "fe":
+                    iw[active_or_inactive][species][k] = (
+                        iw[active_or_inactive][species][k] - config["units"]["shifts"][species][k]
+                    ) / config["units"]["norms"][species][k]
+                else:
+                    iw[active_or_inactive][species][k] = (
+                        iw[active_or_inactive][species][k] - config["units"]["shifts"][species][k].reshape(jnp.shape(iw[active_or_inactive][species][k]))
+                    ) / config["units"]["norms"][species][k].reshape(jnp.shape(iw[active_or_inactive][species][k]))
 
     return lb, ub, iw
