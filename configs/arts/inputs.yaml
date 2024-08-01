@@ -4,7 +4,7 @@ data:
         type:
             range
         start: 90
-        end: 950
+        end: 450
         skip: 20
     background:
         type:
@@ -95,7 +95,7 @@ parameters:
       dim: 2
       fe_decrease_strict: false
       lb: -100.0
-      length: 16
+      length: 64
       m_asym: 1.0
       m_theta: 0.0
       symmetric: false

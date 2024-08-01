@@ -427,7 +427,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     print("minimizing")
 
     if "angular" in config["other"]["extraoptions"]["spectype"]:
-        fitted_weights, overall_loss, ts_fitter = scipy_angular_loop(config, all_data, sa)
+        fitted_weights, overall_loss, ts_fitter = angular_adam(config, all_data, sa, batch_indices, num_batches)
     else:
         fitted_weights, overall_loss, ts_fitter = one_d_loop(config, all_data, sa, batch_indices, num_batches)
 

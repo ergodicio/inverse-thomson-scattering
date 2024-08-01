@@ -42,6 +42,7 @@ class FitModel:
             elif "ion" in config["parameters"][species]["type"].keys():
                 self.num_ions += 1
 
+        print(config["other"]["npts"])
         self.electron_form_factor = FormFactor(
             config["other"]["lamrangE"],
             npts=config["other"]["npts"],
@@ -197,25 +198,6 @@ class FitModel:
                     (fecur, vcur),
                     lam,
                 )
-            if self.num_dist_func.dim == 1:
-                ThryI, lamAxisI = self.ion_form_factor(
-                    all_params, cur_ne, cur_Te, A, Z, Ti, fract, self.sa["sa"], (fecur, vcur), lam
-                )
-            else:
-                ThryI, lamAxisI = self.ion_form_factor.calc_in_2D(
-                    all_params,
-                    self.config["parameters"]["general"]["ud"]["angle"],
-                    self.config["parameters"]["general"]["ud"]["angle"],
-                    cur_ne,
-                    cur_Te,
-                    A,
-                    Z,
-                    Ti,
-                    fract,
-                    self.sa["sa"],
-                    (fecur, vcur),
-                    lam,
-                )
 
             # remove extra dimensions and rescale to nm
             lamAxisI = jnp.squeeze(lamAxisI) * 1e7  # TODO hardcoded
@@ -228,34 +210,6 @@ class FitModel:
             lamAxisI = []
 
         if self.config["other"]["extraoptions"]["load_ele_spec"]:
-            if self.num_dist_func.dim == 1:
-                ThryE, lamAxisE = self.electron_form_factor(
-                    all_params,
-                    cur_ne,
-                    cur_Te,
-                    A,
-                    Z,
-                    Ti,
-                    fract,
-                    self.sa["sa"],
-                    (fecur, vcur),
-                    lam + self.config["data"]["ele_lam_shift"],
-                )
-            else:
-                ThryE, lamAxisE = self.electron_form_factor.calc_in_2D(
-                    all_params,
-                    self.config["parameters"]["general"]["ud"]["angle"],
-                    self.config["parameters"]["general"]["ud"]["angle"],
-                    cur_ne,
-                    cur_Te,
-                    A,
-                    Z,
-                    Ti,
-                    fract,
-                    self.sa["sa"],
-                    (fecur, vcur),
-                    lam + self.config["data"]["ele_lam_shift"],
-                )
             if self.num_dist_func.dim == 1:
                 ThryE, lamAxisE = self.electron_form_factor(
                     all_params,
