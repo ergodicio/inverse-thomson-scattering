@@ -130,7 +130,7 @@ other:
 plotting:
     n_sigmas: 3
     rolling_std_width: 5
-    data_cbar_u: 1.1
+    data_cbar_u: data
     data_cbar_l: 0
     ion_window_start: 525
     ion_window_end: 528
@@ -188,7 +188,7 @@ optimizer:
     grad_method: AD
     grad_scalar: 1.0
     batch_size: 6
-    num_epochs: 1
+    num_epochs: 500
     learning_rate: 0.0001
     parameter_norm: True
     refine_factor: 1

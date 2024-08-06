@@ -199,6 +199,10 @@ def get_sigmas(hess: Dict, batch_size: int) -> Dict:
 def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter, sa, fitted_weights):
     t1 = time.time()
 
+    for species in config["parameters"].keys():
+        if "electron" in config["parameters"][species]["type"].keys():
+            elec_species = species
+    
     if config["other"]["extraoptions"]["spectype"] != "angular_full" and config["other"]["refit"]:
         losses_init, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
             config, batch_indices, all_data, ts_fitter, False, fitted_weights
@@ -275,9 +279,12 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
         if config["other"]["extraoptions"]["spectype"] == "angular_full":
             best_weights_val = {}
             best_weights_std = {}
-            for k, v in fitted_weights.items():
-                best_weights_val[k] = np.average(v, axis=0)  # [0, :]
-                best_weights_std[k] = np.std(v, axis=0)  # [0, :]
+            if config["optimizer"]["num_mins"]>1:
+                for k, v in fitted_weights.items():
+                    best_weights_val[k] = np.average(v, axis=0)  # [0, :]
+                    best_weights_std[k] = np.std(v, axis=0)  # [0, :]
+            else:
+                best_weights_val = fitted_weights
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
                 config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], best_weights_val
             )
@@ -292,7 +299,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
                 sigma_fe = np.zeros_like(final_params["fe"])
             savedata = plotters.plot_data_angular(config, fits, all_data, all_axes, td)
             plotters.plot_ang_lineouts(used_points, sqdevs, losses, all_params, all_axes, savedata, td)
-            plotters.plot_dist(config, final_params, sigma_fe, td)
+            plotters.plot_dist(config, elec_species, final_params, sigma_fe, td)
 
         else:
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(

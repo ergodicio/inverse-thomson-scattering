@@ -65,7 +65,6 @@ class FormFactor:
         self.Mp = self.Me * 1836.1  # proton mass keV/C^2
         self.lamrang = lamrang
         self.npts = npts
-        print(npts)
         self.h = 0.01
         minmax = 8.2
         h1 = 1024  # 1024  # 1024
@@ -310,7 +309,6 @@ class FormFactor:
         _, (fe_vphi, chiEI, chiERrat) = scan(
             self.calc_chi_vals, (x, jnp.squeeze(DF)), (beta.flatten(), xie_mag.flatten(), klde_mag.flatten()), unroll=16
         )
-
         # fe_vphi, chiEI, chiERrat = self._calc_all_chi_vals_(
         #     (x, DF), beta.flatten(), xie_mag.flatten(), klde_mag.flatten()
         # )
@@ -417,7 +415,6 @@ class FormFactor:
         # xie = vsub(vdiv(omgdop, vdot(k, vTe)), vdiv(ud, vTe))
         xie = vdiv(vsub(vdot(omgdop / k_mag**2, k), ud), vTe)
         xie_mag = jnp.sqrt(vdot(xie, xie))
-        print(np.shape(xie_mag))
         DF, (x, y) = fe
 
         # for each vector in xie

@@ -29,8 +29,8 @@ def get_final_params(config, best_weights, all_axes, td):
     for species in best_weights.keys():
         for k, v in best_weights[species].items():
             if k == "fe":
-                dist[k] = pandas.Series(v[0])
-                dist["v"] = pandas.Series(config[species]["fe"]["velocity"])
+                dist[k] = v[0]
+                dist["v"] = config["parameters"][species]["fe"]["velocity"]
             else:
                 all_params[k + "_" + species] = pandas.Series(v.reshape(-1))
                 # if np.shape(v)[1] > 1:
@@ -43,12 +43,12 @@ def get_final_params(config, best_weights, all_axes, td):
     if config["other"]["extraoptions"]["load_ion_spec"]:
         final_params.insert(0, all_axes["x_label"], np.array(all_axes["iaw_x"][config["data"]["lineouts"]["pixelI"]]))
         final_params.insert(0, "lineout pixel", config["data"]["lineouts"]["pixelI"])
-    else:
+    elif config["other"]["extraoptions"]["spectype"] != "angular_full":    
         final_params.insert(0, all_axes["x_label"], np.array(all_axes["epw_x"][config["data"]["lineouts"]["pixelE"]]))
         final_params.insert(0, "lineout pixel", config["data"]["lineouts"]["pixelE"])
     final_params.to_csv(os.path.join(td, "csv", "learned_parameters.csv"))
 
-    final_dist = pandas.DataFrame(dist)
+    final_dist = pandas.DataFrame({'fe':[l for l in dist['fe']], 'vx':[vx for vx in dist['v'][0]], 'vy':[vy for vy in dist['v'][1]]})
     final_dist.to_csv(os.path.join(td, "csv", "learned_dist.csv"))
 
     return all_params | dist
