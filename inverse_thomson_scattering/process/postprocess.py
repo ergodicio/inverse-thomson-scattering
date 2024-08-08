@@ -292,7 +292,7 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
             mlflow.set_tag("status", "plotting")
             t1 = time.time()
 
-            final_params = plotters.get_final_params(config, best_weights_val, all_axes, td)
+            final_params = plotters.get_final_params(config, all_params, all_axes, td)
             if config["other"]["calc_sigmas"]:
                 sigma_fe = plotters.save_sigmas_fe(final_params, best_weights_std, sigmas, td)
             else:

@@ -3,6 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import copy
+import json
 import scipy.optimize as spopt
 
 import jaxopt, mlflow, optax
@@ -218,7 +219,7 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
     jaxopt_kwargs = dict(
         fun=ts_fitter.vg_loss, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
     )
-    opt = optax.adam(config["optimizer"]["learning_rate"])
+    opt = optax.adamw(config["optimizer"]["learning_rate"])
     solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
 
     weights = ts_fitter.pytree_weights["active"]
@@ -234,6 +235,7 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
     opt_state = solver.init_state(weights, batch=test_batch)
 
     # start train loop
+    state_weights = {}
     t1 = time.time()
     print("minimizing")
     mlflow.set_tag("status", "minimizing")
@@ -252,8 +254,17 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
         if epoch_loss < best_loss:
             best_loss = epoch_loss
             best_weights = weights
+        
+        if config["optimizer"]["save_state"]:
+            if i_epoch % config["optimizer"]["save_state_freq"] == 0:
+                state_weights[i_epoch] = best_weights
 
         mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
+
+    with open('state_weights.txt', 'w') as file:
+        file.write(json.dumps(state_weights))
+
+    mlflow.log_artifact('state_weights.txt')
     return best_weights, best_loss, ts_fitter
 
 def _1d_adam_loop_(

@@ -92,7 +92,7 @@ parameters:
       val: 1.0
     fe:
       active: true
-      dim: 2
+      dim: 1
       fe_decrease_strict: false
       lb: -100.0
       length: 64
