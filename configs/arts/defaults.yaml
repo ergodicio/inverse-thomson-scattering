@@ -188,13 +188,13 @@ optimizer:
     grad_method: AD
     grad_scalar: 1.0
     batch_size: 6
-    num_epochs: 1
+    num_epochs: 4
     learning_rate: 0.0001
     parameter_norm: True
     refine_factor: 1
     num_mins: 1
     save_state: True
-    save_state_freq: 100
+    save_state_freq: 2
 
 nn:
     use: false

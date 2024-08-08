@@ -31,7 +31,7 @@ other:
 
 mlflow:
     experiment: inverse-thomson-scattering
-    run: angular_2D_fit_scaling_epochs_500
+    run: angular_2D_plot_print_test
     
 machine: gpu
 
@@ -92,7 +92,7 @@ parameters:
       val: 1.0
     fe:
       active: true
-      dim: 1
+      dim: 2
       fe_decrease_strict: false
       lb: -100.0
       length: 64
@@ -103,7 +103,7 @@ parameters:
       type:
         DLM: null
       ub: -0.5
-      v_res: 0.2
+      v_res: 0.5
       val: []
     m:
       active: false

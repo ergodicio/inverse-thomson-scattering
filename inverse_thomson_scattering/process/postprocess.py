@@ -78,8 +78,11 @@ def recalculate_with_chosen_weights(
 
         for species in all_params.keys():
             for k in all_params[species].keys():
-                # all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
-                all_params[species][k] = params[species][k].reshape(-1)
+                if k != 'fe':
+                    # all_params[k] = np.concatenate([all_params[k], params[k].reshape(-1)])
+                    all_params[species][k] = params[species][k].reshape(-1)
+                else:
+                    all_params[species][k] = params[species][k]
 
         if calc_sigma:
             # this line may need to be omited since the weights may be transformed by line 77
@@ -285,9 +288,11 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
                     best_weights_std[k] = np.std(v, axis=0)  # [0, :]
             else:
                 best_weights_val = fitted_weights
+                
             losses, sqdevs, used_points, fits, sigmas, all_params = recalculate_with_chosen_weights(
                 config, batch_indices, all_data, ts_fitter, config["other"]["calc_sigmas"], best_weights_val
             )
+            
             mlflow.log_metrics({"postprocessing time": round(time.time() - t1, 2)})
             mlflow.set_tag("status", "plotting")
             t1 = time.time()

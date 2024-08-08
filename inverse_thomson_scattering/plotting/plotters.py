@@ -29,7 +29,7 @@ def get_final_params(config, best_weights, all_axes, td):
     for species in best_weights.keys():
         for k, v in best_weights[species].items():
             if k == "fe":
-                dist[k] = v
+                dist[k] = v.squeeze()
                 dist["v"] = config["parameters"][species]["fe"]["velocity"]
             else:
                 all_params[k + "_" + species] = pandas.Series(v.reshape(-1))
@@ -48,6 +48,7 @@ def get_final_params(config, best_weights, all_axes, td):
         final_params.insert(0, "lineout pixel", config["data"]["lineouts"]["pixelE"])
     final_params.to_csv(os.path.join(td, "csv", "learned_parameters.csv"))
 
+    
     if len(np.shape(dist['fe']))==1:
         final_dist = pandas.DataFrame({'fe':[l for l in dist['fe']], 'vx':[vx for vx in dist['v']]})
     elif len(np.shape(dist['fe']))==2:

@@ -3,7 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import copy
-import json
+import pickle
 import scipy.optimize as spopt
 
 import jaxopt, mlflow, optax
@@ -237,8 +237,8 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
     # start train loop
     state_weights = {}
     t1 = time.time()
-    print("minimizing")
-    mlflow.set_tag("status", "minimizing")
+    # print("minimizing")
+    # mlflow.set_tag("status", "minimizing")
 
     best_loss = 1e16
     for i_epoch in (pbar := trange(config["optimizer"]["num_epochs"])):
@@ -261,8 +261,8 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
 
         mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
 
-    with open('state_weights.txt', 'w') as file:
-        file.write(json.dumps(state_weights))
+    with open('state_weights.txt', 'wb') as file:
+        file.write(pickle.dumps(state_weights))
 
     mlflow.log_artifact('state_weights.txt')
     return best_weights, best_loss, ts_fitter
