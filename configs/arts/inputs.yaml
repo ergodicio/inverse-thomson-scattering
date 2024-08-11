@@ -103,7 +103,7 @@ parameters:
       type:
         DLM: null
       ub: -0.5
-      v_res: 0.5
+      v_res: 0.01
       val: []
     m:
       active: false
