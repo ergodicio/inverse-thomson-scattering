@@ -48,7 +48,7 @@ def prepare_data(config: Dict) -> Dict:
             elecData, config["other"]["extraoptions"]["spectype"], axisyE, config["data"]["shotnum"]
         )
         # temp fix for zeros
-        elecData = elecData + 10.0
+        elecData = elecData + 0.1
 
     # load and correct background
     [BGele, BGion] = get_shot_bg(config, axisyE, elecData)
@@ -94,7 +94,7 @@ def prepare_data(config: Dict) -> Dict:
         all_data["i_data"] = all_data["i_amps"] = np.zeros(len(data_res_unit))
         # changed this 8-29-23 not sure how it worked with =0?
         config["other"]["PhysParams"]["noiseI"] = np.zeros(np.shape(bg_res_unit))
-        config["other"]["PhysParams"]["noiseE"] = bg_res_unit
+        config["other"]["PhysParams"]["noiseE"] = config["data"]["bgscaleE"]*bg_res_unit + 0.1
         config["other"]["CCDsize"] = np.shape(data_res_unit)
         config["data"]["lineouts"]["start"] = int(config["data"]["lineouts"]["start"] / ang_res_unit)
         config["data"]["lineouts"]["end"] = int(config["data"]["lineouts"]["end"] / ang_res_unit)
