@@ -170,7 +170,7 @@ def calc_series(config):
                 config["parameters"][species]["m"]["val"]
             )
             config["parameters"][species]["fe"]["val"] = np.log(config["parameters"][species]["fe"]["val"])[None, :]
-    
+
     config["units"] = init_param_norm_and_shift(config)
 
     sas = get_scattering_angles(config)

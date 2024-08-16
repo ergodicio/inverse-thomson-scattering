@@ -42,7 +42,7 @@ class FitModel:
             elif "ion" in config["parameters"][species]["type"].keys():
                 self.num_ions += 1
 
-        print(config["other"]["npts"])
+        print(f"{config['other']['npts']=}")
         self.electron_form_factor = FormFactor(
             config["other"]["lamrangE"],
             npts=config["other"]["npts"],
@@ -81,12 +81,6 @@ class FitModel:
             all_params: The input all_params is returned
 
         """
-
-        # not sure why this is required
-        # for key in self.config["parameters"].keys():
-        #     if key != "fe":
-        #         all_params[key] = jnp.squeeze(all_params[key])
-
         if self.config["parameters"][self.e_species]["m"]["active"]:
             (
                 self.config["parameters"][self.e_species]["fe"]["velocity"],

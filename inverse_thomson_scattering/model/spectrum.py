@@ -75,7 +75,7 @@ class SpectrumCalculator:
 
     def reduce_ATS_to_resunit(self, ThryE, lamAxisE, TSins, batch):
         """
-        Integrate synthetic angularly resolved Thomson spectra over a resolution unit. A resolution unit is 2D with a width in the spectral and angular domains. 
+        Integrate synthetic angularly resolved Thomson spectra over a resolution unit. A resolution unit is 2D with a width in the spectral and angular domains.
 
         Args:
             ThryE: Synthetic angularly resolved spectrum
