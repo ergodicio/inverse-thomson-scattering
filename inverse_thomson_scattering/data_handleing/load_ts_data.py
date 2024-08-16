@@ -42,6 +42,8 @@ def loadData(sNum, sDay, loadspecs):
     file_list = listdir(folder)
     files = [name for name in file_list if str(sNum) in name]
     t0 = [0, 0]
+    print(sNum)
+    print(files)
 
     for fl in files:
         if "epw" in fl or "EPW" in fl:
@@ -99,6 +101,7 @@ def loadData(sNum, sDay, loadspecs):
 
             if specType == "angular":
                 eDat = np.fliplr(eDat)
+                print("found angular data")
             elif specType == "temporal":
                 eDat = perform_warp_correction(eDat)
             elif specType == "imaging":
