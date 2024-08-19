@@ -567,7 +567,17 @@ class TSFitter:
             flattened_grads = np.array(temp_grad)
             return value, flattened_grads
         else:
-            return self._vg_func_(weights, batch)
+            (value, aux), grad = self._vg_func_(weights, batch)
+            jax.debug.print("{x}",x=grad)
+            for species in self.cfg["parameters"].keys():
+                for k, param_dict in self.cfg["parameters"][species].items():
+                    if param_dict["active"]:
+                        scalar = param_dict["gradient_scalar"] if "gradient_scalar" in param_dict else 1.0
+                        grad[species][k] = grad[species][k].at[0,0].multiply(scalar)
+            jax.debug.print("{x}",x=grad)
+            #(value, aux), grad = self._vg_func_(weights, batch)
+            #print(grad)
+            return (value, aux), grad
 
     def h_loss_wrt_params(self, weights, batch):
         return self._h_func_(weights, batch)

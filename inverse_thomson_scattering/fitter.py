@@ -219,7 +219,7 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
     jaxopt_kwargs = dict(
         fun=ts_fitter.vg_loss, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
     )
-    opt = optax.adamw(config["optimizer"]["learning_rate"])
+    opt = optax.adam(config["optimizer"]["learning_rate"])
     solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
 
     weights = ts_fitter.pytree_weights["active"]
