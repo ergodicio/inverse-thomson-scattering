@@ -6,7 +6,7 @@ import copy
 import pickle
 import scipy.optimize as spopt
 
-import jaxopt, mlflow, optax
+import mlflow, optax
 from tqdm import trange
 from jax.flatten_util import ravel_pytree
 
@@ -127,76 +127,78 @@ def _validate_inputs_(config: Dict) -> Dict:
     return config
 
 
-def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, TSFitter]:
-    """
-    Performs angular thomson scattering i.e. ARTEMIS fitting exercise using the SciPy optimizer routines
+# def scipy_angular_loop(config: Dict, all_data: Dict, sa) -> Tuple[Dict, float, TSFitter]:
+#     """
+#     Performs angular thomson scattering i.e. ARTEMIS fitting exercise using the SciPy optimizer routines
 
+
+#     Args:
+#         config:
+#         all_data:
+#         best_weights:
+#         all_weights:
+#         sa:
+
+#     Returns:
+
+#     """
+#     print("Running Angular, setting batch_size to 1")
+#     config["optimizer"]["batch_size"] = 1
+#     batch = {
+#         "e_data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+#         "e_amps": all_data["e_amps"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+#         "i_data": all_data["i_data"],
+#         "i_amps": all_data["i_amps"],
+#         "noise_e": config["other"]["PhysParams"]["noiseE"][
+#             config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+#         ],
+#         "noise_i": config["other"]["PhysParams"]["noiseI"][
+#             config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+#         ],
+#     }
+
+#     ts_fitter = TSFitter(config, sa, batch)
+#     all_weights = {k: [] for k in ts_fitter.pytree_weights["active"].keys()}
+
+#     if config["optimizer"]["num_mins"] > 1:
+#         print(Warning("multiple num mins doesnt work. only running once"))
+#     for i in range(1):
+#         ts_fitter = TSFitter(config, sa, batch)
+#         init_weights = copy.deepcopy(ts_fitter.flattened_weights)
+
+#         res = spopt.minimize(
+#             ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
+#             init_weights,
+#             args=batch,
+#             method=config["optimizer"]["method"],
+#             jac=True if config["optimizer"]["grad_method"] == "AD" else False,
+#             bounds=ts_fitter.bounds,
+#             options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
+#         )
+#         these_weights = ts_fitter.unravel_pytree(res["x"])
+#         for k in all_weights.keys():
+#             all_weights[k].append(these_weights[k])
+
+#     overall_loss = res["fun"]
+
+#     return all_weights, overall_loss, ts_fitter
+
+
+def angular_optax(config, all_data, sa, batch_indices, num_batches):
+    """
+    This performs an fitting routines from the optax packages, different minimizers have different requirements for updating steps
 
     Args:
-        config:
-        all_data:
-        best_weights:
-        all_weights:
-        sa:
+        config: Configuration dictionary build from the input decks
+        all_data: dictionary of the datasets, amplitudes, and backgrounds as constructed by the prepare.py code
+        sa: dictionary of the scattering angles and thier relative weights
+        batch_indices: NA
+        num_batches: NA
 
     Returns:
-
-    """
-    print("Running Angular, setting batch_size to 1")
-    config["optimizer"]["batch_size"] = 1
-    batch = {
-        "e_data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
-        "e_amps": all_data["e_amps"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
-        "i_data": all_data["i_data"],
-        "i_amps": all_data["i_amps"],
-        "noise_e": config["other"]["PhysParams"]["noiseE"][
-            config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
-        ],
-        "noise_i": config["other"]["PhysParams"]["noiseI"][
-            config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
-        ],
-    }
-
-    ts_fitter = TSFitter(config, sa, batch)
-    all_weights = {k: [] for k in ts_fitter.pytree_weights["active"].keys()}
-
-    if config["optimizer"]["num_mins"] > 1:
-        print(Warning("multiple num mins doesnt work. only running once"))
-    for i in range(1):
-        ts_fitter = TSFitter(config, sa, batch)
-        init_weights = copy.deepcopy(ts_fitter.flattened_weights)
-
-        res = spopt.minimize(
-            ts_fitter.vg_loss if config["optimizer"]["grad_method"] == "AD" else ts_fitter.loss,
-            init_weights,
-            args=batch,
-            method=config["optimizer"]["method"],
-            jac=True if config["optimizer"]["grad_method"] == "AD" else False,
-            bounds=ts_fitter.bounds,
-            options={"disp": True, "maxiter": config["optimizer"]["num_epochs"]},
-        )
-        these_weights = ts_fitter.unravel_pytree(res["x"])
-        for k in all_weights.keys():
-            all_weights[k].append(these_weights[k])
-
-    overall_loss = res["fun"]
-
-    return all_weights, overall_loss, ts_fitter
-
-
-def angular_adam(config, all_data, sa, batch_indices, num_batches):
-    """
-    This performs an SGD-like fitting routine. It is different than the SciPy routines primarily because we have to
-    manage the number of iterations manually whereas the SciPy routines have their own convergence/termination process
-
-    Args:
-        config:
-        all_data:
-        sa:
-        batch_indices:
-        num_batches:
-
-    Returns:
+        best_weights: best parameter weights as returned by the minimizer
+        best_loss: best value of the fit metric found by ther minimizer
+        ts_fitter: instance of the TSFitter object used for minimization
 
     """
 
@@ -216,11 +218,12 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
 
     ts_fitter = TSFitter(config, sa, test_batch)
 
-    jaxopt_kwargs = dict(
-        fun=ts_fitter.vg_loss, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
-    )
-    opt = optax.adamw(config["optimizer"]["learning_rate"])
-    solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
+    ######
+    # jaxopt_kwargs = dict(
+    #     fun=ts_fitter.vg_loss, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
+    # )
+    solver = optax.adam(config["optimizer"]["learning_rate"])
+    #solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
 
     weights = ts_fitter.pytree_weights["active"]
     # if previous_weights is None:
@@ -246,7 +249,8 @@ def angular_adam(config, all_data, sa, batch_indices, num_batches):
             np.random.shuffle(batch_indices)
             # tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
         epoch_loss = 0.0
-        weights, opt_state = solver.update(params=weights, state=opt_state, batch=test_batch)
+        (val, aux), grad = ts_fitter.vg_loss(weights, test_batch)
+        weights, opt_state = solver.update(grad=grad, state=opt_state, params=weights)
         epoch_loss += opt_state.value
         pbar.set_description(f"Loss {epoch_loss:.2e}")
 
@@ -438,7 +442,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     print("minimizing")
 
     if "angular" in config["other"]["extraoptions"]["spectype"]:
-        fitted_weights, overall_loss, ts_fitter = angular_adam(config, all_data, sa, batch_indices, num_batches)
+        fitted_weights, overall_loss, ts_fitter = angular_optax(config, all_data, sa, batch_indices, num_batches)
     else:
         fitted_weights, overall_loss, ts_fitter = one_d_loop(config, all_data, sa, batch_indices, num_batches)
 
