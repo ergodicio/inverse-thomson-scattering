@@ -11,7 +11,7 @@ data:
 machine: gpu
 mlflow:
   experiment: inverse-thomson-scattering
-  run: test_against_maxwellian_short_6
+  run: test_against_maxwellian_short_gradscale5
 other:
   PhysParams:
     widIRF:
@@ -81,9 +81,10 @@ parameters:
   species1:
     Te:
       active: true
+      gradient_scalar: 5.0
       lb: 0.01
       ub: 2.0
-      val: 1.0
+      val: 1.1
     fe:
       active: true
       dim: 2
@@ -108,9 +109,10 @@ parameters:
       val: 2.0
     ne:
       active: true
+      gradient_scalar: 5.0
       lb: 0.03
       ub: 2.0
-      val: 0.40
+      val: 0.44
     type:
       active: false
       electron: null
