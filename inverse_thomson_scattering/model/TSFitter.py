@@ -158,17 +158,26 @@ class TSFitter:
                 if param_config["active"]:
                     # if self.cfg["optimizer"]["method"] == "adam":
                     #     these_params[param_name] = 0.5 + 0.5 * jnp.tanh(these_params[param_name])
-                    if param_name != 'fe':
+                    if param_name != "fe":
                         these_params[species][param_name] = (
                             these_params[species][param_name] * self.cfg["units"]["norms"][species][param_name]
                             + self.cfg["units"]["shifts"][species][param_name]
                         )
                     else:
-                        these_params[species][param_name] = (
-                            these_params[species][param_name] * self.cfg["units"]["norms"][species][param_name].reshape(jnp.shape(these_params[species][param_name]))
-                            + self.cfg["units"]["shifts"][species][param_name].reshape(jnp.shape(these_params[species][param_name]))
+                        these_params[species][param_name] = these_params[species][param_name] * self.cfg["units"][
+                            "norms"
+                        ][species][param_name].reshape(jnp.shape(these_params[species][param_name])) + self.cfg[
+                            "units"
+                        ][
+                            "shifts"
+                        ][
+                            species
+                        ][
+                            param_name
+                        ].reshape(
+                            jnp.shape(these_params[species][param_name])
                         )
-                        if self.cfg['parameters'][species]["fe"]["dim"]==1:
+                        if self.cfg["parameters"][species]["fe"]["dim"] == 1:
                             these_params[species]["fe"] = jnp.log(
                                 self.smooth(jnp.exp(these_params[species]["fe"][0]))[None, :]
                             )
@@ -436,7 +445,7 @@ class TSFitter:
             # needs to be fixed
             # momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
             momentum_loss = 0.0
-            #print(temperature_loss)
+            # print(temperature_loss)
         return density_loss, temperature_loss, momentum_loss
 
     def calc_other_losses(self, params):
@@ -480,7 +489,7 @@ class TSFitter:
         param_penalty = 0.0
         for species in weights.keys():
             for k in weights[species].keys():
-                param_penalty += jnp.maximum(0.0, jnp.log(jnp.abs(weights[species][k]-0.5)+0.5))
+                param_penalty += jnp.maximum(0.0, jnp.log(jnp.abs(weights[species][k] - 0.5) + 0.5))
         ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
         i_error, e_error = self.calc_ei_error(
             batch,
@@ -498,7 +507,14 @@ class TSFitter:
         normed_e_data = normed_batch["e_data"]
         ion_error = self.cfg["data"]["ion_loss_scale"] * i_error
 
-        total_loss = ion_error + e_error + density_loss + temperature_loss + momentum_loss + jnp.sum(jnp.nan_to_num(param_penalty))
+        total_loss = (
+            ion_error
+            + e_error
+            + density_loss
+            + temperature_loss
+            + momentum_loss
+            + jnp.sum(jnp.nan_to_num(param_penalty))
+        )
         return total_loss, [ThryE, normed_e_data, params]
 
     def _get_normed_batch_(self, batch: Dict):
@@ -633,13 +649,14 @@ def init_weights_and_bounds(config, num_slices):
                     [1.0 + 0 * config["units"]["ub"][species][k] for _ in range(num_slices)]
                 )
 
-                if k!= "fe":
+                if k != "fe":
                     iw[active_or_inactive][species][k] = (
                         iw[active_or_inactive][species][k] - config["units"]["shifts"][species][k]
                     ) / config["units"]["norms"][species][k]
                 else:
                     iw[active_or_inactive][species][k] = (
-                        iw[active_or_inactive][species][k] - config["units"]["shifts"][species][k].reshape(jnp.shape(iw[active_or_inactive][species][k]))
+                        iw[active_or_inactive][species][k]
+                        - config["units"]["shifts"][species][k].reshape(jnp.shape(iw[active_or_inactive][species][k]))
                     ) / config["units"]["norms"][species][k].reshape(jnp.shape(iw[active_or_inactive][species][k]))
 
     return lb, ub, iw
