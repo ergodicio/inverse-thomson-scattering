@@ -217,51 +217,31 @@ def angular_optax(config, all_data, sa, batch_indices, num_batches):
     }
 
     ts_fitter = TSFitter(config, sa, test_batch)
-
-    ######
-    # jaxopt_kwargs = dict(
-    #     fun=ts_fitter.vg_loss, maxiter=config["optimizer"]["num_epochs"], value_and_grad=True, has_aux=True
-    # )
-    solver = optax.adam(config["optimizer"]["learning_rate"])
-    #solver = jaxopt.OptaxSolver(opt=opt, **jaxopt_kwargs)
+    minimizer = getattr(optax, config["optimizer"]["method"])
+    solver = minimizer(config["optimizer"]["learning_rate"])
 
     weights = ts_fitter.pytree_weights["active"]
-    # if previous_weights is None:
-    #     init_weights = ts_fitter.pytree_weights["active"]
-    # else:
-    #     init_weights = previous_weights
-
-    # if "sequential" in config["optimizer"]:
-    #     if config["optimizer"]["sequential"]:
-    #         if previous_weights is not None:
-    #             init_weights = previous_weights
-    opt_state = solver.init_state(weights, batch=test_batch)
+    opt_state = solver.init(weights)
 
     # start train loop
     state_weights = {}
     t1 = time.time()
-    # print("minimizing")
-    # mlflow.set_tag("status", "minimizing")
-
-    best_loss = 1e16
+    
     for i_epoch in (pbar := trange(config["optimizer"]["num_epochs"])):
         if config["nn"]["use"]:
             np.random.shuffle(batch_indices)
-            # tbatch.set_description(f"Epoch {i_epoch + 1}, Prev Epoch Loss {epoch_loss:.2e}")
         epoch_loss = 0.0
         (val, aux), grad = ts_fitter.vg_loss(weights, test_batch)
-        weights, opt_state = solver.update(grad=grad, state=opt_state, params=weights)
-        epoch_loss += opt_state.value
+        updates, opt_state = solver.update(grad, opt_state, weights)
+        #print(opt_state)
+        epoch_loss += val
         pbar.set_description(f"Loss {epoch_loss:.2e}")
-
-        # epoch_loss /= num_batches
-        if epoch_loss < best_loss:
-            best_loss = epoch_loss
-            best_weights = weights
+        
+        weights = optax.apply_updates(weights, updates)
         
         if config["optimizer"]["save_state"]:
             if i_epoch % config["optimizer"]["save_state_freq"] == 0:
-                state_weights[i_epoch] = best_weights
+                state_weights[i_epoch] = weights
 
         mlflow.log_metrics({"epoch loss": float(epoch_loss)}, step=i_epoch)
 
@@ -269,7 +249,7 @@ def angular_optax(config, all_data, sa, batch_indices, num_batches):
         file.write(pickle.dumps(state_weights))
 
     mlflow.log_artifact('state_weights.txt')
-    return best_weights, best_loss, ts_fitter
+    return weights, epoch_loss, ts_fitter
 
 def _1d_adam_loop_(
     config: Dict, ts_fitter: TSFitter, previous_weights: np.ndarray, batch: Dict, tbatch

@@ -11,7 +11,7 @@ data:
 machine: gpu
 mlflow:
   experiment: inverse-thomson-scattering
-  run: maxwellian_minimizer_test_adam
+  run: maxwellian_minimizer_test_wgmult_noisysgd_long
 other:
   PhysParams:
     widIRF:
@@ -81,7 +81,7 @@ parameters:
   species1:
     Te:
       active: true
-      gradient_scalar: 1.0
+      gradient_scalar: 10.0
       lb: 0.01
       ub: 2.0
       val: 1.1
@@ -109,7 +109,7 @@ parameters:
       val: 2.0
     ne:
       active: true
-      gradient_scalar: 1.0
+      gradient_scalar: 10.0
       lb: 0.03
       ub: 2.0
       val: 0.44

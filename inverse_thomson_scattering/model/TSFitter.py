@@ -584,13 +584,13 @@ class TSFitter:
             return value, flattened_grads
         else:
             (value, aux), grad = self._vg_func_(weights, batch)
-            jax.debug.print("{x}",x=grad)
+            #jax.debug.print("{x}",x=grad)
             for species in self.cfg["parameters"].keys():
                 for k, param_dict in self.cfg["parameters"][species].items():
                     if param_dict["active"]:
                         scalar = param_dict["gradient_scalar"] if "gradient_scalar" in param_dict else 1.0
                         grad[species][k] = grad[species][k].at[0,0].multiply(scalar)
-            jax.debug.print("{x}",x=grad)
+            #jax.debug.print("{x}",x=grad)
             #(value, aux), grad = self._vg_func_(weights, batch)
             #print(grad)
             return (value, aux), grad
