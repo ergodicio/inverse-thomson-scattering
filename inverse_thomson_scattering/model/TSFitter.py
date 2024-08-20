@@ -417,32 +417,48 @@ class TSFitter:
                 )
             )
         else:
-            density_loss = jnp.mean(
-                jnp.square(
-                    1.0
-                    - trapz(
+            fedens = trapz(
                         trapz(
                             jnp.exp(params[self.e_species]["fe"]), self.cfg["parameters"][self.e_species]["fe"]["v_res"]
                         ),
                         self.cfg["parameters"][self.e_species]["fe"]["v_res"],
                     )
-                )
-            )
-            temperature_loss = jnp.mean(
-                jnp.square(
-                    1.0
-                    - trapz(
+            #jax.debug.print("zero moment = {fedens}", fedens=fedens)
+            density_loss = jnp.mean(jnp.square(1.0-fedens))
+            
+            # density_loss = jnp.mean(
+            #     jnp.square(
+            #         1.0
+            #         - trapz(
+            #             trapz(
+            #                 jnp.exp(params[self.e_species]["fe"]), self.cfg["parameters"][self.e_species]["fe"]["v_res"]
+            #             ),
+            #             self.cfg["parameters"][self.e_species]["fe"]["v_res"],
+            #         )
+            #     )
+            # )
+            second_moment = trapz(
                         trapz(
                             jnp.exp(params[self.e_species]["fe"])
-                            * self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]
-                            * self.cfg["parameters"][self.e_species]["fe"]["velocity"][1],
+                            * (self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]**2
+                            + self.cfg["parameters"][self.e_species]["fe"]["velocity"][1]**2),
                             self.cfg["parameters"][self.e_species]["fe"]["v_res"],
                         ),
                         self.cfg["parameters"][self.e_species]["fe"]["v_res"],
                     )
-                )
-            )
+            #jax.debug.print("second moment = {fedens}", fedens=second_moment)
+            temperature_loss = jnp.mean(jnp.square(1.0- second_moment/2))
             # needs to be fixed
+            first_moment = second_moment = trapz(
+                        trapz(
+                            jnp.exp(params[self.e_species]["fe"])
+                            * (self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]**2
+                            + self.cfg["parameters"][self.e_species]["fe"]["velocity"][1]**2)**(1/2),
+                            self.cfg["parameters"][self.e_species]["fe"]["v_res"],
+                        ),
+                        self.cfg["parameters"][self.e_species]["fe"]["v_res"],
+                    )
+            #jax.debug.print("second moment = {fedens}", fedens=first_moment)
             # momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
             momentum_loss = 0.0
             # print(temperature_loss)
@@ -515,6 +531,11 @@ class TSFitter:
             + momentum_loss
             + jnp.sum(jnp.nan_to_num(param_penalty))
         )
+        # jax.debug.print("e_error= {e_error}", e_error=e_error)
+        # jax.debug.print("ne_loss= {density_loss}", density_loss=density_loss)
+        # jax.debug.print("te_loss= {temperature_loss}", temperature_loss=temperature_loss)
+        # jax.debug.print("momentum loss= {momentum_loss}", momentum_loss=momentum_loss)
+        # jax.debug.print("total loss= {total_loss}", total_loss=total_loss)
         return total_loss, [ThryE, normed_e_data, params]
 
     def _get_normed_batch_(self, batch: Dict):
