@@ -15,12 +15,7 @@ from inverse_thomson_scattering.distribution_functions.dist_functional_forms imp
 
 class TSFitter:
     """
-    This class is responsible for handling the forward pass and using that to create a loss function
-
-    Args:
-            cfg: Configuration dictionary
-            sas: TODO
-            dummy_batch: Dictionary of dummy data
+    This class is responsible for handling the forward pass and using that to create a loss function.
 
     """
 
@@ -28,8 +23,8 @@ class TSFitter:
         """
 
         Args:
-            cfg: Configuration dictionary
-            sas: TODO
+            cfg: Configuration dictionary constructed from the inputs
+            sas: Dictionary containing the scattering angles and thier relative weights
             dummy_batch: Dictionary of dummy data
         """
         self.cfg = cfg
@@ -423,7 +418,7 @@ class TSFitter:
                         ),
                         self.cfg["parameters"][self.e_species]["fe"]["v_res"],
                     )
-            #jax.debug.print("zero moment = {fedens}", fedens=fedens)
+            jax.debug.print("zero moment = {fedens}", fedens=fedens)
             density_loss = jnp.mean(jnp.square(1.0-fedens))
             
             # density_loss = jnp.mean(
@@ -446,7 +441,7 @@ class TSFitter:
                         ),
                         self.cfg["parameters"][self.e_species]["fe"]["v_res"],
                     )
-            #jax.debug.print("second moment = {fedens}", fedens=second_moment)
+            jax.debug.print("second moment = {fedens}", fedens=second_moment)
             temperature_loss = jnp.mean(jnp.square(1.0- second_moment/2))
             # needs to be fixed
             first_moment = second_moment = trapz(
@@ -458,7 +453,7 @@ class TSFitter:
                         ),
                         self.cfg["parameters"][self.e_species]["fe"]["v_res"],
                     )
-            #jax.debug.print("second moment = {fedens}", fedens=first_moment)
+            jax.debug.print("first moment = {fedens}", fedens=first_moment)
             # momentum_loss = jnp.mean(jnp.square(jnp.sum(jnp.exp(params["fe"]) * self.cfg["velocity"] * dv, axis=1)))
             momentum_loss = 0.0
             # print(temperature_loss)
