@@ -26,9 +26,11 @@ def get_final_params(config, best_weights, all_axes, td):
     """
     all_params = {}
     dist = {}
+    fitted_dist = False
     for species in best_weights.keys():
         for k, v in best_weights[species].items():
             if k == "fe":
+                fitted_dist =True
                 dist[k] = v.squeeze()
                 dist["v"] = config["parameters"][species]["fe"]["velocity"]
             else:
@@ -49,11 +51,12 @@ def get_final_params(config, best_weights, all_axes, td):
     final_params.to_csv(os.path.join(td, "csv", "learned_parameters.csv"))
 
     
-    if len(np.shape(dist['fe']))==1:
-        final_dist = pandas.DataFrame({'fe':[l for l in dist['fe']], 'vx':[vx for vx in dist['v']]})
-    elif len(np.shape(dist['fe']))==2:
-        final_dist = pandas.DataFrame({'fe':[l for l in dist['fe']], 'vx':[vx for vx in dist['v'][0]], 'vy':[vy for vy in dist['v'][1]]})
-    final_dist.to_csv(os.path.join(td, "csv", "learned_dist.csv"))
+    if fitted_dist:
+        if len(np.shape(dist['fe']))==1:
+            final_dist = pandas.DataFrame({'fe':[l for l in dist['fe']], 'vx':[vx for vx in dist['v']]})
+        elif len(np.shape(dist['fe']))==2:
+            final_dist = pandas.DataFrame({'fe':[l for l in dist['fe']], 'vx':[vx for vx in dist['v'][0]], 'vy':[vy for vy in dist['v'][1]]})
+        final_dist.to_csv(os.path.join(td, "csv", "learned_dist.csv"))
 
     return all_params | dist
 

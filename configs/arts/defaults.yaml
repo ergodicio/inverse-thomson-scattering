@@ -49,7 +49,7 @@ optimizer:
   grad_scalar: 1.0
   hessian: false
   learning_rate: 0.0001
-  method: noisy_sgd
+  method: sgd
   num_epochs: 500
   num_mins: 1
   parameter_norm: true
