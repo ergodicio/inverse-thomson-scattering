@@ -91,14 +91,14 @@ parameters:
       fe_decrease_strict: false
       lb: -100.0
       length: 64
-      m_asym: 1.0
+      m_asym: 1.5
       m_theta: 0.0
       symmetric: false
-      temp_asym: 1.0
+      temp_asym: 1.5
       type:
         DLM: null
       ub: -0.5
-      v_res: 0.2
+      v_res: 0.05
       val: []
     m:
       active: false

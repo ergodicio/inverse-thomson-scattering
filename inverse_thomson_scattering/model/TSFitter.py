@@ -7,10 +7,11 @@ from jax import numpy as jnp
 
 from jax import jit, value_and_grad
 from jax.flatten_util import ravel_pytree
+from interpax import interp2d
 import numpy as np
 
 from inverse_thomson_scattering.model.spectrum import SpectrumCalculator
-from inverse_thomson_scattering.distribution_functions.dist_functional_forms import trapz
+from inverse_thomson_scattering.distribution_functions.dist_functional_forms import calc_moment, trapz
 
 
 class TSFitter:
@@ -60,19 +61,14 @@ class TSFitter:
 
         ############
 
-        if cfg["optimizer"]["method"] == "adam":
-            lb, ub, init_weights = init_weights_and_bounds(cfg, num_slices=cfg["optimizer"]["batch_size"])
-            self.static_params = init_weights["inactive"]
-            self.pytree_weights = init_weights
 
-        else:
-            lb, ub, init_weights = init_weights_and_bounds(cfg, num_slices=cfg["optimizer"]["batch_size"])
-            self.flattened_weights, self.unravel_pytree = ravel_pytree(init_weights["active"])
-            self.static_params = init_weights["inactive"]
-            self.pytree_weights = init_weights
-            self.lb = lb
-            self.ub = ub
-            self.construct_bounds()
+        lb, ub, init_weights = init_weights_and_bounds(cfg, num_slices=cfg["optimizer"]["batch_size"])
+        self.flattened_weights, self.unravel_pytree = ravel_pytree(init_weights["active"])
+        self.static_params = init_weights["inactive"]
+        self.pytree_weights = init_weights
+        self.lb = lb
+        self.ub = ub
+        self.construct_bounds()
 
         # this needs to be rethought and does not work in all cases
         if cfg["parameters"][self.e_species]["fe"]["active"]:
@@ -137,46 +133,60 @@ class TSFitter:
 
     def weights_to_params(self, input_weights: Dict, return_static_params: bool = True) -> Dict:
         """
-        This function creates the physical parameters used in the TS algorithm from the weights. The input these_params
-        is directly modified.
+        This function creates the physical parameters used in the TS algorithm from the weights. The input input_weights
+        is mapped to these_params causing the input_weights to also be modified.
 
         This could be a 1:1 mapping, or it could be a linear transformation e.g. "normalized" parameters, or it could
         be something else altogether e.g. a neural network
 
         Args:
-            these_params:
-            return_static_params:
+            input_weights: dictionary of weights used or supplied by the minimizer, these are bounded from 0 to 1
+            return_static_params: boolean determining if the static parameters (these not modified during fitting) will 
+            be inculded in the retuned dictionary. This is nessesary for the physics model which requires values for all 
+            parameters.
 
         Returns:
+            these_params: dictionary of the paramters in physics units
 
         """
+        Te_mult=1.0
+        ne_mult=1.0
         these_params = copy.deepcopy(input_weights)
         for species in self.cfg["parameters"].keys():
             for param_name, param_config in self.cfg["parameters"][species].items():
                 if param_name == "type":
                     continue
                 if param_config["active"]:
-                    # if self.cfg["optimizer"]["method"] == "adam":
-                    #     these_params[param_name] = 0.5 + 0.5 * jnp.tanh(these_params[param_name])
                     if param_name != "fe":
                         these_params[species][param_name] = (
                             these_params[species][param_name] * self.cfg["units"]["norms"][species][param_name]
                             + self.cfg["units"]["shifts"][species][param_name]
                         )
                     else:
-                        these_params[species][param_name] = these_params[species][param_name] * self.cfg["units"][
-                            "norms"
-                        ][species][param_name].reshape(jnp.shape(these_params[species][param_name])) + self.cfg[
-                            "units"
-                        ][
-                            "shifts"
-                        ][
-                            species
-                        ][
-                            param_name
-                        ].reshape(
-                            jnp.shape(these_params[species][param_name])
+                        fe_shape = jnp.shape(these_params[species][param_name])
+                        #convert EDF from 01 bounded log units to unbounded log units
+                        these_params[species][param_name] = (
+                            these_params[species][param_name] * self.cfg["units"]["norms"][species][param_name].reshape(fe_shape) 
+                            + self.cfg["units"]["shifts"][species][param_name].reshape(fe_shape)
                         )
+                        #this only works for 2D edfs and will have to be genralized to 1D
+                        #recaclulate the moments of the EDF
+                        renorm = jnp.sqrt(
+                            calc_moment(jnp.exp(these_params[species][param_name]), self.cfg["parameters"][self.e_species]["fe"]["velocity"],2)
+                            / (2*calc_moment(jnp.exp(these_params[species][param_name]), self.cfg["parameters"][self.e_species]["fe"]["velocity"],0)))
+                        Te_mult = renorm**2
+                        h2 = self.cfg["parameters"][self.e_species]["fe"]["v_res"]/renorm
+                        vx2 = jnp.arange(-8/renorm, 8/renorm, h2)
+                        vy2 = jnp.arange(-8/renorm, 8/renorm, h2)
+                        fe_num = interp2d(
+                            self.cfg["parameters"][self.e_species]["fe"]["velocity"][0].flatten(), 
+                            self.cfg["parameters"][self.e_species]["fe"]["velocity"][1].flatten(), 
+                            vx2, vy2, fe_num, extrap=True, method="linear").reshape(
+                                jnp.shape(self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]),order="F")
+                        ne_mult = calc_moment(fe_num,self.cfg["parameters"][self.e_species]["fe"]["velocity"],0)
+                        fe_num = fe_num/ ne_mult
+
+
                         if self.cfg["parameters"][species]["fe"]["dim"] == 1:
                             these_params[species]["fe"] = jnp.log(
                                 self.smooth(jnp.exp(these_params[species]["fe"][0]))[None, :]
@@ -186,6 +196,10 @@ class TSFitter:
                 else:
                     if return_static_params:
                         these_params[species][param_name] = self.static_params[species][param_name]
+
+        #need to confirm this works due to jax imutability
+        these_params[self.e_species]['Te']*=Te_mult
+        these_params[self.e_species]['ne']*=ne_mult
 
         return these_params
 
@@ -451,10 +465,10 @@ class TSFitter:
     def calc_other_losses(self, params):
         if self.cfg["parameters"]["fe"]["fe_decrease_strict"]:
             gradfe = jnp.sign(self.cfg["velocity"][1:]) * jnp.diff(params["fe"].squeeze())
-            vals = jnp.where(gradfe > 0, gradfe, 0).sum()
+            vals = jnp.where(gradfe > 0.0, gradfe, 0.0).sum()
             fe_penalty = jnp.tan(jnp.amin(jnp.array([vals, jnp.pi / 2])))
         else:
-            fe_penalty = 0
+            fe_penalty = 0.0
 
         return fe_penalty
 
@@ -515,6 +529,11 @@ class TSFitter:
             + momentum_loss
             + jnp.sum(jnp.nan_to_num(param_penalty))
         )
+        # jax.debug.print("{e_error}", e_error=e_error)
+        # jax.debug.print("{density_loss}", density_loss=density_loss)
+        # jax.debug.print("{temperature_loss}", temperature_loss=temperature_loss)
+        # jax.debug.print("{momentum_loss}", momentum_loss=momentum_loss)
+        # jax.debug.print("{total_loss}", total_loss=total_loss)
         return total_loss, [ThryE, normed_e_data, params]
 
     def _get_normed_batch_(self, batch: Dict):
