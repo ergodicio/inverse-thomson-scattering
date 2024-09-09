@@ -4,7 +4,7 @@
 #SBATCH -q debug
 #SBATCH -t 0:30:00
 #SBATCH -n 1
-#SBATCH --gpus-per-task=4
+#SBATCH --gpus-per-task=1
 
 export SLURM_CPU_BIND="cores"
 export BASE_TEMPDIR="$PSCRATCH/tmp/"

@@ -103,7 +103,7 @@ def BiDLM(mx, my, tasym, theta, h):
     h2 = h/renorm
     vx2 = jnp.arange(-8/renorm, 8/renorm, h2)
     vy2 = jnp.arange(-8/renorm, 8/renorm, h2)
-    fe_num = interp2d(vx.flatten(), vy.flatten(), vx2, vy2, fe_num, extrap=True, method="linear").reshape(jnp.shape(vx),order="F")
+    fe_num = interp2d(vx.flatten(), vy.flatten(), vx2, vy2, fe_num, extrap=[0, 0], method="linear").reshape(jnp.shape(vx),order="F")
     fe_num = fe_num / calc_moment(fe_num,(vx,vy),0)
     
     return (vx, vy), fe_num
@@ -183,6 +183,8 @@ def calc_moment(f,v,m):
     Returns:
         moment_val: value of the mth moment
     """
+    print(jnp.shape(f))
+    print(jnp.shape(v))
     if len(jnp.shape(f))==1:
         moment_val = trapz(v**m *f, v[1]-v[0])
     elif len(jnp.shape(f))==2:
