@@ -55,7 +55,8 @@ def get_final_params(config, best_weights, all_axes, td):
         if len(np.shape(dist['fe']))==1:
             final_dist = pandas.DataFrame({'fe':[l for l in dist['fe']], 'vx':[vx for vx in dist['v']]})
         elif len(np.shape(dist['fe']))==2:
-            final_dist = pandas.DataFrame({'fe':[l for l in dist['fe']], 'vx':[vx for vx in dist['v'][0]], 'vy':[vy for vy in dist['v'][1]]})
+            final_dist = pandas.DataFrame(data=dist['fe'], columns=dist['v'][0][0], index=dist['v'][0][:,0]) 
+            #final_dist = pandas.DataFrame({'fe':[l for l in dist['fe']], 'vx':[vx for vx in dist['v'][0]], 'vy':[vy for vy in dist['v'][1]]})
         final_dist.to_csv(os.path.join(td, "csv", "learned_dist.csv"))
 
     return all_params | dist

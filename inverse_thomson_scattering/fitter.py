@@ -9,6 +9,7 @@ import scipy.optimize as spopt
 import mlflow, optax
 from tqdm import trange
 from jax.flatten_util import ravel_pytree
+import jaxopt
 
 from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
 from inverse_thomson_scattering.model.TSFitter import TSFitter
@@ -218,7 +219,8 @@ def angular_optax(config, all_data, sa, batch_indices, num_batches):
 
     ts_fitter = TSFitter(config, sa, test_batch)
     minimizer = getattr(optax, config["optimizer"]["method"])
-    solver = minimizer(config["optimizer"]["learning_rate"])
+    schedule = optax.schedules.cosine_decay_schedule(config["optimizer"]["learning_rate"], 10, alpha = 0.00001)
+    solver = minimizer(schedule)
 
     weights = ts_fitter.pytree_weights["active"]
     opt_state = solver.init(weights)
@@ -226,18 +228,32 @@ def angular_optax(config, all_data, sa, batch_indices, num_batches):
     # start train loop
     state_weights = {}
     t1 = time.time()
-    
+    epoch_loss = 0.0
+    best_loss = 100.0
     for i_epoch in (pbar := trange(config["optimizer"]["num_epochs"])):
         if config["nn"]["use"]:
             np.random.shuffle(batch_indices)
-        epoch_loss = 0.0
+        
         (val, aux), grad = ts_fitter.vg_loss(weights, test_batch)
+        #print(f"aux {aux}")
+        #print(f"aux {grad}")
         updates, opt_state = solver.update(grad, opt_state, weights)
         #print(opt_state)
-        epoch_loss += val
+        #print(f"weights preupdate {weights}")
+        #print(f"updates {updates}")
+        
+        epoch_loss = val
+        if epoch_loss < best_loss:
+            print(f"delta loss {best_loss - epoch_loss}")
+            if best_loss - epoch_loss < 0.00000001:
+                print("Minimizer exited due to change in loss < 1e-8")
+                break
+            else:
+                best_loss = epoch_loss
         pbar.set_description(f"Loss {epoch_loss:.2e}")
         
         weights = optax.apply_updates(weights, updates)
+        #print(f"weights post update {weights}")
         
         if config["optimizer"]["save_state"]:
             if i_epoch % config["optimizer"]["save_state_freq"] == 0:

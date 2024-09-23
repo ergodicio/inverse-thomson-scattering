@@ -11,7 +11,7 @@ data:
 machine: gpu
 mlflow:
   experiment: inverse-thomson-scattering
-  run: asym_exact_test_1
+  run: bidlm_minimizer_test_wgmult_rmsprop_longer_hires
 other:
   PhysParams:
     widIRF:
@@ -84,7 +84,7 @@ parameters:
       gradient_scalar: 10.0
       lb: 0.01
       ub: 2.0
-      val: 1.0
+      val: 1.1
     fe:
       active: true
       dim: 2
@@ -94,11 +94,11 @@ parameters:
       m_asym: 1.0
       m_theta: 0.0
       symmetric: false
-      temp_asym: 1.5
+      temp_asym: 1.0
       type:
         DLM: null
       ub: -0.5
-      v_res: 0.2
+      v_res: 0.1
       val: []
     m:
       active: false
@@ -112,7 +112,7 @@ parameters:
       gradient_scalar: 10.0
       lb: 0.03
       ub: 2.0
-      val: 0.4
+      val: 0.44
     type:
       active: false
       electron: null

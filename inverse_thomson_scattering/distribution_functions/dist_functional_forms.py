@@ -101,9 +101,15 @@ def BiDLM(mx, my, tasym, theta, h):
 
     renorm = jnp.sqrt(calc_moment(fe_num,(vx,vy),2)/ (2*calc_moment(fe_num,(vx,vy),0)))#the 2 is to make the moment equal the number of dimensions, not sure on this
     h2 = h/renorm
-    vx2 = jnp.arange(-8/renorm, 8/renorm, h2)
-    vy2 = jnp.arange(-8/renorm, 8/renorm, h2)
-    fe_num = interp2d(vx.flatten(), vy.flatten(), vx2, vy2, fe_num, extrap=[0, 0], method="linear").reshape(jnp.shape(vx),order="F")
+    #vx2 = jnp.arange(-8/renorm, 8/renorm, h2)
+    vx2 = vx[0]/renorm
+    vy2 = vx[0]/renorm
+    #vy2 = jnp.arange(-8/renorm, 8/renorm, h2)
+    print(jnp.shape(fe_num))
+    print(jnp.shape(vx2))
+    print(h2)
+    print(jnp.shape(jnp.log(fe_num)))
+    fe_num = jnp.exp(interp2d(vx.flatten(), vy.flatten(), vx2, vy2, jnp.log(fe_num), extrap=[-100, -100], method="linear").reshape(jnp.shape(vx),order="F"))
     fe_num = fe_num / calc_moment(fe_num,(vx,vy),0)
     
     return (vx, vy), fe_num
@@ -183,8 +189,8 @@ def calc_moment(f,v,m):
     Returns:
         moment_val: value of the mth moment
     """
-    print(jnp.shape(f))
-    print(jnp.shape(v))
+    #print(jnp.shape(f))
+    #print(jnp.shape(v))
     if len(jnp.shape(f))==1:
         moment_val = trapz(v**m *f, v[1]-v[0])
     elif len(jnp.shape(f))==2:
