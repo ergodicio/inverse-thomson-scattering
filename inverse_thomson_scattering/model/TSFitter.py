@@ -166,35 +166,36 @@ class TSFitter:
                             these_params[species][param_name] * self.cfg["units"]["norms"][species][param_name].reshape(fe_shape) 
                             + self.cfg["units"]["shifts"][species][param_name].reshape(fe_shape)
                         )
-                        #jax.debug.print("fe_cur {a}", a=fe_cur)
-                        #this only works for 2D edfs and will have to be genralized to 1D
-                        #recaclulate the moments of the EDF
-                        renorm = jnp.sqrt(
-                            calc_moment(jnp.squeeze(fe_cur), 
-                                        self.cfg["parameters"][self.e_species]["fe"]["velocity"],2)
-                            / (2*calc_moment(jnp.squeeze(fe_cur), 
-                                             self.cfg["parameters"][self.e_species]["fe"]["velocity"],0)))
-                        Te_mult = renorm**2
-                        #h2 = self.cfg["parameters"][self.e_species]["fe"]["v_res"]/renorm
-                        vx2 = self.cfg["parameters"][self.e_species]["fe"]["velocity"][0][0]/renorm
-                        vy2 = self.cfg["parameters"][self.e_species]["fe"]["velocity"][0][0]/renorm
-                        # fe_cur = interp2d(
+                        #commented out the renormalization to see effect on 2D edfs 9/26/24
+                        # #jax.debug.print("fe_cur {a}", a=fe_cur)
+                        # #this only works for 2D edfs and will have to be genralized to 1D
+                        # #recaclulate the moments of the EDF
+                        # renorm = jnp.sqrt(
+                        #     calc_moment(jnp.squeeze(fe_cur), 
+                        #                 self.cfg["parameters"][self.e_species]["fe"]["velocity"],2)
+                        #     / (2*calc_moment(jnp.squeeze(fe_cur), 
+                        #                      self.cfg["parameters"][self.e_species]["fe"]["velocity"],0)))
+                        # Te_mult = renorm**2
+                        # #h2 = self.cfg["parameters"][self.e_species]["fe"]["v_res"]/renorm
+                        # vx2 = self.cfg["parameters"][self.e_species]["fe"]["velocity"][0][0]/renorm
+                        # vy2 = self.cfg["parameters"][self.e_species]["fe"]["velocity"][0][0]/renorm
+                        # # fe_cur = interp2d(
+                        # #     self.cfg["parameters"][self.e_species]["fe"]["velocity"][0].flatten(), 
+                        # #     self.cfg["parameters"][self.e_species]["fe"]["velocity"][1].flatten(), 
+                        # #     vx2, vy2,
+                        # #     jnp.squeeze(fe_cur),
+                        # #     extrap=[0, 0], method="linear").reshape(
+                        # #         jnp.shape(self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]),order="F")
+                        # fe_cur = jnp.exp(interp2d(
                         #     self.cfg["parameters"][self.e_species]["fe"]["velocity"][0].flatten(), 
                         #     self.cfg["parameters"][self.e_species]["fe"]["velocity"][1].flatten(), 
                         #     vx2, vy2,
-                        #     jnp.squeeze(fe_cur),
-                        #     extrap=[0, 0], method="linear").reshape(
-                        #         jnp.shape(self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]),order="F")
-                        fe_cur = jnp.exp(interp2d(
-                            self.cfg["parameters"][self.e_species]["fe"]["velocity"][0].flatten(), 
-                            self.cfg["parameters"][self.e_species]["fe"]["velocity"][1].flatten(), 
-                            vx2, vy2,
-                            jnp.log(jnp.squeeze(fe_cur)),
-                            extrap=[-100, -100], method="linear").reshape(
-                                jnp.shape(self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]),order="F"))
-                        ne_mult = calc_moment(jnp.squeeze(fe_cur),
-                                              self.cfg["parameters"][self.e_species]["fe"]["velocity"],0)
-                        fe_cur = fe_cur/ ne_mult
+                        #     jnp.log(jnp.squeeze(fe_cur)),
+                        #     extrap=[-100, -100], method="linear").reshape(
+                        #         jnp.shape(self.cfg["parameters"][self.e_species]["fe"]["velocity"][0]),order="F"))
+                        # ne_mult = calc_moment(jnp.squeeze(fe_cur),
+                        #                       self.cfg["parameters"][self.e_species]["fe"]["velocity"],0)
+                        # fe_cur = fe_cur/ ne_mult
                         these_params[species][param_name]=jnp.log(fe_cur)
 
 

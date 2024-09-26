@@ -3,7 +3,7 @@ from typing import Dict, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
-import mlflow, tempfile, yaml
+import mlflow, tempfile, yaml, pandas
 import multiprocessing as mp
 import xarray as xr
 from tqdm import tqdm
@@ -275,6 +275,12 @@ def calc_series(config):
                 np.zeros_like(config["parameters"][elec_species]["fe"]["val"]),
                 td,
             )
+            print(np.shape(config["parameters"][elec_species]["fe"]["val"]))
+            if len(np.shape(np.squeeze(config["parameters"][elec_species]["fe"]["val"])))==1:
+                final_dist = pandas.DataFrame({'fe':[l for l in config["parameters"][elec_species]["fe"]["val"]], 'vx':[vx for vx in config["parameters"][elec_species]["fe"]["velocity"]]})
+            elif len(np.shape(np.squeeze(config["parameters"][elec_species]["fe"]["val"])))==2:
+                final_dist = pandas.DataFrame(data=np.squeeze(config["parameters"][elec_species]["fe"]["val"]), columns=config["parameters"][elec_species]["fe"]["velocity"][0][0], index=config["parameters"][elec_species]["fe"]["velocity"][0][:,0]) 
+            final_dist.to_csv(os.path.join(td, "csv", "learned_dist.csv"))
         else:
             if config["parameters"][elec_species]["fe"]["dim"] == 2:
                 plotters.plot_dist(

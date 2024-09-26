@@ -7,6 +7,7 @@ import pickle
 import scipy.optimize as spopt
 
 import mlflow, optax
+from optax import tree_utils as otu 
 from tqdm import trange
 from jax.flatten_util import ravel_pytree
 import jaxopt
@@ -219,8 +220,9 @@ def angular_optax(config, all_data, sa, batch_indices, num_batches):
 
     ts_fitter = TSFitter(config, sa, test_batch)
     minimizer = getattr(optax, config["optimizer"]["method"])
-    schedule = optax.schedules.cosine_decay_schedule(config["optimizer"]["learning_rate"], 10, alpha = 0.00001)
-    solver = minimizer(schedule)
+    #schedule = optax.schedules.cosine_decay_schedule(config["optimizer"]["learning_rate"], 100, alpha = 0.00001)
+    #solver = minimizer(schedule)
+    solver = minimizer(config["optimizer"]["learning_rate"])
 
     weights = ts_fitter.pytree_weights["active"]
     opt_state = solver.init(weights)
@@ -250,7 +252,7 @@ def angular_optax(config, all_data, sa, batch_indices, num_batches):
                 break
             else:
                 best_loss = epoch_loss
-        pbar.set_description(f"Loss {epoch_loss:.2e}")
+        pbar.set_description(f"Loss {epoch_loss:.2e}, Learning rate {otu.tree_get(opt_state, 'scale')}")
         
         weights = optax.apply_updates(weights, updates)
         #print(f"weights post update {weights}")

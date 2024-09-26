@@ -1,17 +1,17 @@
 data:
   background:
-    slice: 10002
+    slice: 10003
     type: Fit
   lineouts:
     end: 950
     skip: 20
     start: 90
     type: range
-  shotnum: 10002
+  shotnum: 10003
 machine: gpu
 mlflow:
   experiment: inverse-thomson-scattering
-  run: bidlm_minimizer_test_wgmult_rmsprop_longer_hires
+  run: bidlm_rot_tests_15_noedfnorm
 other:
   PhysParams:
     widIRF:
