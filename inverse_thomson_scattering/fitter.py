@@ -151,10 +151,10 @@ def _validate_inputs_(config: Dict) -> Dict:
 #         "e_amps": all_data["e_amps"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
 #         "i_data": all_data["i_data"],
 #         "i_amps": all_data["i_amps"],
-#         "noise_e": config["other"]["PhysParams"]["noiseE"][
+#         "noise_e": all_data["noiseE"][
 #             config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
 #         ],
-#         "noise_i": config["other"]["PhysParams"]["noiseI"][
+#         "noise_i": all_data["noiseI"][
 #             config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
 #         ],
 #     }
@@ -205,18 +205,32 @@ def angular_optax(config, all_data, sa, batch_indices, num_batches):
     """
 
     config["optimizer"]["batch_size"] = 1
-    test_batch = {
+    batch1 = {
         "e_data": all_data["e_data"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
         "e_amps": all_data["e_amps"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
         "i_data": all_data["i_data"],
         "i_amps": all_data["i_amps"],
-        "noise_e": config["other"]["PhysParams"]["noiseE"][
+        "noise_e": all_data["noiseE"][
             config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
         ],
-        "noise_i": config["other"]["PhysParams"]["noiseI"][
+        "noise_i": all_data["noiseI"][
             config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
         ],
     }
+    if isinstance(config["data"]["shotnum"],list):
+        batch2 = {
+            "e_data_rot": all_data["e_data_rot"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+            "e_amps_rot": all_data["e_amps_rot"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+            "noise_e_rot": all_data["noiseE_rot"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+            "i_data": all_data["i_data"],
+            "i_amps": all_data["i_amps"],
+            "noise_i": all_data["noiseI"][
+                config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
+            ],
+            }
+        test_batch = {'b1':batch1,'b2':batch2}
+    else:
+        test_batch = batch1
 
     ts_fitter = TSFitter(config, sa, test_batch)
     minimizer = getattr(optax, config["optimizer"]["method"])
@@ -355,8 +369,8 @@ def one_d_loop(
     """
     sample = {k: v[: config["optimizer"]["batch_size"]] for k, v in all_data.items()}
     sample = {
-        "noise_e": config["other"]["PhysParams"]["noiseE"][: config["optimizer"]["batch_size"]],
-        "noise_i": config["other"]["PhysParams"]["noiseI"][: config["optimizer"]["batch_size"]],
+        "noise_e": all_data["noiseE"][: config["optimizer"]["batch_size"]],
+        "noise_i": all_data["noiseI"][: config["optimizer"]["batch_size"]],
     } | sample
     ts_fitter = TSFitter(config, sa, sample)
 
@@ -374,8 +388,8 @@ def one_d_loop(
                 "e_amps": all_data["e_amps"][inds],
                 "i_data": all_data["i_data"][inds],
                 "i_amps": all_data["i_amps"][inds],
-                "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
-                "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
+                "noise_e": all_data["noiseE"][inds],
+                "noise_i": all_data["noiseI"][inds],
             }
 
             if config["optimizer"]["method"] == "adam":  # Stochastic Gradient Descent
@@ -429,7 +443,17 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
     config = _validate_inputs_(config)
 
     # prepare data
-    all_data, sa, all_axes = prepare.prepare_data(config)
+    if isinstance(config["data"]["shotnum"],list):
+        all_data, sa, all_axes = prepare.prepare_data(config, config["data"]["shotnum"][0])
+        all_data2, _, _ = prepare.prepare_data(config, config["data"]["shotnum"][1])
+        all_data.update({'e_data_rot': all_data2['e_data'], 'e_amps_rot': all_data2['e_amps'], 
+                         'rot_angle': config["data"]['shot_rot'], 'noiseE_rot': all_data2['noiseE_rot']})
+        
+        if config["other"]["extraoptions"]["spectype"] != 'angular_full':
+            raise NotImplementedError('Muliplexed data fitting is only availible for angular data')
+    else:
+        all_data, sa, all_axes = prepare.prepare_data(config)
+    
     batch_indices = np.arange(max(len(all_data["e_data"]), len(all_data["i_data"])))
     num_batches = len(batch_indices) // config["optimizer"]["batch_size"] or 1
     mlflow.log_metrics({"setup_time": round(time.time() - t1, 2)})

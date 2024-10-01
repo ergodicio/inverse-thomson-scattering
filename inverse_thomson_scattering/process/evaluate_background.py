@@ -10,7 +10,7 @@ from inverse_thomson_scattering.data_handleing.load_ts_data import loadData
 from inverse_thomson_scattering.process.correct_throughput import correctThroughput
 
 
-def get_shot_bg(config, axisyE, elecData):
+def get_shot_bg(config, shotNum, axisyE, elecData):
     """
     Quantify the background for full images
 
@@ -45,7 +45,7 @@ def get_shot_bg(config, axisyE, elecData):
             config["data"]["background"]["slice"], config["data"]["shotDay"], config["other"]["extraoptions"]
         )
 
-        BGele = correctThroughput(BGele, config["other"]["extraoptions"]["spectype"], axisyE, config["data"]["shotnum"])
+        BGele = correctThroughput(BGele, config["other"]["extraoptions"]["spectype"], axisyE, shotNum)
 
         BGele = conv2(BGele, np.ones([5, 5]) / 25, mode="same")  # 1/27 for H2 and 1/24 for kr
         xx = np.arange(1024)

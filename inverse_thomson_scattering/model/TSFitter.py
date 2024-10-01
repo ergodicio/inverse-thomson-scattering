@@ -12,6 +12,7 @@ import numpy as np
 
 from inverse_thomson_scattering.model.spectrum import SpectrumCalculator
 from inverse_thomson_scattering.distribution_functions.dist_functional_forms import calc_moment, trapz
+from inverse_thomson_scattering.misc.vector_tools import rotate
 
 
 class TSFitter:
@@ -46,6 +47,9 @@ class TSFitter:
         for species in self.cfg["parameters"].keys():
             if "electron" in self.cfg["parameters"][species]["type"].keys():
                 self.e_species = species
+
+        #boolean used to determine if the analyis is performed twice with rotation of the EDF
+        self.multiplex_ang = isinstance(cfg["data"]["shotnum"],list)
 
         self.spec_calc = SpectrumCalculator(cfg, sas, dummy_batch)
 
@@ -537,16 +541,43 @@ class TSFitter:
         for species in weights.keys():
             for k in weights[species].keys():
                 param_penalty += jnp.maximum(0.0, jnp.log(jnp.abs(weights[species][k] - 0.5) + 0.5))
-        ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
-        i_error, e_error = self.calc_ei_error(
-            batch,
-            ThryI,
-            lamAxisI,
-            ThryE,
-            lamAxisE,
-            denom=[jnp.square(self.i_norm), jnp.square(self.e_norm)],
-            reduce_func=jnp.mean,
-        )
+        
+        if self.multiplex_ang:
+            ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch['b1'])
+            params[self.e_species]['fe']=rotate(params[self.e_species]['fe'],self.cfg['data']['shot_rot'])
+            ThryE_rot, _, _, _ = self.spec_calc(params, batch['b2'])
+            i_error1, e_error1 = self.calc_ei_error(
+                batch['b1'],
+                ThryI,
+                lamAxisI,
+                ThryE,
+                lamAxisE,
+                denom=[jnp.square(self.i_norm), jnp.square(self.e_norm)],
+                reduce_func=jnp.mean,
+            )
+            i_error2, e_error2 = self.calc_ei_error(
+                batch['b2'],
+                ThryI,
+                lamAxisI,
+                ThryE_rot,
+                lamAxisE,
+                denom=[jnp.square(self.i_norm), jnp.square(self.e_norm)],
+                reduce_func=jnp.mean,
+            )
+            i_error = i_error1 +i_error2
+            e_error = e_error1 +e_error2
+        else:
+            ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
+
+            i_error, e_error = self.calc_ei_error(
+                batch,
+                ThryI,
+                lamAxisI,
+                ThryE,
+                lamAxisE,
+                denom=[jnp.square(self.i_norm), jnp.square(self.e_norm)],
+                reduce_func=jnp.mean,
+            )
         #density_loss, temperature_loss, momentum_loss = self._moment_loss_(params)
         # other_losses = calc_other_losses(params)
 

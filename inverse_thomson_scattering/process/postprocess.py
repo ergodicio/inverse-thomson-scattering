@@ -65,10 +65,10 @@ def recalculate_with_chosen_weights(
             "e_amps": all_data["e_amps"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
             "i_data": all_data["i_data"],
             "i_amps": all_data["i_amps"],
-            "noise_e": config["other"]["PhysParams"]["noiseE"][
+            "noise_e": all_data["noiseE"][
                 config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
             ],
-            "noise_i": config["other"]["PhysParams"]["noiseI"][
+            "noise_i": all_data["noiseI"][
                 config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :
             ],
         }
@@ -98,8 +98,8 @@ def recalculate_with_chosen_weights(
                 "e_amps": all_data["e_amps"][inds],
                 "i_data": all_data["i_data"][inds],
                 "i_amps": all_data["i_amps"][inds],
-                "noise_e": config["other"]["PhysParams"]["noiseE"][inds],
-                "noise_i": config["other"]["PhysParams"]["noiseI"][inds],
+                "noise_e": all_data["noiseE"][inds],
+                "noise_i": all_data["noiseI"][inds],
             }
 
             loss, sqds, used_points, [ThryE, ThryI, params] = ts_fitter.array_loss(fitted_weights[i_batch], batch)
@@ -227,8 +227,8 @@ def postprocess(config, batch_indices, all_data: Dict, all_axes: Dict, ts_fitter
                 "e_amps": np.reshape(all_data["e_amps"][i], (1, -1)),
                 "i_data": np.reshape(all_data["i_data"][i], (1, -1)),
                 "i_amps": np.reshape(all_data["i_amps"][i], (1, -1)),
-                "noise_e": np.reshape(config["other"]["PhysParams"]["noiseE"][i], (1, -1)),
-                "noise_i": np.reshape(config["other"]["PhysParams"]["noiseI"][i], (1, -1)),
+                "noise_e": np.reshape(all_data["noiseE"][i], (1, -1)),
+                "noise_i": np.reshape(all_data["noiseI"][i], (1, -1)),
             }
 
             # previous_weights = {}

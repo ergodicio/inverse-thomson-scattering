@@ -101,8 +101,8 @@ def get_lineouts(
             axis=1,
         )
 
-    config["other"]["PhysParams"]["noiseI"] = noiseI
-    config["other"]["PhysParams"]["noiseE"] = noiseE
+    all_data["noiseI"] = noiseI
+    all_data["noiseE"] = noiseE
 
     all_data = defaultdict(list)
 

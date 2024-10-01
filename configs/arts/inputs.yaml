@@ -1,13 +1,14 @@
 data:
   background:
-    slice: 10003
+    slice: 10000
     type: Fit
   lineouts:
     end: 950
     skip: 20
     start: 90
     type: range
-  shotnum: 10003
+  shotnum: [10000, 10000]
+  shot_rot: 90.0
 machine: gpu
 mlflow:
   experiment: inverse-thomson-scattering

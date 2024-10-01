@@ -29,11 +29,6 @@ class SpectrumCalculator:
         self.lam = cfg["parameters"]["general"]["lam"]["val"]
 
         if cfg["other"]["extraoptions"]["spectype"] == "angular_full":
-            # if (
-            #     cfg["other"]["extraoptions"]["spectype"] == "angular_full"
-            #     or max(dummy_batch["e_data"].shape[0], dummy_batch["i_data"].shape[0]) <= 1
-            # ):
-            # ATS data can't be vmaped and single lineouts cant be vmapped
             self.vmap_forward_pass = self.forward_pass
             self.vmap_postprocess_thry = self.postprocess_thry
         else:
