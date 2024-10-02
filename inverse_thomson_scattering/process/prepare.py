@@ -100,8 +100,8 @@ def prepare_data(config: Dict, shotNum: int) -> Dict:
         all_data["noiseI"] = np.zeros(np.shape(bg_res_unit))
         all_data['noiseE']=config["data"]["bgscaleE"]*bg_res_unit + 0.1
         config["other"]["CCDsize"] = np.shape(data_res_unit)
-        config["data"]["lineouts"]["start"] = int(config["data"]["lineouts"]["start"] / ang_res_unit)
-        config["data"]["lineouts"]["end"] = int(config["data"]["lineouts"]["end"] / ang_res_unit)
+        #config["data"]["lineouts"]["start"] = int(config["data"]["lineouts"]["start"] / ang_res_unit)
+        #config["data"]["lineouts"]["end"] = int(config["data"]["lineouts"]["end"] / ang_res_unit)
 
     else:
         all_data = get_lineouts(
