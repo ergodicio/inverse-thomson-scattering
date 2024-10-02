@@ -544,7 +544,10 @@ class TSFitter:
         
         if self.multiplex_ang:
             ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch['b1'])
-            params[self.e_species]['fe']=rotate(params[self.e_species]['fe'],self.cfg['data']['shot_rot'])
+            #jax.debug.print("fe size {e_error}", e_error=jnp.shape(params[self.e_species]['fe']))
+            params[self.e_species]['fe']=rotate(jnp.squeeze(params[self.e_species]['fe']),self.cfg['data']['shot_rot']*jnp.pi/180.0)
+            test = rotate(jnp.squeeze(params[self.e_species]['fe']),self.cfg['data']['shot_rot']*jnp.pi/180.0)
+            #jax.debug.print("fe size post rotate {e_error}", e_error=jnp.shape(test))
             ThryE_rot, _, _, _ = self.spec_calc(params, batch['b2'])
             i_error1, e_error1 = self.calc_ei_error(
                 batch['b1'],
@@ -566,6 +569,8 @@ class TSFitter:
             )
             i_error = i_error1 +i_error2
             e_error = e_error1 +e_error2
+            
+            normed_batch = self._get_normed_batch_(batch['b1'])
         else:
             ThryE, ThryI, lamAxisE, lamAxisI = self.spec_calc(params, batch)
 
@@ -578,10 +583,11 @@ class TSFitter:
                 denom=[jnp.square(self.i_norm), jnp.square(self.e_norm)],
                 reduce_func=jnp.mean,
             )
+            
+            normed_batch = self._get_normed_batch_(batch)
         #density_loss, temperature_loss, momentum_loss = self._moment_loss_(params)
         # other_losses = calc_other_losses(params)
 
-        normed_batch = self._get_normed_batch_(batch)
         normed_e_data = normed_batch["e_data"]
         ion_error = self.cfg["data"]["ion_loss_scale"] * i_error
 
