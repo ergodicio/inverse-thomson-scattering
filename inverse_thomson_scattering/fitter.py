@@ -219,9 +219,9 @@ def angular_optax(config, all_data, sa, batch_indices, num_batches):
     }
     if isinstance(config["data"]["shotnum"],list):
         batch2 = {
-            "e_data_rot": all_data["e_data_rot"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
-            "e_amps_rot": all_data["e_amps_rot"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
-            "noise_e_rot": all_data["noiseE_rot"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+            "e_data": all_data["e_data_rot"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+            "e_amps": all_data["e_amps_rot"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
+            "noise_e": all_data["noiseE_rot"][config["data"]["lineouts"]["start"] : config["data"]["lineouts"]["end"], :],
             "i_data": all_data["i_data"],
             "i_amps": all_data["i_amps"],
             "noise_i": all_data["noiseI"][
@@ -232,7 +232,7 @@ def angular_optax(config, all_data, sa, batch_indices, num_batches):
     else:
         test_batch = batch1
 
-    ts_fitter = TSFitter(config, sa, test_batch)
+    ts_fitter = TSFitter(config, sa, batch1)
     minimizer = getattr(optax, config["optimizer"]["method"])
     #schedule = optax.schedules.cosine_decay_schedule(config["optimizer"]["learning_rate"], 100, alpha = 0.00001)
     #solver = minimizer(schedule)
@@ -447,7 +447,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
         all_data, sa, all_axes = prepare.prepare_data(config, config["data"]["shotnum"][0])
         all_data2, _, _ = prepare.prepare_data(config, config["data"]["shotnum"][1])
         all_data.update({'e_data_rot': all_data2['e_data'], 'e_amps_rot': all_data2['e_amps'], 
-                         'rot_angle': config["data"]['shot_rot'], 'noiseE_rot': all_data2['noiseE_rot']})
+                         'rot_angle': config["data"]['shot_rot'], 'noiseE_rot': all_data2['noiseE']})
         
         if config["other"]["extraoptions"]["spectype"] != 'angular_full':
             raise NotImplementedError('Muliplexed data fitting is only availible for angular data')
