@@ -447,7 +447,7 @@ def fit(config) -> Tuple[pd.DataFrame, float]:
         all_data, sa, all_axes = prepare.prepare_data(config, config["data"]["shotnum"][0])
         all_data2, _, _ = prepare.prepare_data(config, config["data"]["shotnum"][1])
         all_data.update({'e_data_rot': all_data2['e_data'], 'e_amps_rot': all_data2['e_amps'], 
-                         'rot_angle': config["data"]['shot_rot'], 'noiseE_rot': all_data2['noiseE_rot']})
+                         'rot_angle': config["data"]['shot_rot'], 'noiseE_rot': all_data2['noiseE']})
         
         if config["other"]["extraoptions"]["spectype"] != 'angular_full':
             raise NotImplementedError('Muliplexed data fitting is only availible for angular data')
