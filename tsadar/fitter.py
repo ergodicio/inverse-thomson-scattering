@@ -9,9 +9,9 @@ import jaxopt, mlflow, optax
 from tqdm import trange
 from jax.flatten_util import ravel_pytree
 
-from inverse_thomson_scattering.distribution_functions.gen_num_dist_func import DistFunc
-from inverse_thomson_scattering.process import prepare, postprocess
-from inverse_thomson_scattering.model.TSFitter import TSFitter
+from tsadar.distribution_functions.gen_num_dist_func import DistFunc
+from tsadar.process import prepare, postprocess
+from tsadar.model.TSFitter import TSFitter
 
 
 def init_param_norm_and_shift(config: Dict) -> Dict:

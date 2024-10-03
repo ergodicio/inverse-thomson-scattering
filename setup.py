@@ -16,7 +16,7 @@ with open(os.path.join(here, "README.md"), encoding="utf-8") as f:
 setup(
     # metadata
     name="tsadar",
-    description="Automatic Differentiation Enabled Thomson Scattering Analysis",
+    description="Thomson Scattering Analysis software",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ergodicio/inverse-thomson-scattering",
@@ -46,5 +46,6 @@ setup(
         "pandas",
         "interpax",
         "tabulate",
+        "psutil",
     ],
 )
