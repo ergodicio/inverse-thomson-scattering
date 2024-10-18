@@ -14,7 +14,10 @@ from tsadar.data_handleing import lam_parse
 from tsadar.misc.vector_tools import vsub, vdot, vdiv
 
 
-BASE_FILES_PATH = os.environ["TS_BASE_FILES_PATH"]
+if "TS_BASE_FILES_PATH" not in os.environ:
+    BASE_FILES_PATH = os.getcwd()
+else:
+    BASE_FILES_PATH = os.environ["TS_BASE_FILES_PATH"]
 
 
 def zprimeMaxw(xi):

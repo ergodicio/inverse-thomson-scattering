@@ -6,7 +6,10 @@ import scipy.io as sio
 from os.path import join
 import os
 
-BASE_FILES_PATH = os.environ["TS_BASE_FILES_PATH"]
+if "TS_BASE_FILES_PATH" not in os.environ:
+    BASE_FILES_PATH = os.getcwd()
+else:
+    BASE_FILES_PATH = os.environ["TS_BASE_FILES_PATH"]
 
 
 def correctThroughput(data, tstype, axisy, shotNum):
