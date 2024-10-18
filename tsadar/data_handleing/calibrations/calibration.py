@@ -6,7 +6,10 @@ import os
 
 from tsadar.data_handleing.calibrations.sa_table import sa_lookup
 
-BASE_FILES_PATH = os.environ["TS_BASE_FILES_PATH"]
+if "TS_BASE_FILES_PATH" not in os.environ:
+    BASE_FILES_PATH = os.getcwd()
+else:
+    BASE_FILES_PATH = os.environ["TS_BASE_FILES_PATH"]
 
 
 def get_calibrations(shotNum, tstype, CCDsize):
