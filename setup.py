@@ -19,15 +19,14 @@ setup(
     description="Thomson Scattering Analysis software",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ergodicio/inverse-thomson-scattering",
+    url="https://github.com/ergodicio/tsadar",
     author="Avi Milder, Archis Joglekar",
     author_email="amild@lle.rochester.edu, archis@ergodic.io",
-    version="0.0.1",
+    version="0.0.2",
     # cmdclass=versioneer.get_cmdclass(),
     packages=find_packages(),
     python_requires=">=3.10",
     install_requires=[
-        "jax[cpu]",
         "numpy",
         "scipy",
         "matplotlib",
@@ -48,4 +47,8 @@ setup(
         "tabulate",
         "psutil",
     ],
+    extras_require={
+        "cpu": ["jax"],
+        "gpu": ["jax[cuda12]"],
+    },
 )
